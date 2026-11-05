@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan for extending the Meridian Works MES data model to a first-class relational hierarchy (1 Master Order -> Multiple GRN Batches -> Multiple Requisitions with M-REQ and A-REQ slips) and adding two-way Gate & Floor Reconciliation directly onto the Super User Dashboard.",
+  "updatedAt": "2026-11-04T11:33:50.199384879Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

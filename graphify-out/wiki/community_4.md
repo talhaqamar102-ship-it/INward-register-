@@ -1,0 +1,33 @@
+# C4: SQLite WAL Database & 17-Table Schema (src/db.js)
+
+Cohesion Score: `0.58` • Total Nodes: 27
+
+## Nodes in Community
+
+- **src/db.js** (`file:src/db.js`) — `src/db.js:L1` (degree: 36)
+- **SQLite Table: cartons** (`table:cartons`) — `src/db.js:L146` (degree: 31)
+- **initDatabase()** (`fn:src/db.js:initDatabase`) — `src/db.js:L17` (degree: 26)
+- **SQLite Table: alterations** (`table:alterations`) — `src/db.js:L134` (degree: 25)
+- **SQLite Table: customers** (`table:customers`) — `src/db.js:L35` (degree: 24)
+- **SQLite Table: products** (`table:products`) — `src/db.js:L44` (degree: 21)
+- **SQLite Table: packing_wip** (`table:packing_wip`) — `src/db.js:L87` (degree: 18)
+- **SQLite Table: glove_requisitions** (`table:glove_requisitions`) — `src/db.js:L74` (degree: 15)
+- **SQLite Table: pending_orders** (`table:pending_orders`) — `src/db.js:L251` (degree: 11)
+- **SQLite Table: store_receivings** (`table:store_receivings`) — `src/db.js:L172` (degree: 10)
+- **SQLite Table: store_materials_inventory** (`table:store_materials_inventory`) — `src/db.js:L65` (degree: 8)
+- **SQLite Table: material_requisitions** (`table:material_requisitions`) — `src/db.js:L121` (degree: 8)
+- **SQLite Table: store_gloves_inventory** (`table:store_gloves_inventory`) — `src/db.js:L56` (degree: 7)
+- **migrateDatabase()** (`fn:src/db.js:migrateDatabase`) — `src/db.js:L336` (degree: 7)
+- **SQLite Table: final_inspections** (`table:final_inspections`) — `src/db.js:L157` (degree: 6)
+- **seedInitialData()** (`fn:src/db.js:seedInitialData`) — `src/db.js:L452` (degree: 6)
+- **SQLite Table: receiving_size_breakdowns** (`table:receiving_size_breakdowns`) — `src/db.js:L192` (degree: 5)
+- **SQLite Table: product_packaging_bom** (`table:product_packaging_bom`) — `src/db.js:L202` (degree: 5)
+- **SQLite Table: scrap_ledger** (`table:scrap_ledger`) — `src/db.js:L213` (degree: 5)
+- **SQLite Table: material_return_vouchers** (`table:material_return_vouchers`) — `src/db.js:L241` (degree: 5)
+- **seedPackagingBOM()** (`fn:src/db.js:seedPackagingBOM`) — `src/db.js:L546` (degree: 5)
+- **SQLite Table: grn_req_allocations** (`table:grn_req_allocations`) — `src/db.js:L273` (degree: 4)
+- **SQLite Table: export_shipments** (`table:export_shipments`) — `src/db.js:L225` (degree: 3)
+- **SQLite Table: audit_trail** (`table:audit_trail`) — `src/db.js:L285` (degree: 3)
+- **seedDemoSheet()** (`fn:src/db.js:seedDemoSheet`) — `src/db.js:L512` (degree: 3)
+- **seedSizeBreakdowns()** (`fn:src/db.js:seedSizeBreakdowns`) — `src/db.js:L572` (degree: 3)
+- **backupDatabase()** (`fn:src/db.js:backupDatabase`) — `src/db.js:L594` (degree: 2)

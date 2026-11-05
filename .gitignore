@@ -1,0 +1,18 @@
+node_modules/
+build/
+dist/
+data/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# dev-team runtime artifacts
+.claude/memory/
+.claude/plans/
+.claude/metrics/
+.dev-team-reports/
+
+# vendored upstream checkout of bdfinst/agentic-dev-team (install separately)
+.agentic-dev-team/

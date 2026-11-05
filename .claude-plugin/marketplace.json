@@ -1,0 +1,23 @@
+{
+  "name": "meridian-works-mes",
+  "owner": {
+    "name": "Meridian Works"
+  },
+  "metadata": {
+    "description": "Packing & cobalting MES with the bdfinst/agentic-dev-team plugin vendored at .agentic-dev-team/"
+  },
+  "plugins": [
+    {
+      "name": "dev-team",
+      "version": "14.0.1",
+      "description": "Persona-driven AI development team (vendored from bdfinst/agentic-dev-team plugins/dev-team)",
+      "source": {
+        "source": "local",
+        "path": ".agentic-dev-team/plugins/dev-team"
+      },
+      "license": "MIT",
+      "homepage": "https://github.com/bdfinst/agentic-dev-team",
+      "repository": "https://github.com/bdfinst/agentic-dev-team"
+    }
+  ]
+}

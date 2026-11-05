@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Factory ERP & QA Portal</title>
+    <meta name="description" content="Lightweight Vanilla HTML5/CSS/JavaScript manufacturing execution system and quality assurance portal for Meridian Works." />
+    <meta property="og:title" content="Factory ERP & QA Portal" />
+    <meta property="og:description" content="Lightweight Vanilla HTML5/CSS/JavaScript manufacturing execution system and quality assurance portal for Meridian Works." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <script>
+      // Ignore HMR and WebSocket errors in preview environment per system constraints
+      window.addEventListener('error', function(e) {
+        if (e && (e.message?.includes('WebSocket') || e.message?.includes('createWebSocketModuleRunnerTransport') || e.filename?.includes('@vite/client'))) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(e) {
+        const str = String(e.reason || '');
+        if (str.includes('WebSocket') || str.includes('createWebSocketModuleRunnerTransport')) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+

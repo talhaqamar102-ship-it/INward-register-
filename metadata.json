@@ -1,0 +1,8 @@
+{
+  "name": "Remix new-WIP",
+  "description": "Imported from GitHub: talhaqamar102-ship-it/new-WIP",
+  "requestFramePermissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

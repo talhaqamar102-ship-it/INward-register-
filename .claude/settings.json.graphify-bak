@@ -1,0 +1,346 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "Read",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "Agent",
+      "NotebookEdit",
+      "mcp__*"
+    ],
+    "deny": [
+      "Bash(rm *)",
+      "Bash(git push *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/pending_review_notify.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/repo_review_nudge.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/mcp_json_repowise_nudge.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/codegraph_bootstrap.py"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/autocompact_setup_nudge.py"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/post_compact_state_reinject.py"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/telemetry.py"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/pre_tool_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/contract_version_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/refactor_test_freeze_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/boundary_events_write_guard.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/verify_guard_edit_marker.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/destructive_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/refactor_test_bash_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/pre_pr_review.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/internal_double_gate.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/pre_commit_knowledge_index.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/telemetry.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/verify_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/bash_retry_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/stryker_xunit_shim_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/mutation_testing_smoke_gate.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/scan_bash_command_for_banned_scripts.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/boundary_events_write_guard.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/telemetry.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/code_intelligence_nudge.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/code_intelligence_nudge.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/code_intelligence_nudge.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/agent_dispatch_ledger.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/checkpoint_dispatch_instrument.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/subagent_skill_context.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/js_fp_review.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/token_efficiency_review.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/eval_compliance_check.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/tdd_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/knowledge_index.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/skills_index.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/mutation_gate.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/refactor_test_revert_guard.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/version_check.py"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__codegraph__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/code_intelligence_turn_mark.py"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__plugin_repowise_repowise__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/code_intelligence_turn_mark.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/phase_marker.py"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/scan_worktree_for_banned_scripts.py"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/session_learning_trigger.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/cost_meter.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/task_completion_metrics.py"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/cost_meter.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/task_completion_metrics.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/subagent_completion_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "sh .agentic-dev-team/plugins/dev-team/hooks/py.sh .agentic-dev-team/plugins/dev-team/hooks/review_verdict_recorder.py"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meridian Works — Gloves Packing Execution System (MES)</title>
+  <link rel="stylesheet" href="styles.css?v=20261031_hardened">
+  <style>
+    /* Absolute Executive White Theme Guarantee */
+    html, body {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .modal-card {
+      background: #ffffff;
+      border-radius: 6px;
+      width: 90%;
+      max-width: 650px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+    .pipeline-stage-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 12px 14px;
+      flex: 1;
+      min-width: 175px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .pipeline-stage-header {
+      font-size: 11px;
+      font-weight: 800;
+      color: #1e293b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 4px;
+    }
+    .pipeline-stage-metric {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #475569;
+    }
+    .pipeline-stage-metric strong {
+      color: #0f172a;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .nav-tab-active {
+      background: #2563eb !important;
+      color: #ffffff !important;
+      font-weight: 700 !important;
+      border-color: #1d4ed8 !important;
+    }
+    .nav-tab-inactive {
+      background: #ffffff !important;
+      color: #334155 !important;
+      border: 1px solid #cbd5e1 !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- ========================================================
+       1. TOP EXECUTIVE NAVY ENTERPRISE HEADER
+       ======================================================== -->
+  <header class="erp-topbar">
+    <div class="erp-topbar-left">
+      <div class="erp-brand-title">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14.93V17a1 1 0 11-2 0v-.07A7.003 7.003 0 015.07 11H5a1 1 0 010-2h.07A7.003 7.003 0 0111 5.07V5a1 1 0 112 0v.07A7.003 7.003 0 0118.93 11H19a1 1 0 110 2h-.07A7.003 7.003 0 0113 16.93zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+        <span class="erp-brand-name">MERIDIAN WORKS</span>
+        <span class="erp-module-divider">|</span>
+        <span class="erp-module-name" id="erpMainTitle">Enterprise MES &amp; Materials Management Portal</span>
+      </div>
+    </div>
+    <div class="erp-topbar-right">
+      <span class="erp-station-badge" id="stationBadge">Enterprise Master Hub</span>
+      <span class="erp-system-date">System Date: 31-10-2026</span>
+      <a href="store.html" class="erp-btn-secondary" style="padding: 4px 10px; font-size: 11.5px; text-decoration: none;" target="_blank">Store Register ↗</a>
+      <a href="packing.html" class="erp-btn-primary" style="padding: 4px 10px; font-size: 11.5px; text-decoration: none;" target="_blank">Packing Hall ↗</a>
+      <div class="erp-user-avatar">HI</div>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       2. ENTERPRISE MODULE NAVIGATION TABS
+       ======================================================== -->
+  <nav style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 8px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <button id="tabNavReceiving" class="erp-btn-primary nav-tab-active" style="padding: 6px 14px; font-size: 12px;" onclick="switchHubView('receiving')">
+        📥 Inward Receiving (Dock #1)
+      </button>
+      <button id="tabNavPacking" class="erp-btn-secondary nav-tab-inactive" style="padding: 6px 14px; font-size: 12px;" onclick="switchHubView('packing')">
+        🏭 Packing Hall (5-Stage WIP)
+      </button>
+      <button id="tabNavAlterations" class="erp-btn-secondary nav-tab-inactive" style="padding: 6px 14px; font-size: 12px;" onclick="switchHubView('alterations')">
+        🛠️ Alteration / Repair Bay
+      </button>
+      <button id="tabNavQC" class="erp-btn-secondary nav-tab-inactive" style="padding: 6px 14px; font-size: 12px;" onclick="switchHubView('qc')">
+        🔬 Final QC &amp; Cartons
+      </button>
+      <button id="tabNavInventory" class="erp-btn-secondary nav-tab-inactive" style="padding: 6px 14px; font-size: 12px;" onclick="switchHubView('inventory')">
+        📦 Dual Store &amp; Requisitions
+      </button>
+    </div>
+    <div style="font-size: 11.5px; color: #64748b; display: flex; align-items: center; gap: 12px;">
+      <span>DB Engine: <strong style="color: #059669;">SQLite WAL Active</strong></span>
+      <span>Live Port: <strong style="color: #0f172a;">3050</strong></span>
+    </div>
+  </nav>
+
+  <main style="padding: 16px 24px; max-width: 1600px; margin: 0 auto;">
+
+    <!-- ========================================================
+         VIEW 1: INWARD RECEIVING REGISTER (DOCK #1)
+         ======================================================== -->
+    <section id="viewReceiving">
+      <!-- HORIZONTAL ENTRY RIBBON -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 14px 18px; margin-bottom: 16px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+          <div class="erp-field" style="flex: 1.5; min-width: 170px;">
+            <label>Maker / Contractor</label>
+            <select id="hubRcvMaker" class="urdu-text" onchange="onMakerChanged('hub')">
+              <option value="">-- Choose Maker --</option>
+            </select>
+          </div>
+
+          <div class="erp-field" style="flex: 1; min-width: 130px;">
+            <label>Customer</label>
+            <select id="hubRcvCustomer">
+              <option value="">-- Choose Customer --</option>
+            </select>
+          </div>
+
+          <div class="erp-field" style="flex: 0.9; min-width: 110px;">
+            <label>PO Number</label>
+            <input type="text" id="hubRcvPO" list="hubPoListOptions" placeholder="e.g. 27347" />
+            <datalist id="hubPoListOptions"></datalist>
+          </div>
+
+          <div class="erp-field" style="flex: 1.3; min-width: 150px;">
+            <label>Article</label>
+            <select id="hubRcvArticle">
+              <option value="">-- Choose Article --</option>
+            </select>
+          </div>
+
+          <div class="erp-field" style="width: 100px;">
+            <label>Order Qty</label>
+            <input type="number" id="hubRcvOrderQty" placeholder="3090" oninput="calculateBalance('hub')" />
+          </div>
+
+          <div class="erp-field" style="width: 100px;">
+            <label>Rcvd Pairs</label>
+            <input type="number" id="hubRcvPairs" placeholder="942" oninput="calculateBalance('hub')" />
+          </div>
+
+          <div class="erp-field" style="width: 90px;">
+            <label>Balance</label>
+            <input type="text" id="hubRcvBalance" class="readonly-field" readonly value="-" />
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="erp-btn-primary" onclick="submitStoreReceiving('hub')">Post Goods Receipt (GRN)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INWARD RECEIVING TABLE -->
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 24px;">
+        <div style="padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <strong style="font-size: 13px; color: #0f172a;">Store Register — Contractor Shipment Receiving Sheet (Dock #1)</strong>
+            <span class="erp-tag erp-tag-complete">Live Ledger</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="hubSearchReceivings" placeholder="Filter PO / Article..." style="padding: 4px 10px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;" oninput="onReceivingsFilterChanged()" />
+            <button class="erp-btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="openPrintReceivingModal()">🖨️ Print Sheet</button>
+          </div>
+        </div>
+
+        <table class="erp-table">
+          <thead>
+            <tr>
+              <th style="width: 45px; text-align: center;">SR #</th>
+              <th>Date</th>
+              <th>Maker / Contractor</th>
+              <th>Customer</th>
+              <th>PO Number</th>
+              <th>Article</th>
+              <th style="text-align: right;">Order Qty</th>
+              <th style="text-align: right;">Rcvd Pairs</th>
+              <th style="text-align: right;">Balance</th>
+              <th style="text-align: center;">Status</th>
+              <th style="text-align: center;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="hubReceivingsTableBody">
+            <tr><td colspan="11" style="text-align: center; color: #64748b; padding: 16px;">Loading Goods Receipts...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 2: PACKING HALL & 5-STAGE WIP (PICTURE 2)
+         ======================================================== -->
+    <section id="viewPacking" style="display: none;">
+      <!-- ACTIVE ORDER TOOLBAR -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 12px 18px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <div class="erp-field" style="min-width: 220px;">
+              <label>Active Requisition / Lot</label>
+              <select id="batchSelect" style="font-weight: 700; color: #2563eb;" onchange="onBatchSelectChanged()">
+                <option value="">-- Choose Requisition --</option>
+              </select>
+            </div>
+            <div class="erp-field"><label>Buyer</label><div id="dispBuyer" style="font-size: 13px; font-weight: 700; color: #0f172a; padding: 7px 0;">Northwind</div></div>
+            <div class="erp-field"><label>PO Number</label><div id="dispPO" style="font-size: 13px; font-weight: 700; color: #0f172a; padding: 7px 0;">27347</div></div>
+            <div class="erp-field"><label>Article</label><div id="dispArticle" style="font-size: 13px; font-weight: 700; color: #0f172a; padding: 7px 0;">Model A9 Stealth Black</div></div>
+            <div class="erp-field"><label>Planned Demand</label><div id="dispPlannedQty" style="font-size: 13px; font-weight: 700; color: #0f172a; padding: 7px 0;">3,090 Pairs</div></div>
+            <div class="erp-field"><label>Issued WIP Batch</label><div id="dispWipBatch" style="font-size: 13px; font-weight: 700; color: #2563eb; padding: 7px 0;">942 Pairs</div></div>
+          </div>
+          <button class="erp-btn-primary" onclick="openNewReqModal()">+ New Requisition</button>
+        </div>
+      </div>
+
+      <!-- 5-STAGE PIPELINE CARDS -->
+      <div style="margin-bottom: 20px;">
+        <h3 style="font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px;">
+          5-Stage WIP Floor Process Pipeline
+        </h3>
+        <div style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px;">
+          <!-- Stage 1 -->
+          <div class="pipeline-stage-card">
+            <div>
+              <div class="pipeline-stage-header">STAGE 1: Checking / Inspection</div>
+              <div class="pipeline-stage-metric"><span>In Stage:</span> <strong id="stg1In">942</strong></div>
+              <div class="pipeline-stage-metric"><span>Passed:</span> <strong id="stg1Passed" style="color: #047857;">920</strong></div>
+              <div class="pipeline-stage-metric"><span>Defects to Repair:</span> <strong id="stg1Defects" style="color: #dc2626;">22</strong></div>
+            </div>
+            <button class="erp-btn-primary" style="margin-top: 10px; width: 100%; font-size: 12px;" onclick="openStepModal('step1')">Process Checking &rarr;</button>
+          </div>
+
+          <!-- Stage 2 -->
+          <div class="pipeline-stage-card">
+            <div>
+              <div class="pipeline-stage-header">STAGE 2: Ironing &amp; Brushing</div>
+              <div class="pipeline-stage-metric"><span>In Stage:</span> <strong id="stg2In">920</strong></div>
+              <div class="pipeline-stage-metric"><span>Passed:</span> <strong id="stg2Passed" style="color: #047857;">910</strong></div>
+              <div class="pipeline-stage-metric"><span>Defects to Repair:</span> <strong id="stg2Defects" style="color: #dc2626;">10</strong></div>
+            </div>
+            <button class="erp-btn-primary" style="margin-top: 10px; width: 100%; font-size: 12px;" onclick="openStepModal('step2')">Process Ironing &rarr;</button>
+          </div>
+
+          <!-- Stage 3 -->
+          <div class="pipeline-stage-card">
+            <div>
+              <div class="pipeline-stage-header">STAGE 3: Pair Matching</div>
+              <div class="pipeline-stage-metric"><span>In Stage:</span> <strong id="stg3In">910</strong></div>
+              <div class="pipeline-stage-metric"><span>Matched:</span> <strong id="stg3Passed" style="color: #047857;">910 Pairs</strong></div>
+              <div class="pipeline-stage-metric"><span>Mismatches:</span> <strong id="stg3Defects" style="color: #dc2626;">0</strong></div>
+            </div>
+            <button class="erp-btn-primary" style="margin-top: 10px; width: 100%; font-size: 12px;" onclick="openStepModal('step3')">Process Matching &rarr;</button>
+          </div>
+
+          <!-- Material Handoff -->
+          <div class="pipeline-stage-card" style="border-color: #cbd5e1; background: #fffdf5;">
+            <div>
+              <div class="pipeline-stage-header" style="color: #92400e;">PACKAGING ACCESSORIES (MREQ)</div>
+              <div class="pipeline-stage-metric"><span>MREQ Ref:</span> <strong id="dispMReqNo">MREQ-2026-0018</strong></div>
+              <div class="pipeline-stage-metric"><span>Ordered Qty:</span> <strong id="dispMReqQty">910 Sets</strong></div>
+              <div class="pipeline-stage-metric"><span>BOM Deductions:</span> <strong style="color: #047857;">Poly, Silica, Tag</strong></div>
+            </div>
+            <button class="erp-btn-secondary" style="margin-top: 10px; width: 100%; font-size: 12px;" onclick="generateMaterialReq()">Request BOM Accessories &rarr;</button>
+          </div>
+
+          <!-- Stage 4 -->
+          <div class="pipeline-stage-card">
+            <div>
+              <div class="pipeline-stage-header">STAGE 4: 1st Packing (Accessories)</div>
+              <div class="pipeline-stage-metric"><span>Matched Pairs:</span> <strong id="stg4In">910</strong></div>
+              <div class="pipeline-stage-metric"><span>Packaged Pairs:</span> <strong id="stg4Passed" style="color: #047857;">910</strong></div>
+              <div class="pipeline-stage-metric"><span>Pending:</span> <strong id="stg4Pending">0</strong></div>
+            </div>
+            <button class="erp-btn-primary" style="margin-top: 10px; width: 100%; font-size: 12px;" onclick="openStep4Modal()">Record 1st Packing &rarr;</button>
+          </div>
+
+          <!-- Stage 5 -->
+          <div class="pipeline-stage-card">
+            <div>
+              <div class="pipeline-stage-header">STAGE 5: 2nd Packing (Cartons)</div>
+              <div class="pipeline-stage-metric"><span>Output:</span> <strong id="stg5Cartons">30 Cartons (900 Prs)</strong></div>
+              <div class="pipeline-stage-metric"><span>Loose Units:</span> <strong id="stg5Loose">10 Pairs</strong></div>
+              <div class="pipeline-stage-metric"><span>Carton Spec:</span> <strong>30 Prs / 5-Ply</strong></div>
+            </div>
+            <button class="erp-btn-primary" style="margin-top: 10px; width: 100%; font-size: 12px;" onclick="openStep5Modal()">Pack Cartons &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 3: CLOSED-LOOP ALTERATION BAY (PICTURE 3)
+         ======================================================== -->
+    <section id="viewAlterations" style="display: none;">
+      <div class="erp-rule-banner" style="margin-bottom: 16px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>MANDATORY QUALITY POLICY: Repaired pairs must STRICTLY return to Step 1 Checking for 100% full re-inspection. Units exceeding 2 rework cycles auto-condemn to Scrap.</span>
+      </div>
+
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 24px;">
+        <div style="padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+          <strong style="font-size: 13px; color: #0f172a;">Active Alteration &amp; Repair Bay Ledger</strong>
+          <span class="erp-tag erp-tag-partial">Closed-Loop Enforcement</span>
+        </div>
+        <table class="erp-table">
+          <thead>
+            <tr>
+              <th>Defect ID</th>
+              <th>Source Stage</th>
+              <th>Defect Reason</th>
+              <th style="text-align: right;">Pairs</th>
+              <th>Routing Rule</th>
+              <th style="text-align: center;">Status</th>
+              <th style="text-align: center;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="alterationLoopBody">
+            <tr><td colspan="7" style="text-align: center; color: #64748b; padding: 14px;">Zero open alterations. 100% first-pass quality!</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 4: FINAL QC & MASTER CARTONS (PICTURE 4)
+         ======================================================== -->
+    <section id="viewQC" style="display: none;">
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 24px;">
+        <div style="padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+          <strong style="font-size: 13px; color: #0f172a;">Master Carton Packing Manifest (AQL 1.5 Sampling Passed)</strong>
+          <button class="erp-btn-primary" style="padding: 4px 12px; font-size: 12px;" onclick="openFinalQCModal()">Run AQL Audit</button>
+        </div>
+        <table class="erp-table">
+          <thead>
+            <tr>
+              <th>Carton #</th>
+              <th style="text-align: right;">Pairs</th>
+              <th style="text-align: right;">Gross Wt</th>
+              <th style="text-align: center;">QC Status</th>
+              <th style="text-align: center;">Export Ready</th>
+            </tr>
+          </thead>
+          <tbody id="cartonManifestBody">
+            <tr><td colspan="5" style="text-align: center; color: #64748b; padding: 14px;">No boxed cartons generated yet. Complete Step 5 to populate manifest.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         VIEW 5: DUAL STORE & REQUISITIONS (PICTURE 5)
+         ======================================================== -->
+    <section id="viewInventory" style="display: none;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+        <!-- Glove Inventory -->
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden;">
+          <div style="padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 700;">
+            🧤 Raw Glove Store Inventory
+          </div>
+          <table class="erp-table">
+            <thead>
+              <tr><th>Article Code</th><th>Customer</th><th style="text-align: right;">Available Pairs</th></tr>
+            </thead>
+            <tbody id="hubGloveStockTableBody">
+              <tr><td colspan="3" style="text-align: center; color: #64748b; padding: 12px;">Loading glove stocks...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Material Inventory -->
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden;">
+          <div style="padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 700;">
+            📦 Packaging Materials Inventory
+          </div>
+          <table class="erp-table">
+            <thead>
+              <tr><th>Material Code</th><th>Description</th><th style="text-align: right;">Qty</th><th>Unit</th></tr>
+            </thead>
+            <tbody id="hubMaterialStockTableBody">
+              <tr><td colspan="4" style="text-align: center; color: #64748b; padding: 12px;">Loading accessory stocks...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL CONTAINERS -->
+  <div id="modalNewReq" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div style="padding: 14px 18px; background: #0f172a; color: #ffffff; font-weight: 700; display: flex; justify-content: space-between;">
+        <span>Create Glove Requisition</span>
+        <button onclick="closeNewReqModal()" style="background: none; border: none; color: #fff; font-size: 16px; cursor: pointer;">&times;</button>
+      </div>
+      <div style="padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div class="erp-field"><label>Customer</label><select id="newReqCustomer" onchange="onCustomerSelected()"></select></div>
+        <div class="erp-field"><label>Glove Article</label><select id="newReqProduct"></select></div>
+        <div class="erp-field"><label>Quantity (Pairs)</label><input type="number" id="newReqPairs" placeholder="e.g. 500" min="1" /></div>
+        <div class="erp-field"><label>Notes / PO Number</label><input type="text" id="newReqNotes" placeholder="e.g. PO 27347" /></div>
+        <button class="erp-btn-primary" onclick="submitNewRequisition()">Submit Requisition</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toastAlert" class="toast-alert" style="display: none;">
+    <span id="toastIcon"></span> <span id="toastMessage"></span>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="app-packing.js?v=20261031_hardened"></script>
+  <script src="app-store.js?v=20261031_hardened"></script>
+  <script>
+    function switchHubView(view) {
+      const views = ['receiving', 'packing', 'alterations', 'qc', 'inventory'];
+      const tabs = {
+        receiving: 'tabNavReceiving',
+        packing: 'tabNavPacking',
+        alterations: 'tabNavAlterations',
+        qc: 'tabNavQC',
+        inventory: 'tabNavInventory'
+      };
+
+      views.forEach(v => {
+        const sec = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
+        const btn = document.getElementById(tabs[v]);
+        if (sec) sec.style.display = (v === view) ? 'block' : 'none';
+        if (btn) {
+          if (v === view) {
+            btn.className = 'erp-btn-primary nav-tab-active';
+          } else {
+            btn.className = 'erp-btn-secondary nav-tab-inactive';
+          }
+        }
+      });
+
+      if (view === 'receiving') {
+        loadStoreReceivings();
+      } else if (view === 'packing') {
+        loadActiveBatchDetails();
+      } else if (view === 'inventory') {
+        loadHubStocks();
+      }
+    }
+
+    async function loadHubStocks() {
+      try {
+        const [gRes, mRes] = await Promise.all([
+          fetch('/api/inventory/gloves'),
+          fetch('/api/inventory/materials')
+        ]);
+        const [gJson, mJson] = await Promise.all([gRes.json(), mRes.json()]);
+
+        const gTbody = document.getElementById('hubGloveStockTableBody');
+        if (gTbody && gJson.success) {
+          gTbody.innerHTML = gJson.data.map(g => `
+            <tr>
+              <td><strong>${g.product_name}</strong></td>
+              <td>${g.customer_name}</td>
+              <td style="text-align: right; font-weight: 700; color: #2563eb;">${Number(g.available_pairs).toLocaleString()}</td>
+            </tr>
+          `).join('');
+        }
+
+        const mTbody = document.getElementById('hubMaterialStockTableBody');
+        if (mTbody && mJson.success) {
+          mTbody.innerHTML = mJson.data.map(m => `
+            <tr>
+              <td><strong>${m.material_code}</strong></td>
+              <td>${m.material_name}</td>
+              <td style="text-align: right; font-weight: 700; color: #047857;">${Number(m.available_qty).toLocaleString()}</td>
+              <td>${m.unit}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initPackingHall();
+      initStorePortal();
+      loadHubStocks();
+    });
+  </script>
+</body>
+</html>

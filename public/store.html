@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meridian — Store Keeper Portal &amp; Store Manager Terminal</title>
+  <link rel="stylesheet" href="styles.css?v=20261031_hardened">
+  <style>
+    /* Executive White Theme Guarantee */
+    html, body, .main-content {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+    }
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .modal-card {
+      background: #ffffff;
+      border-radius: 6px;
+      width: 90%;
+      max-width: 650px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <!-- ========================================================
+       1. TOP EXECUTIVE NAVY ENTERPRISE HEADER (PICTURES 1 & 3)
+       ======================================================== -->
+  <header class="erp-topbar">
+    <div class="erp-topbar-left">
+      <div class="erp-brand-title">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14.93V17a1 1 0 11-2 0v-.07A7.003 7.003 0 015.07 11H5a1 1 0 010-2h.07A7.003 7.003 0 0111 5.07V5a1 1 0 112 0v.07A7.003 7.003 0 0118.93 11H19a1 1 0 110 2h-.07A7.003 7.003 0 0113 16.93zM12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+        <span class="erp-brand-name">MERIDIAN WORKS</span>
+        <span class="erp-module-divider">|</span>
+        <span class="erp-module-name" id="erpHeaderTitle">Materials Management (MM) – Inward Goods Receiving / Store Register</span>
+      </div>
+    </div>
+    <div class="erp-topbar-right">
+      <span class="erp-station-badge" id="stationBadge">Dock #1</span>
+      <span class="erp-system-date">System Date: 31-10-2026</span>
+      <a href="index.html" class="erp-btn-secondary" style="padding: 4px 10px; font-size: 11.5px; text-decoration: none;">Hub Cockpit</a>
+      <a href="packing.html" class="erp-btn-primary" style="padding: 4px 10px; font-size: 11.5px; text-decoration: none;">Packing Hall &rarr;</a>
+      <div class="erp-user-avatar">HI</div>
+    </div>
+  </header>
+
+  <!-- STORE KEEPER PORTAL NAVIGATION TABS -->
+  <div style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 6px 24px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; gap: 8px;">
+      <button id="btnTabReceivings" class="erp-btn-primary" style="padding: 6px 14px; font-size: 12px;" onclick="switchStoreHardenedTab('receivings')">
+        📥 Inward Goods Receiving (Dock #1)
+      </button>
+      <button id="btnTabStoreHub" class="erp-btn-secondary" style="padding: 6px 14px; font-size: 12px;" onclick="switchStoreHardenedTab('storeHub')">
+        📦 Store Keeper Portal (Requisitions &amp; Stock Hub)
+      </button>
+    </div>
+    <div style="font-size: 11.5px; color: #64748b;">
+      Active Station: <strong style="color: #0f172a;">Glove Store &amp; Packing Materials Store Terminal</strong>
+    </div>
+  </div>
+
+  <main style="padding: 16px 24px; max-width: 1600px; margin: 0 auto;">
+
+    <!-- ========================================================
+         VIEW 1: INWARD RECEIVING & SHIPMENT REGISTER (PICTURE 1)
+         ======================================================== -->
+    <div id="viewReceivings">
+      <!-- HORIZONTAL KEYBOARD-FIRST ENTRY RIBBON -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 14px 18px; margin-bottom: 16px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+          <div class="erp-field" style="flex: 1.5; min-width: 170px;">
+            <label>Maker / Contractor</label>
+            <select id="rcvMaker" class="urdu-text" onchange="onMakerChanged('')">
+              <option value="">-- Choose Maker --</option>
+            </select>
+          </div>
+
+          <div class="erp-field" style="flex: 1; min-width: 130px;">
+            <label>Customer</label>
+            <select id="rcvCustomer">
+              <option value="">-- Choose Customer --</option>
+            </select>
+          </div>
+
+          <div class="erp-field" style="flex: 0.9; min-width: 110px;">
+            <label>PO Number</label>
+            <input type="text" id="rcvPO" list="poListOptions" placeholder="e.g. 27347" />
+            <datalist id="poListOptions"></datalist>
+          </div>
+
+          <div class="erp-field" style="flex: 1.3; min-width: 150px;">
+            <label>Article</label>
+            <select id="rcvArticle">
+              <option value="">-- Choose Article --</option>
+            </select>
+          </div>
+
+          <div class="erp-field" style="width: 100px;">
+            <label>Order Qty</label>
+            <input type="number" id="rcvOrderQty" placeholder="3090" oninput="calculateBalance('')" />
+          </div>
+
+          <div class="erp-field" style="width: 100px;">
+            <label>Rcvd Pairs</label>
+            <input type="number" id="rcvPairs" placeholder="942" oninput="calculateBalance('')" />
+          </div>
+
+          <div class="erp-field" style="width: 90px;">
+            <label>Balance</label>
+            <input type="text" id="rcvBalance" class="readonly-field" readonly value="-" />
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="erp-btn-primary" onclick="submitStoreReceiving('')">Post Goods Receipt (GRN)</button>
+            <button class="erp-btn-secondary" onclick="openPrintReceivingModal()">Print Receiving Slip</button>
+            <button class="erp-btn-secondary" onclick="openSizeMatrixModal()">Size Matrix</button>
+            <button class="erp-btn-secondary" onclick="clearReceivingForm()">Clear</button>
+          </div>
+        </div>
+
+        <!-- Secondary industrial fields (Challan, Gate Pass, Vehicle) -->
+        <div style="display: flex; gap: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 12px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="color: #64748b; font-weight: 600;">Challan #:</span>
+            <input type="text" id="rcvChallan" placeholder="CH-8821" style="width: 110px; padding: 4px 8px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;" />
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="color: #64748b; font-weight: 600;">Gate Pass #:</span>
+            <input type="text" id="rcvGatePass" placeholder="IGP-4091" style="width: 110px; padding: 4px 8px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;" />
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="color: #64748b; font-weight: 600;">Vehicle / Driver:</span>
+            <input type="text" id="rcvVehicle" placeholder="SLK-9902" style="width: 130px; padding: 4px 8px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;" />
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN DATA GRID TABLE (SAP ALV GRID STYLE - PICTURE 1) -->
+      <div style="border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; background: #ffffff;">
+        <table class="erp-table">
+          <thead>
+            <tr>
+              <th style="width: 45px; text-align: center;">SR #</th>
+              <th style="width: 95px;">Date</th>
+              <th>Maker / Contractor</th>
+              <th style="width: 110px;">Customer</th>
+              <th style="width: 100px;">PO Number</th>
+              <th>Article</th>
+              <th style="width: 90px; text-align: right;">Order Qty</th>
+              <th style="width: 90px; text-align: right;">Rcvd Pairs</th>
+              <th style="width: 85px; text-align: right;">Balance</th>
+              <th style="width: 90px; text-align: center;">Status</th>
+              <th style="width: 100px; text-align: center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="receivingsTableBody">
+            <tr><td colspan="11" style="text-align: center; color: #64748b; padding: 1.5rem;">Loading receiving register records...</td></tr>
+          </tbody>
+        </table>
+
+        <!-- FOOTER METRIC BAR -->
+        <div class="erp-footer-bar">
+          <div>
+            <strong>Total Records:</strong> <span id="regTotalRecords">18</span> &bull; 
+            <strong>Sum Received:</strong> <span id="regSumReceived">13,889 Pairs</span> &bull; 
+            <strong>Balance:</strong> <span id="regSumBalance">7,088 Pairs</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="erp-btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="exportReceivingsToCSV()">📊 Excel export</button>
+            <button class="erp-btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="openPrintReceivingModal()">🖨️ Print</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         VIEW 2: STORE KEEPER PORTAL & REQUISITIONS (PICTURE 3)
+         ======================================================== -->
+    <div id="viewStoreHub" style="display: none;">
+      <!-- DUAL PENDING REQUISITION QUEUES -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <!-- LEFT: GLOVE REQUISITIONS -->
+        <div style="border: 1px solid #e2e8f0; border-radius: 4px; background: #ffffff; overflow: hidden;">
+          <div style="background: #f8fafc; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 700; font-size: 12.5px; color: #0f172a;">Pending Raw Glove Requisitions (Packing Line Draw)</span>
+            <span class="erp-tag erp-tag-partial" id="badgePendingReqs">2 Pending</span>
+          </div>
+          <table class="erp-table">
+            <thead>
+              <tr>
+                <th>Requisition ID</th>
+                <th>Customer</th>
+                <th>PO#</th>
+                <th>Article</th>
+                <th style="text-align: right;">Requested</th>
+                <th style="text-align: right;">Available</th>
+                <th style="text-align: center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="gloveReqQueueBody">
+              <tr>
+                <td><strong>REQ-2026-0042</strong></td>
+                <td>Northwind</td>
+                <td>27347</td>
+                <td>Model A9</td>
+                <td style="text-align: right;">942 Pairs</td>
+                <td style="text-align: right; color: #047857; font-weight: 700;">942 Pairs</td>
+                <td style="text-align: center;"><button class="erp-btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="issueGloveReqDirect('REQ-2026-0042')">Approve &amp; Issue to Floor</button></td>
+              </tr>
+              <tr>
+                <td><strong>REQ-2026-0043</strong></td>
+                <td>Globex</td>
+                <td>3326</td>
+                <td>Model A1</td>
+                <td style="text-align: right;">2,500 Pairs</td>
+                <td style="text-align: right; color: #047857; font-weight: 700;">4,284 Pairs</td>
+                <td style="text-align: center;"><button class="erp-btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="issueGloveReqDirect('REQ-2026-0043')">Approve &amp; Issue to Floor</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- RIGHT: MATERIAL REQUISITIONS FOR 1ST PACKING -->
+        <div style="border: 1px solid #e2e8f0; border-radius: 4px; background: #ffffff; overflow: hidden;">
+          <div style="background: #f8fafc; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 700; font-size: 12.5px; color: #0f172a;">Pending Material Requisitions (1st Packing Accessories)</span>
+            <span class="erp-tag erp-tag-partial" id="badgePendingMReqs">2 Pending</span>
+          </div>
+          <table class="erp-table">
+            <thead>
+              <tr>
+                <th>Requisition ID</th>
+                <th>Linked Glove Req</th>
+                <th>Items &amp; Sets</th>
+                <th style="text-align: center;">Status</th>
+                <th style="text-align: center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="materialReqQueueBody">
+              <tr>
+                <td><strong>MREQ-2026-0018</strong></td>
+                <td>For REQ-2026-0042</td>
+                <td>910 Sets (Polybags, Hangtags, Silica)</td>
+                <td style="text-align: center;"><span class="erp-tag erp-tag-complete">Ready</span></td>
+                <td style="text-align: center;"><button class="erp-btn-primary" style="padding: 4px 8px; font-size: 11px; background: #059669;" onclick="issueMaterialReqDirect('MREQ-2026-0018')">Issue Accessories &amp; Print Slip</button></td>
+              </tr>
+              <tr>
+                <td><strong>MREQ-2026-0019</strong></td>
+                <td>For REQ-2026-0040</td>
+                <td>1,200 Sets</td>
+                <td style="text-align: center;"><span class="erp-tag erp-tag-partial">Partial Stock</span></td>
+                <td style="text-align: center;"><button class="erp-btn-secondary" style="padding: 4px 8px; font-size: 11px;">Inspect Items</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- LIVE STORE INVENTORY MASTER GRID -->
+      <div style="border: 1px solid #e2e8f0; border-radius: 4px; background: #ffffff; overflow: hidden;">
+        <div style="background: #f8fafc; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; font-size: 13px; color: #0f172a;">Live Store Inventory Master Grid (Glove Store &amp; Packing Materials Store)</span>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" placeholder="Quick filter..." style="padding: 4px 8px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;" />
+            <select style="padding: 4px 8px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;">
+              <option value="">All Categories</option>
+              <option value="stitched">Stitched Gloves</option>
+              <option value="accessories">Packaging Accessories</option>
+            </select>
+          </div>
+        </div>
+
+        <table class="erp-table">
+          <thead>
+            <tr>
+              <th>Item Code</th>
+              <th>Description</th>
+              <th>Category</th>
+              <th style="text-align: right;">Current Stock</th>
+              <th style="text-align: right;">Reserved (WIP)</th>
+              <th style="text-align: right;">Available Stock</th>
+              <th>Bin Location</th>
+              <th style="text-align: right;">Reorder Level</th>
+              <th style="text-align: center;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryMasterGridBody">
+            <tr>
+              <td><strong>GLV-RAW-BRISBANE</strong></td>
+              <td>Model A9 Stealth Stitched Pairs</td>
+              <td>Stitched Gloves</td>
+              <td style="text-align: right;">2,148 Pairs</td>
+              <td style="text-align: right; color: #b45309;">942 Pairs</td>
+              <td style="text-align: right; font-weight: 700; color: #047857;">1,206 Pairs</td>
+              <td>Bin A-12</td>
+              <td style="text-align: right;">500</td>
+              <td style="text-align: center;"><span class="erp-tag erp-tag-complete">In Stock</span></td>
+            </tr>
+            <tr>
+              <td><strong>GLV-RAW-Model A1</strong></td>
+              <td>Model A1 Stitched Gloves</td>
+              <td>Stitched Gloves</td>
+              <td style="text-align: right;">4,284 Pairs</td>
+              <td style="text-align: right; color: #b45309;">2,500 Pairs</td>
+              <td style="text-align: right; font-weight: 700; color: #047857;">1,784 Pairs</td>
+              <td>Bin A-08</td>
+              <td style="text-align: right;">800</td>
+              <td style="text-align: center;"><span class="erp-tag erp-tag-complete">In Stock</span></td>
+            </tr>
+            <tr>
+              <td><strong>ACC-POLY-MED</strong></td>
+              <td>Standard Northwind Heavy Polybag</td>
+              <td>Packaging Accessory</td>
+              <td style="text-align: right;">15,400 Pcs</td>
+              <td style="text-align: right; color: #b45309;">910 Pcs</td>
+              <td style="text-align: right; font-weight: 700; color: #047857;">14,490 Pcs</td>
+              <td>Rack P-04</td>
+              <td style="text-align: right;">2,000</td>
+              <td style="text-align: center;"><span class="erp-tag erp-tag-complete">In Stock</span></td>
+            </tr>
+            <tr>
+              <td><strong>ACC-TAG-STD</strong></td>
+              <td>Northwind Genuine Hangtag / Rider</td>
+              <td>Brand Trims</td>
+              <td style="text-align: right;">8,200 Pcs</td>
+              <td style="text-align: right; color: #b45309;">910 Pcs</td>
+              <td style="text-align: right; font-weight: 700; color: #047857;">7,290 Pcs</td>
+              <td>Rack T-02</td>
+              <td style="text-align: right;">1,500</td>
+              <td style="text-align: center;"><span class="erp-tag erp-tag-complete">In Stock</span></td>
+            </tr>
+            <tr>
+              <td><strong>ACC-SILICA-2G</strong></td>
+              <td>Silica Gel Moisture Sachet 2g</td>
+              <td>Packaging Accessory</td>
+              <td style="text-align: right;">22,000 Pcs</td>
+              <td style="text-align: right; color: #b45309;">910 Pcs</td>
+              <td style="text-align: right; font-weight: 700; color: #047857;">21,090 Pcs</td>
+              <td>Rack S-01</td>
+              <td style="text-align: right;">3,000</td>
+              <td style="text-align: center;"><span class="erp-tag erp-tag-complete">In Stock</span></td>
+            </tr>
+            <tr>
+              <td><strong>CTN-5PLY-6040</strong></td>
+              <td>5-Ply Heavy Master Carton (30 prs)</td>
+              <td>Packaging Materials</td>
+              <td style="text-align: right;">420 Cartons</td>
+              <td style="text-align: right; color: #b45309;">32 Cartons</td>
+              <td style="text-align: right; font-weight: 700; color: #047857;">388 Cartons</td>
+              <td>Bay C-03</td>
+              <td style="text-align: right;">100</td>
+              <td style="text-align: center;"><span class="erp-tag erp-tag-complete">In Stock</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- FOOTER METRIC BAR -->
+        <div class="erp-footer-bar">
+          <div>
+            <strong>Total Active SKUs:</strong> 142 &bull; 
+            <strong>Stock Value:</strong> PKR 18.4M &bull; 
+            <strong>Pending Requisitions:</strong> 3 &bull; 
+            <strong>Low Stock Alerts:</strong> 0
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="erp-btn-secondary" style="padding: 4px 10px; font-size: 12px;">Export Stock Ledger to Excel</button>
+            <button class="erp-btn-secondary" style="padding: 4px 10px; font-size: 12px;">Print Material Issue Vouchers</button>
+            <button class="erp-btn-secondary" style="padding: 4px 10px; font-size: 12px;">Physical Stock Audit</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SIZE BREAKDOWN MATRIX MODAL -->
+  <div id="sizeMatrixModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div style="background: #0f172a; color: #fff; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 700; font-size: 14px;">Size Breakdown Ratio Matrix</span>
+        <button onclick="closeSizeMatrixModal()" style="background: transparent; border: none; color: #fff; font-size: 18px; cursor: pointer;">&times;</button>
+      </div>
+      <div style="padding: 16px;">
+        <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">
+          Enter size-wise distribution for order and received pairs:
+        </p>
+        <table class="erp-table" style="margin-bottom: 16px;">
+          <thead>
+            <tr>
+              <th>Size</th>
+              <th style="width: 100px;">Order Pairs</th>
+              <th style="width: 100px;">Rcvd Pairs</th>
+              <th style="width: 100px; text-align: right;">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>7 / S</strong></td>
+              <td><input type="number" id="szOrder_7" class="sz-order" value="300" style="width: 80px; padding: 4px 6px;" oninput="calcSizeTotals()" /></td>
+              <td><input type="number" id="szRcvd_7" class="sz-rcvd" value="90" style="width: 80px; padding: 4px 6px;" oninput="calcSizeTotals()" /></td>
+              <td style="text-align: right; font-weight: 700;" id="szBal_7">210</td>
+            </tr>
+            <tr>
+              <td><strong>8 / M</strong></td>
+              <td><input type="number" id="szOrder_8" class="sz-order" value="900" style="width: 80px; padding: 4px 6px;" oninput="calcSizeTotals()" /></td>
+              <td><input type="number" id="szRcvd_8" class="sz-rcvd" value="280" style="width: 80px; padding: 4px 6px;" oninput="calcSizeTotals()" /></td>
+              <td style="text-align: right; font-weight: 700;" id="szBal_8">620</td>
+            </tr>
+            <tr>
+              <td><strong>9 / L</strong></td>
+              <td><input type="number" id="szOrder_9" class="sz-order" value="1200" style="width: 80px; padding: 4px 6px;" oninput="calcSizeTotals()" /></td>
+              <td><input type="number" id="szRcvd_9" class="sz-rcvd" value="372" style="width: 80px; padding: 4px 6px;" oninput="calcSizeTotals()" /></td>
+              <td style="text-align: right; font-weight: 700;" id="szBal_9">828</td>
+            </tr>
+            <tr>
+              <td><strong>10 / XL</strong></td>
+              <td><input type="number" id="szOrder_10" class="sz-order" value="690" style="width: 80px; padding: 4px 6px;" oninput="calcSizeTotals()" /></td>
+              <td><input type="number" id="szRcvd_10" class="sz-rcvd" value="200" style="width: 80px; padding: 4px 6px;" oninput="calcSizeTotals()" /></td>
+              <td style="text-align: right; font-weight: 700;" id="szBal_10">490</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr style="background: #f1f5f9; font-weight: 800;">
+              <td>TOTAL</td>
+              <td id="szOrderTotal">3,090</td>
+              <td id="szRcvdTotal">942</td>
+              <td style="text-align: right;" id="szBalTotal">2,148</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="erp-btn-secondary" onclick="closeSizeMatrixModal()">Cancel</button>
+          <button class="erp-btn-primary" onclick="applySizeMatrixTotals()">Apply to Inward Form</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastAlert" class="toast-alert" style="display: none;">
+    <span id="toastIcon"></span>
+    <span id="toastMessage"></span>
+  </div>
+
+  <script src="app-store.js?v=20261031_hardened"></script>
+  <script>
+    function switchStoreHardenedTab(tab) {
+      if (tab === 'receivings') {
+        document.getElementById('viewReceivings').style.display = 'block';
+        document.getElementById('viewStoreHub').style.display = 'none';
+        document.getElementById('btnTabReceivings').className = 'erp-btn-primary';
+        document.getElementById('btnTabStoreHub').className = 'erp-btn-secondary';
+        document.getElementById('stationBadge').textContent = 'Dock #1';
+        document.getElementById('erpHeaderTitle').textContent = 'Materials Management (MM) – Inward Goods Receiving / Store Register';
+      } else {
+        document.getElementById('viewReceivings').style.display = 'none';
+        document.getElementById('viewStoreHub').style.display = 'block';
+        document.getElementById('btnTabReceivings').className = 'erp-btn-secondary';
+        document.getElementById('btnTabStoreHub').className = 'erp-btn-primary';
+        document.getElementById('stationBadge').textContent = 'Central Store';
+        document.getElementById('erpHeaderTitle').textContent = 'Warehouse & Materials Management – Requisition Issuance & Stock Hub';
+      }
+    }
+
+    function openSizeMatrixModal() {
+      document.getElementById('sizeMatrixModal').style.display = 'flex';
+      calcSizeTotals();
+    }
+
+    function closeSizeMatrixModal() {
+      document.getElementById('sizeMatrixModal').style.display = 'none';
+    }
+
+    function calcSizeTotals() {
+      const sizes = ['7', '8', '9', '10'];
+      let orderTot = 0;
+      let rcvdTot = 0;
+      sizes.forEach(s => {
+        const o = Number(document.getElementById('szOrder_' + s).value || 0);
+        const r = Number(document.getElementById('szRcvd_' + s).value || 0);
+        const b = Math.max(0, o - r);
+        document.getElementById('szBal_' + s).textContent = b;
+        orderTot += o;
+        rcvdTot += r;
+      });
+      document.getElementById('szOrderTotal').textContent = orderTot;
+      document.getElementById('szRcvdTotal').textContent = rcvdTot;
+      document.getElementById('szBalTotal').textContent = Math.max(0, orderTot - rcvdTot);
+    }
+
+    function applySizeMatrixTotals() {
+      calcSizeTotals();
+      const o = document.getElementById('szOrderTotal').textContent;
+      const r = document.getElementById('szRcvdTotal').textContent;
+      document.getElementById('rcvOrderQty').value = o;
+      document.getElementById('rcvPairs').value = r;
+      calculateBalance('');
+      closeSizeMatrixModal();
+    }
+
+    function clearReceivingForm() {
+      document.getElementById('rcvOrderQty').value = '';
+      document.getElementById('rcvPairs').value = '';
+      document.getElementById('rcvBalance').value = '-';
+      document.getElementById('rcvPO').value = '';
+      document.getElementById('rcvChallan').value = '';
+      document.getElementById('rcvGatePass').value = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStoreData();
+    });
+  </script>
+</body>
+</html>

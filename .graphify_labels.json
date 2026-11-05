@@ -1,0 +1,10 @@
+{
+  "0": "Frontend MES Screens & UI State (src/main.ts)",
+  "1": "Requisition & Multi-Order Pure Logic (src/utils)",
+  "2": "Express API & HTTP Server Layer (server.ts, api.js)",
+  "3": "Packing Hall 5-Stage & AQL Domain Services (src/services)",
+  "4": "SQLite WAL Database & 17-Table Schema (src/db.js)",
+  "5": "Automated Verification & DBRE Test Suites (test/)",
+  "6": "Legacy & Standalone Portals (public/, vanilla/, Program.cs)",
+  "7": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)"
+}
