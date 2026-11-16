@@ -27,10 +27,19 @@ SQLite via node:sqlite (`data/gloves_packing.db`), Docker runtime
 
 ## Quality gates (run before done)
 
-- `npx tsc --noEmit` — typecheck
-- `npx vite build` — frontend bundle builds
+- `npx tsc --noEmit` (`npm run lint`) — typecheck
+- `npm run test:unit` — frontend logic/template/token regression suite (`tsx --test src/utils/requisitionLogic.test.ts`)
+- `npm test` — backend/DB/order-integrity suite (`node --test`)
+- `npx vite build` (`npm run build`) — frontend bundle builds
+- `npm run test:e2e` — Playwright Chromium E2E & visual QA harness (`playwright.config.ts`, isolated via `MES_DB_PATH`)
 - `npm run graphify` (`npx tsx scripts/graphify.ts update .`) — rebuilds `graphify-out/graph.json` and `graphify-out/GRAPH_REPORT.md` after every code change
 - `docker compose build` + `curl -f http://127.0.0.1:3000/health`
+
+## ECC & Playwright Verification Harness (Hard Rule)
+
+**Everything Claude Code (`affaan-m/ECC`)** is installed in `.agents/` with always-on rule `.agents/rules/ecc-harness.md`:
+- Use ECC skills/workflows (`tdd-workflow`, `e2e-testing`, `browser-qa`, `click-path-audit`, `verification-loop`, `delivery-gate`) whenever their scope applies.
+- Never skip browser verification or leave manual browser inspection steps for the user when UI, CSS, DOM, nav, auth, forms, or interactive handlers change — add/run automated Playwright assertions (`npm run test:e2e`) and observe all checks green after final edits.
 
 ## Graphify Knowledge Graph Harness (`/graphify`)
 

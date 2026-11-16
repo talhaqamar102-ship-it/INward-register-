@@ -16,4 +16,14 @@ data/*.db-shm
 .claude
 .claude-plugin
 skills.md
+data/*.db
+.playwright-tmp
+playwright-report
+test-results
+e2e
+.agents
+.aistudio
+.gemini
+graphify-out
+.graphify_*.json
 
