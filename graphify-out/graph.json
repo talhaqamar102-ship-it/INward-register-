@@ -4,7 +4,7 @@
   "graph": {
     "name": "Meridian Works MES Knowledge Graph",
     "generator": "graphify",
-    "updated_at": "2026-11-16T11:00:49.922Z",
+    "updated_at": "2026-11-16T11:17:34.926Z",
     "communities": {
       "0": "Frontend MES Screens & UI State (src/main.ts)",
       "1": "Requisition & Multi-Order Pure Logic (src/utils)",
@@ -4029,7 +4029,7 @@
       "source_location": "L1",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 86
+      "degree": 89
     },
     {
       "id": "file:src/db.js",
@@ -6578,7 +6578,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1500-L2138",
+      "source_location": "L1500-L2238",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 11
@@ -6589,7 +6589,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2140-L2145",
+      "source_location": "L2240-L2245",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 3
@@ -6600,7 +6600,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2512-L2598",
+      "source_location": "L2612-L2698",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 3
@@ -6611,7 +6611,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2600-L2665",
+      "source_location": "L2700-L2765",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 4
@@ -6622,7 +6622,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2667-L2774",
+      "source_location": "L2767-L2874",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 3
@@ -6633,7 +6633,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2776-L2789",
+      "source_location": "L2876-L2889",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -6644,7 +6644,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791-L2905",
+      "source_location": "L2891-L3005",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 9
@@ -6897,7 +6897,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1806",
+      "source_location": "L1819",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -6908,10 +6908,21 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1824",
+      "source_location": "L1858",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
+    },
+    {
+      "id": "dom:#hint-admin-cust-name",
+      "label": "#hint-admin-cust-name",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1859",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
     },
     {
       "id": "dom:#admin-cust-country",
@@ -6919,10 +6930,21 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1828",
+      "source_location": "L1863",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
+    },
+    {
+      "id": "dom:#hint-admin-cust-country",
+      "label": "#hint-admin-cust-country",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1864",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
     },
     {
       "id": "dom:#admin-cust-pref",
@@ -6930,10 +6952,21 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1832",
+      "source_location": "L1868",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
+    },
+    {
+      "id": "dom:#hint-admin-cust-pref",
+      "label": "#hint-admin-cust-pref",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1872",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
     },
     {
       "id": "dom:#btn-admin-save-customer",
@@ -6941,7 +6974,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1837",
+      "source_location": "L1874",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -6952,7 +6985,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1864",
+      "source_location": "L1964",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -6963,7 +6996,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1882",
+      "source_location": "L1982",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -6974,7 +7007,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1886",
+      "source_location": "L1986",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -6985,7 +7018,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1892",
+      "source_location": "L1992",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -6996,7 +7029,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1896",
+      "source_location": "L1996",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7007,7 +7040,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1898",
+      "source_location": "L1998",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7018,7 +7051,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1928",
+      "source_location": "L2028",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7029,7 +7062,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1946",
+      "source_location": "L2046",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7040,7 +7073,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1947",
+      "source_location": "L2047",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7051,7 +7084,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1965",
+      "source_location": "L2065",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7062,7 +7095,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1966",
+      "source_location": "L2066",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7073,7 +7106,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1985",
+      "source_location": "L2085",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7084,7 +7117,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2033",
+      "source_location": "L2133",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7095,7 +7128,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2049",
+      "source_location": "L2149",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7106,7 +7139,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2052",
+      "source_location": "L2152",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7117,7 +7150,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2055",
+      "source_location": "L2155",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7128,7 +7161,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2092",
+      "source_location": "L2192",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7139,7 +7172,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2612",
+      "source_location": "L2712",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7150,7 +7183,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2621",
+      "source_location": "L2721",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7161,7 +7194,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2630",
+      "source_location": "L2730",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7172,7 +7205,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2639",
+      "source_location": "L2739",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7183,7 +7216,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2647",
+      "source_location": "L2747",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7194,7 +7227,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2650",
+      "source_location": "L2750",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7205,7 +7238,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2659",
+      "source_location": "L2759",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7216,7 +7249,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2682",
+      "source_location": "L2782",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7227,7 +7260,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2686",
+      "source_location": "L2786",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7238,7 +7271,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2690",
+      "source_location": "L2790",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7249,7 +7282,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2695",
+      "source_location": "L2795",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7260,7 +7293,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2705",
+      "source_location": "L2805",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 3
@@ -7271,7 +7304,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2713",
+      "source_location": "L2813",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7282,7 +7315,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2823",
+      "source_location": "L2923",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7293,7 +7326,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2834",
+      "source_location": "L2934",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -13987,7 +14020,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1500-L2138",
+      "source_location": "L1500-L2238",
       "weight": 1
     },
     {
@@ -13996,7 +14029,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2140-L2145",
+      "source_location": "L2240-L2245",
       "weight": 1
     },
     {
@@ -14005,7 +14038,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2512-L2598",
+      "source_location": "L2612-L2698",
       "weight": 1
     },
     {
@@ -14014,7 +14047,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2600-L2665",
+      "source_location": "L2700-L2765",
       "weight": 1
     },
     {
@@ -14023,7 +14056,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2667-L2774",
+      "source_location": "L2767-L2874",
       "weight": 1
     },
     {
@@ -14032,7 +14065,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2776-L2789",
+      "source_location": "L2876-L2889",
       "weight": 1
     },
     {
@@ -14041,7 +14074,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791-L2905",
+      "source_location": "L2891-L3005",
       "weight": 1
     },
     {
@@ -14248,7 +14281,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1806",
+      "source_location": "L1819",
       "weight": 0.9
     },
     {
@@ -14257,7 +14290,16 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1824",
+      "source_location": "L1858",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#hint-admin-cust-name",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1859",
       "weight": 0.9
     },
     {
@@ -14266,30 +14308,12 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1828",
+      "source_location": "L1863",
       "weight": 0.9
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#admin-cust-pref",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L1832",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#btn-admin-save-customer",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L1837",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#articles",
+      "target": "dom:#hint-admin-cust-country",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
@@ -14298,11 +14322,47 @@
     },
     {
       "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-cust-pref",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1868",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#hint-admin-cust-pref",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1872",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#btn-admin-save-customer",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1874",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#articles",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1964",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
       "target": "dom:#admin-prod-name",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1882",
+      "source_location": "L1982",
       "weight": 0.9
     },
     {
@@ -14311,7 +14371,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1886",
+      "source_location": "L1986",
       "weight": 0.9
     },
     {
@@ -14320,7 +14380,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1892",
+      "source_location": "L1992",
       "weight": 0.9
     },
     {
@@ -14329,7 +14389,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1896",
+      "source_location": "L1996",
       "weight": 0.9
     },
     {
@@ -14338,7 +14398,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1898",
+      "source_location": "L1998",
       "weight": 0.9
     },
     {
@@ -14347,7 +14407,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1928",
+      "source_location": "L2028",
       "weight": 0.9
     },
     {
@@ -14356,7 +14416,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1946",
+      "source_location": "L2046",
       "weight": 0.9
     },
     {
@@ -14365,7 +14425,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1947",
+      "source_location": "L2047",
       "weight": 0.9
     },
     {
@@ -14374,7 +14434,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1965",
+      "source_location": "L2065",
       "weight": 0.9
     },
     {
@@ -14383,7 +14443,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1966",
+      "source_location": "L2066",
       "weight": 0.9
     },
     {
@@ -14392,7 +14452,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1985",
+      "source_location": "L2085",
       "weight": 0.9
     },
     {
@@ -14401,7 +14461,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2033",
+      "source_location": "L2133",
       "weight": 0.9
     },
     {
@@ -14410,7 +14470,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2049",
+      "source_location": "L2149",
       "weight": 0.9
     },
     {
@@ -14419,7 +14479,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2052",
+      "source_location": "L2152",
       "weight": 0.9
     },
     {
@@ -14428,7 +14488,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2055",
+      "source_location": "L2155",
       "weight": 0.9
     },
     {
@@ -14437,7 +14497,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2092",
+      "source_location": "L2192",
       "weight": 0.9
     },
     {
@@ -14446,7 +14506,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2612",
+      "source_location": "L2712",
       "weight": 0.9
     },
     {
@@ -14455,7 +14515,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2621",
+      "source_location": "L2721",
       "weight": 0.9
     },
     {
@@ -14464,7 +14524,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2630",
+      "source_location": "L2730",
       "weight": 0.9
     },
     {
@@ -14473,7 +14533,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2639",
+      "source_location": "L2739",
       "weight": 0.9
     },
     {
@@ -14482,7 +14542,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2647",
+      "source_location": "L2747",
       "weight": 0.9
     },
     {
@@ -14491,7 +14551,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2650",
+      "source_location": "L2750",
       "weight": 0.9
     },
     {
@@ -14500,7 +14560,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2659",
+      "source_location": "L2759",
       "weight": 0.9
     },
     {
@@ -14509,7 +14569,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2682",
+      "source_location": "L2782",
       "weight": 0.9
     },
     {
@@ -14518,7 +14578,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2686",
+      "source_location": "L2786",
       "weight": 0.9
     },
     {
@@ -14527,7 +14587,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2690",
+      "source_location": "L2790",
       "weight": 0.9
     },
     {
@@ -14536,7 +14596,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2695",
+      "source_location": "L2795",
       "weight": 0.9
     },
     {
@@ -14545,7 +14605,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2705",
+      "source_location": "L2805",
       "weight": 0.9
     },
     {
@@ -14554,7 +14614,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2713",
+      "source_location": "L2813",
       "weight": 0.9
     },
     {
@@ -14563,7 +14623,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2823",
+      "source_location": "L2923",
       "weight": 0.9
     },
     {
@@ -14572,7 +14632,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2829",
+      "source_location": "L2929",
       "weight": 0.9
     },
     {
@@ -14581,7 +14641,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2834",
+      "source_location": "L2934",
       "weight": 0.9
     },
     {
@@ -21907,7 +21967,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2512",
+      "source_location": "L2612",
       "weight": 1
     },
     {
@@ -21916,7 +21976,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2600",
+      "source_location": "L2700",
       "weight": 1
     },
     {
@@ -21925,7 +21985,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2600",
+      "source_location": "L2700",
       "weight": 1
     },
     {
@@ -21934,7 +21994,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2667",
+      "source_location": "L2767",
       "weight": 1
     },
     {
@@ -21943,7 +22003,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -21952,7 +22012,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -21961,7 +22021,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -21970,7 +22030,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -21979,7 +22039,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -21988,7 +22048,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -32772,7 +32832,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1500-L2138",
+      "source_location": "L1500-L2238",
       "weight": 1
     },
     {
@@ -32781,7 +32841,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2140-L2145",
+      "source_location": "L2240-L2245",
       "weight": 1
     },
     {
@@ -32790,7 +32850,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2512-L2598",
+      "source_location": "L2612-L2698",
       "weight": 1
     },
     {
@@ -32799,7 +32859,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2600-L2665",
+      "source_location": "L2700-L2765",
       "weight": 1
     },
     {
@@ -32808,7 +32868,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2667-L2774",
+      "source_location": "L2767-L2874",
       "weight": 1
     },
     {
@@ -32817,7 +32877,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2776-L2789",
+      "source_location": "L2876-L2889",
       "weight": 1
     },
     {
@@ -32826,7 +32886,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791-L2905",
+      "source_location": "L2891-L3005",
       "weight": 1
     },
     {
@@ -33033,7 +33093,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1806",
+      "source_location": "L1819",
       "weight": 0.9
     },
     {
@@ -33042,7 +33102,16 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1824",
+      "source_location": "L1858",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#hint-admin-cust-name",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1859",
       "weight": 0.9
     },
     {
@@ -33051,30 +33120,12 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1828",
+      "source_location": "L1863",
       "weight": 0.9
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#admin-cust-pref",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L1832",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#btn-admin-save-customer",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L1837",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#articles",
+      "target": "dom:#hint-admin-cust-country",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
@@ -33083,11 +33134,47 @@
     },
     {
       "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-cust-pref",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1868",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#hint-admin-cust-pref",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1872",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#btn-admin-save-customer",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1874",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#articles",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1964",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
       "target": "dom:#admin-prod-name",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1882",
+      "source_location": "L1982",
       "weight": 0.9
     },
     {
@@ -33096,7 +33183,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1886",
+      "source_location": "L1986",
       "weight": 0.9
     },
     {
@@ -33105,7 +33192,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1892",
+      "source_location": "L1992",
       "weight": 0.9
     },
     {
@@ -33114,7 +33201,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1896",
+      "source_location": "L1996",
       "weight": 0.9
     },
     {
@@ -33123,7 +33210,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1898",
+      "source_location": "L1998",
       "weight": 0.9
     },
     {
@@ -33132,7 +33219,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1928",
+      "source_location": "L2028",
       "weight": 0.9
     },
     {
@@ -33141,7 +33228,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1946",
+      "source_location": "L2046",
       "weight": 0.9
     },
     {
@@ -33150,7 +33237,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1947",
+      "source_location": "L2047",
       "weight": 0.9
     },
     {
@@ -33159,7 +33246,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1965",
+      "source_location": "L2065",
       "weight": 0.9
     },
     {
@@ -33168,7 +33255,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1966",
+      "source_location": "L2066",
       "weight": 0.9
     },
     {
@@ -33177,7 +33264,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1985",
+      "source_location": "L2085",
       "weight": 0.9
     },
     {
@@ -33186,7 +33273,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2033",
+      "source_location": "L2133",
       "weight": 0.9
     },
     {
@@ -33195,7 +33282,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2049",
+      "source_location": "L2149",
       "weight": 0.9
     },
     {
@@ -33204,7 +33291,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2052",
+      "source_location": "L2152",
       "weight": 0.9
     },
     {
@@ -33213,7 +33300,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2055",
+      "source_location": "L2155",
       "weight": 0.9
     },
     {
@@ -33222,7 +33309,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2092",
+      "source_location": "L2192",
       "weight": 0.9
     },
     {
@@ -33231,7 +33318,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2612",
+      "source_location": "L2712",
       "weight": 0.9
     },
     {
@@ -33240,7 +33327,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2621",
+      "source_location": "L2721",
       "weight": 0.9
     },
     {
@@ -33249,7 +33336,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2630",
+      "source_location": "L2730",
       "weight": 0.9
     },
     {
@@ -33258,7 +33345,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2639",
+      "source_location": "L2739",
       "weight": 0.9
     },
     {
@@ -33267,7 +33354,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2647",
+      "source_location": "L2747",
       "weight": 0.9
     },
     {
@@ -33276,7 +33363,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2650",
+      "source_location": "L2750",
       "weight": 0.9
     },
     {
@@ -33285,7 +33372,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2659",
+      "source_location": "L2759",
       "weight": 0.9
     },
     {
@@ -33294,7 +33381,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2682",
+      "source_location": "L2782",
       "weight": 0.9
     },
     {
@@ -33303,7 +33390,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2686",
+      "source_location": "L2786",
       "weight": 0.9
     },
     {
@@ -33312,7 +33399,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2690",
+      "source_location": "L2790",
       "weight": 0.9
     },
     {
@@ -33321,7 +33408,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2695",
+      "source_location": "L2795",
       "weight": 0.9
     },
     {
@@ -33330,7 +33417,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2705",
+      "source_location": "L2805",
       "weight": 0.9
     },
     {
@@ -33339,7 +33426,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2713",
+      "source_location": "L2813",
       "weight": 0.9
     },
     {
@@ -33348,7 +33435,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2823",
+      "source_location": "L2923",
       "weight": 0.9
     },
     {
@@ -33357,7 +33444,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2829",
+      "source_location": "L2929",
       "weight": 0.9
     },
     {
@@ -33366,7 +33453,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2834",
+      "source_location": "L2934",
       "weight": 0.9
     },
     {
@@ -40692,7 +40779,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2512",
+      "source_location": "L2612",
       "weight": 1
     },
     {
@@ -40701,7 +40788,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2600",
+      "source_location": "L2700",
       "weight": 1
     },
     {
@@ -40710,7 +40797,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2600",
+      "source_location": "L2700",
       "weight": 1
     },
     {
@@ -40719,7 +40806,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2667",
+      "source_location": "L2767",
       "weight": 1
     },
     {
@@ -40728,7 +40815,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -40737,7 +40824,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -40746,7 +40833,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -40755,7 +40842,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -40764,7 +40851,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {
@@ -40773,7 +40860,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2791",
+      "source_location": "L2891",
       "weight": 1
     },
     {

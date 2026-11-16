@@ -980,6 +980,29 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     expect(buyersOpenBox!.width).toBeGreaterThan(gridBox!.width * 0.9);
     expect(makersClosedBox!.width).toBeLessThan(gridBox!.width * 0.55);
 
+    // UI/UX Pro Max Section 2 semantic color recognition & Buyer creation check
+    const colorDiff = await page.evaluate(() => {
+      const saveBuyerBg = getComputedStyle(document.getElementById('btn-admin-save-customer')!).backgroundColor;
+      const issueOrderBg = getComputedStyle(document.getElementById('btn-admin-add-pending-order')!).backgroundColor;
+      const expandAllBg = getComputedStyle(document.querySelector('.su-btn-expand-all')!).backgroundColor;
+      const collapseAllBg = getComputedStyle(document.querySelector('.su-btn-collapse-all')!).backgroundColor;
+      const randomBadge = document.querySelector('.su-uupm-buyer-table .su-uupm-protocol-badge.is-random');
+      const randomBadgeBg = randomBadge ? getComputedStyle(randomBadge).backgroundColor : '';
+      return { saveBuyerBg, issueOrderBg, expandAllBg, collapseAllBg, randomBadgeBg };
+    });
+    expect(colorDiff.saveBuyerBg).not.toBe(colorDiff.issueOrderBg);
+    expect(colorDiff.expandAllBg).not.toBe(colorDiff.collapseAllBg);
+    expect(colorDiff.randomBadgeBg).not.toBe('');
+
+    await page.fill('#admin-cust-name', 'Nordic Safety GmbH');
+    await page.fill('#admin-cust-country', 'Germany');
+    await page.selectOption('#admin-cust-pref', 'THOROUGH');
+    await page.click('#btn-admin-save-customer');
+    await expect(buyersCard).toContainText('Nordic Safety GmbH');
+    const thoroughBadge = buyersCard.locator('.su-uupm-buyer-table .su-uupm-protocol-badge.is-thorough').first();
+    await expect(thoroughBadge).toBeVisible();
+    await expect(thoroughBadge).toContainText('THOROUGH');
+
     // Clicking Section 4 summary opens it full width and switches toggle pill to Collapse
     await makersCard.locator('summary').click();
     await expect(makersCard).toHaveAttribute('open', '');

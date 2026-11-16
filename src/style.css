@@ -1353,6 +1353,7 @@ body {
   /* 3. Completed / Stage 5 / QC Approved / Reconciled */
   --su-complete-primary: #16A34A;
   --su-complete-dark: #15803D;
+  --su-complete-deep: #166534;
   --su-complete-bg: #F0FDF4;
   --su-complete-border: #BBF7D0;
 
@@ -2346,10 +2347,55 @@ body {
   color: var(--su-text-primary);
 }
 
+.superuser-command-center .su-registries-toolbar-title .admin-meta-caption {
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
 .superuser-command-center .su-registries-toolbar-actions {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.superuser-command-center .btn-outline.su-btn-expand-all,
+.superuser-command-center .btn-outline.su-btn-collapse-all {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  min-height: 32px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.superuser-command-center .btn-outline.su-btn-expand-all {
+  background: var(--su-req-bg);
+  color: var(--su-req-primary);
+  border: 1px solid var(--su-req-border);
+}
+
+.superuser-command-center .btn-outline.su-btn-expand-all:hover {
+  background: var(--su-req-primary);
+  color: var(--su-white);
+  border-color: var(--su-req-dark);
+}
+
+.superuser-command-center .btn-outline.su-btn-collapse-all {
+  background: var(--su-bg-tertiary);
+  color: var(--su-text-secondary);
+  border: 1px solid var(--su-border);
+}
+
+.superuser-command-center .btn-outline.su-btn-collapse-all:hover {
+  background: var(--su-text-primary);
+  color: var(--su-white);
+  border-color: var(--su-text-primary);
 }
 
 .superuser-command-center .su-registries-grid {
@@ -2491,6 +2537,387 @@ body {
   padding: 14px 16px;
   background: var(--su-bg-secondary);
   animation: suRegistryReveal 150ms ease-out;
+}
+
+/* Section 2 Recreated with UI/UX Pro Max Skill */
+.superuser-command-center details.su-uupm-buyer-registry {
+  border-left: 4px solid var(--su-req-accent);
+}
+
+.superuser-command-center details.su-uupm-buyer-registry[open] {
+  border-color: var(--su-req-primary);
+  border-left: 4px solid var(--su-req-primary);
+  box-shadow: 0 6px 20px rgba(30, 64, 175, 0.1);
+}
+
+.superuser-command-center details.su-uupm-buyer-registry > summary {
+  padding: 12px 16px;
+}
+
+.superuser-command-center .su-uupm-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--su-req-fill-soft);
+  color: var(--su-req-primary);
+  border: 1px solid var(--su-req-border);
+  flex-shrink: 0;
+}
+
+.superuser-command-center .su-uupm-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.superuser-command-center .su-uupm-subtitle {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--su-text-muted);
+}
+
+.superuser-command-center .su-uupm-kpi-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.superuser-command-center .su-uupm-kpi-pill.is-random {
+  background: var(--su-mreq-bg);
+  color: var(--su-mreq-dark);
+  border: 1px dashed var(--su-mreq-border);
+}
+
+.superuser-command-center .su-uupm-kpi-pill.is-thorough {
+  background: var(--su-grn-bg);
+  color: var(--su-grn-deep);
+  border: 1px solid var(--su-grn-border);
+}
+
+.superuser-command-center .su-uupm-buyer-body {
+  background: var(--su-bg-primary);
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.superuser-command-center .su-uupm-form-card {
+  background: var(--su-bg-secondary);
+  border: 1px solid var(--su-req-border);
+  border-left: 4px solid var(--su-complete-primary);
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.superuser-command-center .su-uupm-form-card:focus-within {
+  border-color: var(--su-req-accent);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.08);
+}
+
+.superuser-command-center .su-uupm-form-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--su-border-subtle);
+}
+
+.superuser-command-center .su-uupm-form-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--su-text-primary);
+  letter-spacing: 0.01em;
+}
+
+.superuser-command-center .su-uupm-form-heading svg {
+  color: var(--su-complete-dark);
+}
+
+.superuser-command-center .su-uupm-master-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--su-req-bg);
+  color: var(--su-req-primary);
+  border: 1px solid var(--su-req-border);
+}
+
+.superuser-command-center .su-uupm-form-card .su-customer-form-grid {
+  margin-bottom: 0;
+  gap: 12px;
+}
+
+.superuser-command-center .su-uupm-form-card .form-group label {
+  font-weight: 700;
+  color: var(--su-text-primary);
+}
+
+.superuser-command-center .su-uupm-form-card .form-input,
+.superuser-command-center .su-uupm-form-card .form-select {
+  min-height: 40px;
+  border-radius: 6px;
+  border-color: var(--su-border);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.superuser-command-center .su-uupm-form-card .form-input:hover,
+.superuser-command-center .su-uupm-form-card .form-select:hover {
+  border-color: var(--su-border-hover);
+}
+
+.superuser-command-center .su-uupm-form-card .form-input:focus,
+.superuser-command-center .su-uupm-form-card .form-select:focus {
+  border-color: var(--su-req-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.16);
+}
+
+.superuser-command-center .su-uupm-field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--su-text-muted);
+}
+
+.superuser-command-center .btn-primary.su-uupm-save-buyer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 6px;
+  background-color: var(--su-complete-dark);
+  border: 1px solid var(--su-complete-dark);
+  color: var(--su-white);
+  box-shadow: 0 2px 6px rgba(21, 128, 61, 0.24);
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.superuser-command-center .btn-primary.su-uupm-save-buyer-btn:hover {
+  background-color: var(--su-complete-deep);
+  border-color: var(--su-complete-deep);
+  box-shadow: 0 4px 10px rgba(22, 101, 52, 0.3);
+}
+
+.superuser-command-center .btn-primary.su-uupm-save-buyer-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--su-white), 0 0 0 4px var(--su-complete-dark);
+}
+
+.superuser-command-center .su-uupm-table-card {
+  background: var(--su-bg-secondary);
+  border: 1px solid var(--su-border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.superuser-command-center .su-uupm-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--su-bg-tertiary);
+  border-bottom: 1px solid var(--su-border);
+}
+
+.superuser-command-center .su-uupm-table-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--su-text-primary);
+}
+
+.superuser-command-center .su-uupm-table-heading svg {
+  color: var(--su-req-primary);
+}
+
+.superuser-command-center .su-uupm-count-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  background: var(--su-white);
+  color: var(--su-text-primary);
+  border: 1px solid var(--su-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.superuser-command-center .su-uupm-legend {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.superuser-command-center .su-uupm-table-scroll {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.superuser-command-center .su-uupm-buyer-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 14px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.superuser-command-center .su-uupm-buyer-table td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+.superuser-command-center .su-uupm-buyer-table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+.superuser-command-center .su-uupm-buyer-table tbody tr:hover {
+  background-color: var(--su-req-bg);
+}
+
+.superuser-command-center .su-uupm-id-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--su-req-bg);
+  color: var(--su-req-primary);
+  border: 1px solid var(--su-req-border);
+}
+
+.superuser-command-center .su-uupm-buyer-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.superuser-command-center .su-uupm-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.superuser-command-center .su-uupm-avatar.is-random {
+  background: var(--su-mreq-bg);
+  color: var(--su-mreq-dark);
+  border: 1px solid var(--su-mreq-border);
+}
+
+.superuser-command-center .su-uupm-avatar.is-thorough {
+  background: var(--su-grn-bg);
+  color: var(--su-grn-deep);
+  border: 1px solid var(--su-grn-border);
+}
+
+.superuser-command-center .su-uupm-buyer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.superuser-command-center .su-uupm-buyer-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--su-text-primary);
+}
+
+.superuser-command-center .su-uupm-buyer-sub {
+  font-size: 11px;
+  color: var(--su-text-muted);
+}
+
+.superuser-command-center .su-uupm-country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--su-bg-primary);
+  color: var(--su-text-primary);
+  border: 1px solid var(--su-border-subtle);
+}
+
+.superuser-command-center .su-uupm-country-pill svg {
+  color: var(--su-text-muted);
+  flex-shrink: 0;
+}
+
+.superuser-command-center .su-uupm-protocol-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.superuser-command-center .su-uupm-protocol-badge.is-random {
+  background: var(--su-mreq-bg);
+  color: var(--su-mreq-dark);
+  border: 1.5px dashed var(--su-mreq-border);
+}
+
+.superuser-command-center .su-uupm-protocol-badge.is-thorough {
+  background: var(--su-grn-fill-soft);
+  color: var(--su-grn-deep);
+  border: 1.5px solid var(--su-grn-border);
 }
 
 @keyframes suRegistryReveal {

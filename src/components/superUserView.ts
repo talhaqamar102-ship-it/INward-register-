@@ -1790,75 +1790,175 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           ? Boolean(ctx.openRegistryIds[key])
           : defaultOpen;
       return `
+    ${(() => {
+      const buyersList = Array.isArray(ov.customers) ? ov.customers : [];
+      const thoroughBuyerCount = buyersList.filter(
+        (c: any) => String(c.inspection_preference || '').toUpperCase() === 'THOROUGH'
+      ).length;
+      const randomBuyerCount = buyersList.length - thoroughBuyerCount;
+      return `
     <div class="su-registries-toolbar">
       <div class="su-registries-toolbar-title">
         <span>Master Registries &amp; System Administration (Sections 2&ndash;6)</span>
         <span class="admin-meta-caption">Click any card header to expand full-width or collapse</span>
       </div>
       <div class="su-registries-toolbar-actions">
-        <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 11.5px;" data-su-action="toggle-all-registries" data-expanded="true">Expand All Registries</button>
-        <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 11.5px;" data-su-action="toggle-all-registries" data-expanded="false">Collapse All Registries</button>
+        <button type="button" class="btn-outline su-btn-expand-all" data-su-action="toggle-all-registries" data-expanded="true">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
+          <span>Expand All Registries</span>
+        </button>
+        <button type="button" class="btn-outline su-btn-collapse-all" data-su-action="toggle-all-registries" data-expanded="false">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg>
+          <span>Collapse All Registries</span>
+        </button>
       </div>
     </div>
 
     <div class="su-registries-grid">
-      <!-- Collapsible Registry 2: Customer & Buyer Master -->
-      <details class="su-collapsible-registry" data-registry-id="buyers" ${isRegOpen('buyers', true) ? 'open' : ''}>
+      <!-- Collapsible Registry 2: Customer & Buyer Master (UI/UX Pro Max) -->
+      <details class="su-collapsible-registry su-uupm-buyer-registry" data-registry-id="buyers" ${isRegOpen('buyers', true) ? 'open' : ''}>
         <summary>
           <span class="su-registry-summary-main">
             <span class="su-registry-step-badge">02</span>
-            <span class="su-registry-title-text">2. Customer &amp; Buyer Master Registry (${ov.customers.length} Buyers)</span>
+            <span class="su-uupm-header-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </span>
+            <span class="su-uupm-title-block">
+              <span class="su-registry-title-text">2. Customer &amp; Buyer Master Registry (${buyersList.length} Buyers)</span>
+              <span class="su-uupm-subtitle">Commercial buyer accounts, export destinations &amp; default QC sampling gates</span>
+            </span>
           </span>
           <span class="su-registry-summary-meta">
-            <span class="admin-meta-caption">AQL Inspection Rules</span>
+            <span class="su-uupm-kpi-pill is-random" title="Buyers using AQL 1.5 Random Sampling">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+              <span>${randomBuyerCount} Random (AQL 1.5)</span>
+            </span>
+            <span class="su-uupm-kpi-pill is-thorough" title="Buyers requiring 100% Thorough Inspection">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+              <span>${thoroughBuyerCount} Thorough (100%)</span>
+            </span>
             <span class="su-registry-toggle-pill" aria-hidden="true">
               <span class="su-toggle-when-closed">Expand &#9662;</span>
               <span class="su-toggle-when-open">Collapse &#9652;</span>
             </span>
           </span>
         </summary>
-        <div class="su-collapsible-body">
-          <div class="su-customer-form-grid">
-            <div class="form-group">
-              <label for="admin-cust-name">Customer Name</label>
-              <input type="text" id="admin-cust-name" class="form-input" placeholder="e.g. Alpine Tactical" />
+        <div class="su-collapsible-body su-uupm-buyer-body">
+          <div class="su-uupm-form-card">
+            <div class="su-uupm-form-card-header">
+              <span class="su-uupm-form-heading">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+                <span>Register New Customer / Buyer Account</span>
+              </span>
+              <span class="su-uupm-master-chip">SQLite Master &bull; Auto-ID</span>
             </div>
-            <div class="form-group">
-              <label for="admin-cust-country">Destination Country</label>
-              <input type="text" id="admin-cust-country" class="form-input" placeholder="e.g. Germany" value="United Kingdom" />
+            <div class="su-customer-form-grid">
+              <div class="form-group">
+                <label for="admin-cust-name">Customer Name <span class="su-required-mark" aria-hidden="true">*</span></label>
+                <input type="text" id="admin-cust-name" class="form-input" placeholder="e.g. Alpine Tactical" required aria-required="true" aria-describedby="hint-admin-cust-name" />
+                <span class="su-uupm-field-hint" id="hint-admin-cust-name">Buyer name linked to Master Orders &amp; Articles</span>
+              </div>
+              <div class="form-group">
+                <label for="admin-cust-country">Destination Country</label>
+                <input type="text" id="admin-cust-country" class="form-input" placeholder="e.g. Germany" value="United Kingdom" aria-describedby="hint-admin-cust-country" />
+                <span class="su-uupm-field-hint" id="hint-admin-cust-country">Export market printed on dispatch manifests</span>
+              </div>
+              <div class="form-group">
+                <label for="admin-cust-pref">QC Inspection Protocol</label>
+                <select id="admin-cust-pref" class="form-select" aria-describedby="hint-admin-cust-pref">
+                  <option value="RANDOM">RANDOM (AQL 1.5)</option>
+                  <option value="THOROUGH">THOROUGH (100%)</option>
+                </select>
+                <span class="su-uupm-field-hint" id="hint-admin-cust-pref">Controls Stage 5 Final QC release sampling gate</span>
+              </div>
+              <button type="button" class="btn-primary su-uupm-save-buyer-btn" id="btn-admin-save-customer">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                <span>Save Buyer</span>
+              </button>
             </div>
-            <div class="form-group">
-              <label for="admin-cust-pref">QC Inspection Protocol</label>
-              <select id="admin-cust-pref" class="form-select">
-                <option value="RANDOM">RANDOM (AQL 1.5)</option>
-                <option value="THOROUGH">THOROUGH (100%)</option>
-              </select>
-            </div>
-            <button type="button" class="btn-primary" id="btn-admin-save-customer">Save Buyer</button>
           </div>
-          <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
-            <table class="data-table">
-              <thead>
-                <tr><th>Customer ID</th><th>Customer Name</th><th>Country</th><th class="text-center">QC Protocol</th></tr>
-              </thead>
-              <tbody>
-                ${ov.customers
-                  .map(
-                    (c: any) => `
+
+          <div class="su-uupm-table-card">
+            <div class="su-uupm-table-header">
+              <div class="su-uupm-table-heading">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="9" y1="4" x2="9" y2="20"></line></svg>
+                <span>Active Buyer Directory</span>
+                <span class="su-uupm-count-chip">${buyersList.length} Accounts</span>
+              </div>
+              <div class="su-uupm-legend" aria-label="QC Protocol Legend">
+                <span class="admin-meta-caption">Protocol Key:</span>
+                <span class="su-uupm-protocol-badge is-random">RANDOM &bull; AQL 1.5</span>
+                <span class="su-uupm-protocol-badge is-thorough">THOROUGH &bull; 100% QC</span>
+              </div>
+            </div>
+            <div class="table-responsive su-uupm-table-scroll">
+              <table class="data-table su-uupm-buyer-table">
+                <thead>
                   <tr>
-                    <td class="font-bold">${escapeHtml(c.id)}</td>
-                    <td>${escapeHtml(c.name)}</td>
-                    <td>${escapeHtml(c.country || '---')}</td>
-                    <td class="text-center"><span class="status-pill">${escapeHtml(c.inspection_preference)}</span></td>
+                    <th>Customer ID</th>
+                    <th>Customer / Buyer Name</th>
+                    <th>Destination Country</th>
+                    <th class="text-center">QC Protocol</th>
                   </tr>
-                `
-                  )
-                  .join('')}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  ${
+                    buyersList.length === 0
+                      ? '<tr><td colspan="4" class="table-empty-cell">No buyers registered yet. Use the form above to add your first customer account.</td></tr>'
+                      : buyersList
+                          .map((c: any) => {
+                            const rawPref = String(c.inspection_preference || 'RANDOM').toUpperCase();
+                            const isThorough = rawPref === 'THOROUGH';
+                            const initials =
+                              String(c.name || '')
+                                .trim()
+                                .split(/\s+/)
+                                .slice(0, 2)
+                                .map((part: string) => part[0] || '')
+                                .join('')
+                                .toUpperCase() || 'BY';
+                            return `
+                    <tr>
+                      <td><span class="su-uupm-id-chip">${escapeHtml(c.id)}</span></td>
+                      <td>
+                        <div class="su-uupm-buyer-cell">
+                          <span class="su-uupm-avatar ${isThorough ? 'is-thorough' : 'is-random'}" aria-hidden="true">${escapeHtml(initials)}</span>
+                          <span class="su-uupm-buyer-meta">
+                            <span class="su-uupm-buyer-name">${escapeHtml(c.name)}</span>
+                            <span class="su-uupm-buyer-sub">${isThorough ? 'Strict 100% Piece Inspection' : 'Standard AQL 1.5 Lot Sampling'}</span>
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="su-uupm-country-pill">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                          <span>${escapeHtml(c.country || '---')}</span>
+                        </span>
+                      </td>
+                      <td class="text-center">
+                        ${
+                          isThorough
+                            ? `<span class="status-pill su-uupm-protocol-badge is-thorough">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                                <span>THOROUGH &bull; 100% QC</span>
+                              </span>`
+                            : `<span class="status-pill su-uupm-protocol-badge is-random">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+                                <span>RANDOM &bull; AQL 1.5</span>
+                              </span>`
+                        }
+                      </td>
+                    </tr>`;
+                          })
+                          .join('')
+                  }
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </details>
+      </details>`;
+    })()}
 
       <!-- Collapsible Registry 3: Glove Product / Article Master -->
       <details class="su-collapsible-registry" data-registry-id="articles" ${isRegOpen('articles', true) ? 'open' : ''}>

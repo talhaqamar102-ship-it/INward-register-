@@ -1070,8 +1070,11 @@
       "dom:#btn-admin-add-pending-order",
       "dom:#buyers",
       "dom:#admin-cust-name",
+      "dom:#hint-admin-cust-name",
       "dom:#admin-cust-country",
+      "dom:#hint-admin-cust-country",
       "dom:#admin-cust-pref",
+      "dom:#hint-admin-cust-pref",
       "dom:#btn-admin-save-customer",
       "dom:#articles",
       "dom:#admin-prod-name",
@@ -1149,7 +1152,7 @@
       "source_location": "L1",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 86
+      "degree": 89
     },
     {
       "id": "file:src/routes/api.js",
