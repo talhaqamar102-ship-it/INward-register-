@@ -1684,6 +1684,116 @@
       "degree": 0
     },
     {
+      "id": "file:.agents/skills/unslop/SKILL.md",
+      "label": ".agents/skills/unslop/SKILL.md",
+      "kind": "file",
+      "file_type": "document",
+      "source_file": ".agents/skills/unslop/SKILL.md",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "file:.agents/skills/unslop/references/effects.md",
+      "label": ".agents/skills/unslop/references/effects.md",
+      "kind": "file",
+      "file_type": "document",
+      "source_file": ".agents/skills/unslop/references/effects.md",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 0
+    },
+    {
+      "id": "file:.agents/skills/unslop/references/refs.md",
+      "label": ".agents/skills/unslop/references/refs.md",
+      "kind": "file",
+      "file_type": "document",
+      "source_file": ".agents/skills/unslop/references/refs.md",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 0
+    },
+    {
+      "id": "file:.agents/skills/unslop/references/rtl.md",
+      "label": ".agents/skills/unslop/references/rtl.md",
+      "kind": "file",
+      "file_type": "document",
+      "source_file": ".agents/skills/unslop/references/rtl.md",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 0
+    },
+    {
+      "id": "file:.agents/skills/unslop/references/signs.md",
+      "label": ".agents/skills/unslop/references/signs.md",
+      "kind": "file",
+      "file_type": "document",
+      "source_file": ".agents/skills/unslop/references/signs.md",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 0
+    },
+    {
+      "id": "file:.agents/skills/unslop/references/tokens.md",
+      "label": ".agents/skills/unslop/references/tokens.md",
+      "kind": "file",
+      "file_type": "document",
+      "source_file": ".agents/skills/unslop/references/tokens.md",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 0
+    },
+    {
+      "id": "file:.agents/skills/unslop/references/visuals.md",
+      "label": ".agents/skills/unslop/references/visuals.md",
+      "kind": "file",
+      "file_type": "document",
+      "source_file": ".agents/skills/unslop/references/visuals.md",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 0
+    },
+    {
+      "id": "file:.agents/skills/unslop/scripts/snapshot.mjs",
+      "label": ".agents/skills/unslop/scripts/snapshot.mjs",
+      "kind": "file",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/snapshot.mjs",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "file:.agents/skills/unslop/scripts/story-path.mjs",
+      "label": ".agents/skills/unslop/scripts/story-path.mjs",
+      "kind": "file",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story-path.mjs",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "file:.agents/skills/unslop/scripts/story.mjs",
+      "label": ".agents/skills/unslop/scripts/story.mjs",
+      "kind": "file",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 9
+    },
+    {
       "id": "file:.agents/skills/verification-loop/SKILL.md",
       "label": ".agents/skills/verification-loop/SKILL.md",
       "kind": "file",
@@ -4222,7 +4332,7 @@
       "source_location": "L1",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 93
+      "degree": 116
     },
     {
       "id": "file:src/db.js",
@@ -4255,7 +4365,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 326
+      "degree": 335
     },
     {
       "id": "file:src/main.tsx",
@@ -4354,7 +4464,7 @@
       "source_location": "L1",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 28
+      "degree": 30
     },
     {
       "id": "file:src/utils/requisitionLogic.ts",
@@ -4585,7 +4695,7 @@
       "source_location": "L153",
       "community": 4,
       "community_label": "SQLite WAL Database & 17-Table Schema (src/db.js)",
-      "degree": 38
+      "degree": 40
     },
     {
       "id": "table:final_inspections",
@@ -5235,6 +5345,105 @@
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 5
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/snapshot.mjs:browserKit",
+      "label": "browserKit()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/snapshot.mjs",
+      "source_location": "L44-L55",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/story-path.mjs:resolveStoryFile",
+      "label": "resolveStoryFile()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story-path.mjs",
+      "source_location": "L13-L27",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/story.mjs:browserKit",
+      "label": "browserKit()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L18-L29",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/story.mjs:letters",
+      "label": "letters()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L169-L197",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/story.mjs:layer",
+      "label": "layer()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L200-L202",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/story.mjs:put",
+      "label": "put()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L207-L214",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/story.mjs:audit",
+      "label": "audit()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L217-L227",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/story.mjs:spacing",
+      "label": "spacing()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L229-L279",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "fn:.agents/skills/unslop/scripts/story.mjs:details",
+      "label": "details()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L281-L298",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
     },
     {
       "id": "class:Program.cs:Program",
@@ -6815,10 +7024,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1508-L2498",
+      "source_location": "L1508-L2766",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 11
+      "degree": 12
     },
     {
       "id": "fn:src/components/superUserView.ts:buildSuperUserReportHtml",
@@ -6826,7 +7035,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2500-L2505",
+      "source_location": "L2768-L2773",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 3
@@ -6837,7 +7046,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2872-L2958",
+      "source_location": "L3140-L3226",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 3
@@ -6848,7 +7057,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2960-L3025",
+      "source_location": "L3228-L3293",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 4
@@ -6859,7 +7068,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3027-L3134",
+      "source_location": "L3295-L3402",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 3
@@ -6870,7 +7079,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3136-L3149",
+      "source_location": "L3404-L3417",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -6881,7 +7090,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3151-L3265",
+      "source_location": "L3419-L3533",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 9
@@ -7266,10 +7475,208 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2224",
+      "source_location": "L2262",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-bom-preview",
+      "label": "#su-unslop-bom-preview",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2304",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "dom:#su-unslop-preview-id",
+      "label": "#su-unslop-preview-id",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2307",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-preview-name",
+      "label": "#su-unslop-preview-name",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2308",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-preview-buyer",
+      "label": "#su-unslop-preview-buyer",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2309",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-preview-stencil",
+      "label": "#su-unslop-preview-stencil",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2311",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-preview-stickers-vis",
+      "label": "#su-unslop-preview-stickers-vis",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2331",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "dom:#su-unslop-pair-label-count",
+      "label": "#su-unslop-pair-label-count",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2341",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-carton-stencil",
+      "label": "#su-unslop-carton-stencil",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2353",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-batch-calc",
+      "label": "#su-unslop-batch-calc",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2365",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-calc-cartons-badge",
+      "label": "#su-unslop-calc-cartons-badge",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2368",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-calc-cartons",
+      "label": "#su-unslop-calc-cartons",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2372",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-calc-polybags",
+      "label": "#su-unslop-calc-polybags",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2376",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-calc-silica",
+      "label": "#su-unslop-calc-silica",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2380",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-calc-stickers",
+      "label": "#su-unslop-calc-stickers",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2384",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#admin-prod-edit-id",
+      "label": "#admin-prod-edit-id",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2393",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "dom:#su-unslop-form-title",
+      "label": "#su-unslop-form-title",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2396",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "dom:#su-unslop-mode-tag",
+      "label": "#su-unslop-mode-tag",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2400",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "dom:#btn-admin-reset-product",
+      "label": "#btn-admin-reset-product",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2401",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
     },
     {
       "id": "dom:#admin-prod-name",
@@ -7277,7 +7684,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2242",
+      "source_location": "L2408",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7288,7 +7695,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2246",
+      "source_location": "L2412",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7299,7 +7706,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2252",
+      "source_location": "L2418",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7310,7 +7717,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2256",
+      "source_location": "L2422",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7321,7 +7728,62 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2258",
+      "source_location": "L2424",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "dom:#su-unslop-visible-count",
+      "label": "#su-unslop-visible-count",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2437",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "dom:#admin-prod-search",
+      "label": "#admin-prod-search",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2445",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 3
+    },
+    {
+      "id": "dom:#admin-prod-buyer-filter",
+      "label": "#admin-prod-buyer-filter",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2451",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 2
+    },
+    {
+      "id": "dom:#su-unslop-articles-table",
+      "label": "#su-unslop-articles-table",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2465",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 1
+    },
+    {
+      "id": "dom:#su-unslop-empty-state",
+      "label": "#su-unslop-empty-state",
+      "kind": "dom",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2546",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7332,7 +7794,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2288",
+      "source_location": "L2556",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7343,7 +7805,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2306",
+      "source_location": "L2574",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7354,7 +7816,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2307",
+      "source_location": "L2575",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7365,7 +7827,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2325",
+      "source_location": "L2593",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7376,7 +7838,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2326",
+      "source_location": "L2594",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7387,7 +7849,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2345",
+      "source_location": "L2613",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7398,7 +7860,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2393",
+      "source_location": "L2661",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7409,7 +7871,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2409",
+      "source_location": "L2677",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7420,7 +7882,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2412",
+      "source_location": "L2680",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7431,7 +7893,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2415",
+      "source_location": "L2683",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7442,7 +7904,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2452",
+      "source_location": "L2720",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7453,7 +7915,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2972",
+      "source_location": "L3240",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7464,7 +7926,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2981",
+      "source_location": "L3249",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7475,7 +7937,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2990",
+      "source_location": "L3258",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7486,7 +7948,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2999",
+      "source_location": "L3267",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7497,7 +7959,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3007",
+      "source_location": "L3275",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7508,7 +7970,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3010",
+      "source_location": "L3278",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7519,7 +7981,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3019",
+      "source_location": "L3287",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7530,7 +7992,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3042",
+      "source_location": "L3310",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7541,7 +8003,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3046",
+      "source_location": "L3314",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7552,7 +8014,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3050",
+      "source_location": "L3318",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7563,7 +8025,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3055",
+      "source_location": "L3323",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7574,7 +8036,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3065",
+      "source_location": "L3333",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 3
@@ -7585,7 +8047,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3073",
+      "source_location": "L3341",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -7596,7 +8058,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3183",
+      "source_location": "L3451",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -7607,7 +8069,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3194",
+      "source_location": "L3462",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 2
@@ -8498,10 +8960,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4178-L4954",
+      "source_location": "L4178-L5213",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 53
+      "degree": 54
     },
     {
       "id": "fn:src/main.ts:syncAdminOrderDraftFromDom",
@@ -8542,7 +9004,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5654-L5689",
+      "source_location": "L5913-L5948",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -8553,7 +9015,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5692-L5692",
+      "source_location": "L5951-L5951",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 7
@@ -8564,7 +9026,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4989-L4993",
+      "source_location": "L5248-L5252",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -8575,7 +9037,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4995-L5001",
+      "source_location": "L5254-L5260",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -8586,7 +9048,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5003-L5021",
+      "source_location": "L5262-L5280",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -8597,7 +9059,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5023-L5096",
+      "source_location": "L5282-L5355",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 13
@@ -8608,7 +9070,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5098-L5102",
+      "source_location": "L5357-L5361",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -8619,7 +9081,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5104-L5108",
+      "source_location": "L5363-L5367",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -8630,7 +9092,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5110-L5113",
+      "source_location": "L5369-L5372",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -8641,7 +9103,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5115-L5166",
+      "source_location": "L5374-L5425",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -8652,7 +9114,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5169-L5198",
+      "source_location": "L5428-L5457",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -8663,7 +9125,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5200-L5228",
+      "source_location": "L5459-L5487",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -8674,7 +9136,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5230-L5255",
+      "source_location": "L5489-L5514",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -8685,7 +9147,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5257-L5286",
+      "source_location": "L5516-L5545",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -8696,7 +9158,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5288-L5335",
+      "source_location": "L5547-L5594",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 9
@@ -8707,7 +9169,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5337-L5385",
+      "source_location": "L5596-L5644",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 7
@@ -8718,7 +9180,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5387-L5464",
+      "source_location": "L5646-L5723",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 12
@@ -8729,7 +9191,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5466-L5490",
+      "source_location": "L5725-L5749",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -8740,7 +9202,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5492-L5496",
+      "source_location": "L5751-L5755",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -8751,7 +9213,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5498-L5503",
+      "source_location": "L5757-L5762",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -8762,7 +9224,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5505-L5536",
+      "source_location": "L5764-L5795",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -8773,7 +9235,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5538-L5553",
+      "source_location": "L5797-L5812",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -8784,7 +9246,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5555-L5578",
+      "source_location": "L5814-L5837",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -8795,7 +9257,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5580-L5599",
+      "source_location": "L5839-L5858",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -8806,7 +9268,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5601-L5618",
+      "source_location": "L5860-L5877",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -8817,7 +9279,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5620-L5636",
+      "source_location": "L5879-L5895",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -8828,7 +9290,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5638-L5640",
+      "source_location": "L5897-L5899",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -8839,7 +9301,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5642-L5651",
+      "source_location": "L5901-L5910",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -9763,7 +10225,7 @@
       "kind": "dom",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5416",
+      "source_location": "L5675",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -11127,7 +11589,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1308-L1826",
+      "source_location": "L1308-L1830",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 22
@@ -13009,6 +13471,96 @@
       "weight": 1
     },
     {
+      "source": "file:.agents/skills/unslop/scripts/snapshot.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/snapshot.mjs:browserKit",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/snapshot.mjs",
+      "source_location": "L44-L55",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story-path.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/story-path.mjs:resolveStoryFile",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story-path.mjs",
+      "source_location": "L13-L27",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story.mjs",
+      "target": "file:.agents/skills/unslop/scripts/story-path.mjs",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L6",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:browserKit",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L18-L29",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:letters",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L169-L197",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:layer",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L200-L202",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:put",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L207-L214",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:audit",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L217-L227",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:spacing",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L229-L279",
+      "weight": 1
+    },
+    {
+      "source": "file:.agents/skills/unslop/scripts/story.mjs",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:details",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L281-L298",
+      "weight": 1
+    },
+    {
       "source": "file:Program.cs",
       "target": "class:Program.cs:Program",
       "relation": "implements",
@@ -14337,7 +14889,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L1508-L2498",
+      "source_location": "L1508-L2766",
       "weight": 1
     },
     {
@@ -14346,7 +14898,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2500-L2505",
+      "source_location": "L2768-L2773",
       "weight": 1
     },
     {
@@ -14355,7 +14907,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2872-L2958",
+      "source_location": "L3140-L3226",
       "weight": 1
     },
     {
@@ -14364,7 +14916,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2960-L3025",
+      "source_location": "L3228-L3293",
       "weight": 1
     },
     {
@@ -14373,7 +14925,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3027-L3134",
+      "source_location": "L3295-L3402",
       "weight": 1
     },
     {
@@ -14382,7 +14934,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3136-L3149",
+      "source_location": "L3404-L3417",
       "weight": 1
     },
     {
@@ -14391,7 +14943,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3151-L3265",
+      "source_location": "L3419-L3533",
       "weight": 1
     },
     {
@@ -14706,75 +15258,21 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2224",
+      "source_location": "L2262",
       "weight": 0.9
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#admin-prod-name",
+      "target": "dom:#su-unslop-bom-preview",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2242",
+      "source_location": "L2304",
       "weight": 0.9
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#admin-prod-cust",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L2246",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#admin-prod-stickers",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L2252",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#admin-prod-carton",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L2256",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#btn-admin-save-product",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L2258",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#makers_pos",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L2288",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#admin-add-maker-input",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L2306",
-      "weight": 0.9
-    },
-    {
-      "source": "file:src/components/superUserView.ts",
-      "target": "dom:#btn-admin-add-maker",
+      "target": "dom:#su-unslop-preview-id",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
@@ -14783,34 +15281,115 @@
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#admin-add-po-input",
+      "target": "dom:#su-unslop-preview-name",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2325",
+      "source_location": "L2308",
       "weight": 0.9
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#btn-admin-add-po",
+      "target": "dom:#su-unslop-preview-buyer",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2326",
+      "source_location": "L2309",
       "weight": 0.9
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#audit_trail",
+      "target": "dom:#su-unslop-preview-stencil",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2345",
+      "source_location": "L2311",
       "weight": 0.9
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#sqlite_wal",
+      "target": "dom:#su-unslop-preview-stickers-vis",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2331",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-pair-label-count",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2341",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-carton-stencil",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2353",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-batch-calc",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2365",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-calc-cartons-badge",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2368",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-calc-cartons",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2372",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-calc-polybags",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2376",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-calc-silica",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2380",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-calc-stickers",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2384",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-prod-edit-id",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
@@ -14819,16 +15398,43 @@
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#btn-admin-trigger-backup",
+      "target": "dom:#su-unslop-form-title",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2409",
+      "source_location": "L2396",
       "weight": 0.9
     },
     {
       "source": "file:src/components/superUserView.ts",
-      "target": "dom:#btn-admin-reseed-db",
+      "target": "dom:#su-unslop-mode-tag",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2400",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#btn-admin-reset-product",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2401",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-prod-name",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2408",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-prod-cust",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
@@ -14837,11 +15443,164 @@
     },
     {
       "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-prod-stickers",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2418",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-prod-carton",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2422",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#btn-admin-save-product",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2424",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-visible-count",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2437",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-prod-search",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2445",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-prod-buyer-filter",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2451",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-articles-table",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2465",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#su-unslop-empty-state",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2546",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#makers_pos",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2556",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-add-maker-input",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2574",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#btn-admin-add-maker",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2575",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#admin-add-po-input",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2593",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#btn-admin-add-po",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2594",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#audit_trail",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2613",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#sqlite_wal",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2661",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#btn-admin-trigger-backup",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2677",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
+      "target": "dom:#btn-admin-reseed-db",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L2680",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/components/superUserView.ts",
       "target": "dom:#btn-admin-export-json",
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2415",
+      "source_location": "L2683",
       "weight": 0.9
     },
     {
@@ -14850,7 +15609,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2452",
+      "source_location": "L2720",
       "weight": 0.9
     },
     {
@@ -14859,7 +15618,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2972",
+      "source_location": "L3240",
       "weight": 0.9
     },
     {
@@ -14868,7 +15627,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2981",
+      "source_location": "L3249",
       "weight": 0.9
     },
     {
@@ -14877,7 +15636,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2990",
+      "source_location": "L3258",
       "weight": 0.9
     },
     {
@@ -14886,7 +15645,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2999",
+      "source_location": "L3267",
       "weight": 0.9
     },
     {
@@ -14895,7 +15654,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3007",
+      "source_location": "L3275",
       "weight": 0.9
     },
     {
@@ -14904,7 +15663,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3010",
+      "source_location": "L3278",
       "weight": 0.9
     },
     {
@@ -14913,7 +15672,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3019",
+      "source_location": "L3287",
       "weight": 0.9
     },
     {
@@ -14922,7 +15681,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3042",
+      "source_location": "L3310",
       "weight": 0.9
     },
     {
@@ -14931,7 +15690,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3046",
+      "source_location": "L3314",
       "weight": 0.9
     },
     {
@@ -14940,7 +15699,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3050",
+      "source_location": "L3318",
       "weight": 0.9
     },
     {
@@ -14949,7 +15708,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3055",
+      "source_location": "L3323",
       "weight": 0.9
     },
     {
@@ -14958,7 +15717,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3065",
+      "source_location": "L3333",
       "weight": 0.9
     },
     {
@@ -14967,7 +15726,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3073",
+      "source_location": "L3341",
       "weight": 0.9
     },
     {
@@ -14976,7 +15735,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3183",
+      "source_location": "L3451",
       "weight": 0.9
     },
     {
@@ -14985,7 +15744,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3189",
+      "source_location": "L3457",
       "weight": 0.9
     },
     {
@@ -14994,7 +15753,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3194",
+      "source_location": "L3462",
       "weight": 0.9
     },
     {
@@ -15759,7 +16518,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4178-L4954",
+      "source_location": "L4178-L5213",
       "weight": 1
     },
     {
@@ -15795,7 +16554,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5654-L5689",
+      "source_location": "L5913-L5948",
       "weight": 1
     },
     {
@@ -15804,7 +16563,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5692-L5692",
+      "source_location": "L5951-L5951",
       "weight": 1
     },
     {
@@ -15813,7 +16572,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4989-L4993",
+      "source_location": "L5248-L5252",
       "weight": 1
     },
     {
@@ -15822,7 +16581,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4995-L5001",
+      "source_location": "L5254-L5260",
       "weight": 1
     },
     {
@@ -15831,7 +16590,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5003-L5021",
+      "source_location": "L5262-L5280",
       "weight": 1
     },
     {
@@ -15840,7 +16599,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023-L5096",
+      "source_location": "L5282-L5355",
       "weight": 1
     },
     {
@@ -15849,7 +16608,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5098-L5102",
+      "source_location": "L5357-L5361",
       "weight": 1
     },
     {
@@ -15858,7 +16617,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5104-L5108",
+      "source_location": "L5363-L5367",
       "weight": 1
     },
     {
@@ -15867,7 +16626,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5110-L5113",
+      "source_location": "L5369-L5372",
       "weight": 1
     },
     {
@@ -15876,7 +16635,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5115-L5166",
+      "source_location": "L5374-L5425",
       "weight": 1
     },
     {
@@ -15885,7 +16644,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5169-L5198",
+      "source_location": "L5428-L5457",
       "weight": 1
     },
     {
@@ -15894,7 +16653,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5200-L5228",
+      "source_location": "L5459-L5487",
       "weight": 1
     },
     {
@@ -15903,7 +16662,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5230-L5255",
+      "source_location": "L5489-L5514",
       "weight": 1
     },
     {
@@ -15912,7 +16671,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5257-L5286",
+      "source_location": "L5516-L5545",
       "weight": 1
     },
     {
@@ -15921,7 +16680,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5288-L5335",
+      "source_location": "L5547-L5594",
       "weight": 1
     },
     {
@@ -15930,7 +16689,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5337-L5385",
+      "source_location": "L5596-L5644",
       "weight": 1
     },
     {
@@ -15939,7 +16698,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387-L5464",
+      "source_location": "L5646-L5723",
       "weight": 1
     },
     {
@@ -15948,7 +16707,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5466-L5490",
+      "source_location": "L5725-L5749",
       "weight": 1
     },
     {
@@ -15957,7 +16716,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5492-L5496",
+      "source_location": "L5751-L5755",
       "weight": 1
     },
     {
@@ -15966,7 +16725,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5498-L5503",
+      "source_location": "L5757-L5762",
       "weight": 1
     },
     {
@@ -15975,7 +16734,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5505-L5536",
+      "source_location": "L5764-L5795",
       "weight": 1
     },
     {
@@ -15984,7 +16743,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5538-L5553",
+      "source_location": "L5797-L5812",
       "weight": 1
     },
     {
@@ -15993,7 +16752,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5555-L5578",
+      "source_location": "L5814-L5837",
       "weight": 1
     },
     {
@@ -16002,7 +16761,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5580-L5599",
+      "source_location": "L5839-L5858",
       "weight": 1
     },
     {
@@ -16011,7 +16770,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5601-L5618",
+      "source_location": "L5860-L5877",
       "weight": 1
     },
     {
@@ -16020,7 +16779,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5620-L5636",
+      "source_location": "L5879-L5895",
       "weight": 1
     },
     {
@@ -16029,7 +16788,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5638-L5640",
+      "source_location": "L5897-L5899",
       "weight": 1
     },
     {
@@ -16038,7 +16797,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5642-L5651",
+      "source_location": "L5901-L5910",
       "weight": 1
     },
     {
@@ -17779,12 +18538,21 @@
       "weight": 1
     },
     {
-      "source": "dom:#btn-admin-save-product",
+      "source": "dom:#su-unslop-preview-stickers-vis",
       "target": "file:src/main.ts",
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4841",
+      "source_location": "L4874",
+      "weight": 1
+    },
+    {
+      "source": "dom:#admin-prod-edit-id",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4894",
       "weight": 1
     },
     {
@@ -17793,25 +18561,7 @@
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4842",
-      "weight": 1
-    },
-    {
-      "source": "dom:#admin-prod-stickers",
-      "target": "file:src/main.ts",
-      "relation": "handled_by",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L4843",
-      "weight": 1
-    },
-    {
-      "source": "dom:#admin-prod-carton",
-      "target": "file:src/main.ts",
-      "relation": "handled_by",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L4844",
+      "source_location": "L4895",
       "weight": 1
     },
     {
@@ -17820,56 +18570,47 @@
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4846",
-      "weight": 1
-    },
-    {
-      "source": "dom:#btn-admin-add-maker",
-      "target": "file:src/main.ts",
-      "relation": "handled_by",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L4885",
-      "weight": 1
-    },
-    {
-      "source": "dom:#admin-add-maker-input",
-      "target": "file:src/main.ts",
-      "relation": "handled_by",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L4886",
-      "weight": 1
-    },
-    {
-      "source": "dom:#btn-admin-add-po",
-      "target": "file:src/main.ts",
-      "relation": "handled_by",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L4895",
-      "weight": 1
-    },
-    {
-      "source": "dom:#admin-add-po-input",
-      "target": "file:src/main.ts",
-      "relation": "handled_by",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
       "source_location": "L4896",
       "weight": 1
     },
     {
-      "source": "dom:#btn-admin-trigger-backup",
+      "source": "dom:#admin-prod-stickers",
       "target": "file:src/main.ts",
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4905",
+      "source_location": "L4897",
       "weight": 1
     },
     {
-      "source": "dom:#btn-admin-reseed-db",
+      "source": "dom:#admin-prod-carton",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4898",
+      "weight": 1
+    },
+    {
+      "source": "dom:#btn-admin-reset-product",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4922",
+      "weight": 1
+    },
+    {
+      "source": "dom:#btn-admin-save-product",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4923",
+      "weight": 1
+    },
+    {
+      "source": "dom:#su-unslop-form-title",
       "target": "file:src/main.ts",
       "relation": "handled_by",
       "confidence": "EXTRACTED",
@@ -17878,12 +18619,111 @@
       "weight": 1
     },
     {
+      "source": "dom:#su-unslop-mode-tag",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4925",
+      "weight": 1
+    },
+    {
+      "source": "dom:#admin-prod-search",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4964",
+      "weight": 1
+    },
+    {
+      "source": "dom:#admin-prod-buyer-filter",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4968",
+      "weight": 1
+    },
+    {
+      "source": "dom:#su-unslop-visible-count",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4996",
+      "weight": 1
+    },
+    {
+      "source": "dom:#su-unslop-empty-state",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4998",
+      "weight": 1
+    },
+    {
+      "source": "dom:#btn-admin-add-maker",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L5144",
+      "weight": 1
+    },
+    {
+      "source": "dom:#admin-add-maker-input",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L5145",
+      "weight": 1
+    },
+    {
+      "source": "dom:#btn-admin-add-po",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L5154",
+      "weight": 1
+    },
+    {
+      "source": "dom:#admin-add-po-input",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L5155",
+      "weight": 1
+    },
+    {
+      "source": "dom:#btn-admin-trigger-backup",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L5164",
+      "weight": 1
+    },
+    {
+      "source": "dom:#btn-admin-reseed-db",
+      "target": "file:src/main.ts",
+      "relation": "handled_by",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L5183",
+      "weight": 1
+    },
+    {
       "source": "dom:#btn-admin-export-json",
       "target": "file:src/main.ts",
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4942",
+      "source_location": "L5201",
       "weight": 1
     },
     {
@@ -17892,7 +18732,7 @@
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5289",
+      "source_location": "L5548",
       "weight": 1
     },
     {
@@ -17901,7 +18741,7 @@
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5290",
+      "source_location": "L5549",
       "weight": 1
     },
     {
@@ -17910,7 +18750,7 @@
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5291",
+      "source_location": "L5550",
       "weight": 1
     },
     {
@@ -17919,7 +18759,7 @@
       "relation": "handled_by",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5416",
+      "source_location": "L5675",
       "weight": 1
     },
     {
@@ -19161,7 +20001,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1308-L1826",
+      "source_location": "L1308-L1830",
       "weight": 1
     },
     {
@@ -19324,6 +20164,24 @@
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
       "source_location": "L1671",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/utils/requisitionLogic.test.ts",
+      "target": "dom:#su-unslop-bom-preview",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/requisitionLogic.test.ts",
+      "source_location": "L1712",
+      "weight": 0.9
+    },
+    {
+      "source": "file:src/utils/requisitionLogic.test.ts",
+      "target": "dom:#admin-prod-search",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/requisitionLogic.test.ts",
+      "source_location": "L1713",
       "weight": 0.9
     },
     {
@@ -20674,6 +21532,24 @@
       "confidence": "EXTRACTED",
       "source_file": ".agents/skills/council-multi-model/scripts/review-with-codex.js",
       "source_location": "L273",
+      "weight": 1
+    },
+    {
+      "source": "fn:.agents/skills/unslop/scripts/snapshot.mjs:browserKit",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:browserKit",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/snapshot.mjs",
+      "source_location": "L44",
+      "weight": 1
+    },
+    {
+      "source": "fn:.agents/skills/unslop/scripts/story.mjs:put",
+      "target": "fn:.agents/skills/unslop/scripts/story.mjs:layer",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/scripts/story.mjs",
+      "source_location": "L207",
       "weight": 1
     },
     {
@@ -22271,6 +23147,15 @@
     },
     {
       "source": "fn:src/components/superUserView.ts:renderOrderCreationTab",
+      "target": "table:cartons",
+      "relation": "queries_table",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1508",
+      "weight": 1
+    },
+    {
+      "source": "fn:src/components/superUserView.ts:renderOrderCreationTab",
       "target": "table:pending_orders",
       "relation": "queries_table",
       "confidence": "EXTRACTED",
@@ -22338,7 +23223,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2872",
+      "source_location": "L3140",
       "weight": 1
     },
     {
@@ -22347,7 +23232,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2960",
+      "source_location": "L3228",
       "weight": 1
     },
     {
@@ -22356,7 +23241,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L2960",
+      "source_location": "L3228",
       "weight": 1
     },
     {
@@ -22365,7 +23250,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3027",
+      "source_location": "L3295",
       "weight": 1
     },
     {
@@ -22374,7 +23259,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3151",
+      "source_location": "L3419",
       "weight": 1
     },
     {
@@ -22383,7 +23268,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3151",
+      "source_location": "L3419",
       "weight": 1
     },
     {
@@ -22392,7 +23277,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3151",
+      "source_location": "L3419",
       "weight": 1
     },
     {
@@ -22401,7 +23286,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3151",
+      "source_location": "L3419",
       "weight": 1
     },
     {
@@ -22410,7 +23295,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3151",
+      "source_location": "L3419",
       "weight": 1
     },
     {
@@ -22419,7 +23304,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/superUserView.ts",
-      "source_location": "L3151",
+      "source_location": "L3419",
       "weight": 1
     },
     {
@@ -25169,6 +26054,15 @@
     },
     {
       "source": "fn:src/main.ts:attachAdminHandlers",
+      "target": "table:cartons",
+      "relation": "queries_table",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L4178",
+      "weight": 1
+    },
+    {
+      "source": "fn:src/main.ts:attachAdminHandlers",
       "target": "table:audit_trail",
       "relation": "queries_table",
       "confidence": "EXTRACTED",
@@ -25677,7 +26571,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5654",
+      "source_location": "L5913",
       "weight": 1
     },
     {
@@ -25686,7 +26580,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5654",
+      "source_location": "L5913",
       "weight": 1
     },
     {
@@ -25695,7 +26589,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4989",
+      "source_location": "L5248",
       "weight": 1
     },
     {
@@ -25704,7 +26598,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4995",
+      "source_location": "L5254",
       "weight": 1
     },
     {
@@ -25713,7 +26607,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4995",
+      "source_location": "L5254",
       "weight": 1
     },
     {
@@ -25722,7 +26616,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5003",
+      "source_location": "L5262",
       "weight": 1
     },
     {
@@ -25731,7 +26625,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25740,7 +26634,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25749,7 +26643,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25758,7 +26652,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25767,7 +26661,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25776,7 +26670,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25785,7 +26679,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25794,7 +26688,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25803,7 +26697,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25812,7 +26706,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25821,7 +26715,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5023",
+      "source_location": "L5282",
       "weight": 1
     },
     {
@@ -25830,7 +26724,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5098",
+      "source_location": "L5357",
       "weight": 1
     },
     {
@@ -25839,7 +26733,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5104",
+      "source_location": "L5363",
       "weight": 1
     },
     {
@@ -25848,7 +26742,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5110",
+      "source_location": "L5369",
       "weight": 1
     },
     {
@@ -25857,7 +26751,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5115",
+      "source_location": "L5374",
       "weight": 1
     },
     {
@@ -25866,7 +26760,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5115",
+      "source_location": "L5374",
       "weight": 1
     },
     {
@@ -25875,7 +26769,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5115",
+      "source_location": "L5374",
       "weight": 1
     },
     {
@@ -25884,7 +26778,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5115",
+      "source_location": "L5374",
       "weight": 1
     },
     {
@@ -25893,7 +26787,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5169",
+      "source_location": "L5428",
       "weight": 1
     },
     {
@@ -25902,7 +26796,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5169",
+      "source_location": "L5428",
       "weight": 1
     },
     {
@@ -25911,7 +26805,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5169",
+      "source_location": "L5428",
       "weight": 1
     },
     {
@@ -25920,7 +26814,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5200",
+      "source_location": "L5459",
       "weight": 1
     },
     {
@@ -25929,7 +26823,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5200",
+      "source_location": "L5459",
       "weight": 1
     },
     {
@@ -25938,7 +26832,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5200",
+      "source_location": "L5459",
       "weight": 1
     },
     {
@@ -25947,7 +26841,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5230",
+      "source_location": "L5489",
       "weight": 1
     },
     {
@@ -25956,7 +26850,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5230",
+      "source_location": "L5489",
       "weight": 1
     },
     {
@@ -25965,7 +26859,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5230",
+      "source_location": "L5489",
       "weight": 1
     },
     {
@@ -25974,7 +26868,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5230",
+      "source_location": "L5489",
       "weight": 1
     },
     {
@@ -25983,7 +26877,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5257",
+      "source_location": "L5516",
       "weight": 1
     },
     {
@@ -25992,7 +26886,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5257",
+      "source_location": "L5516",
       "weight": 1
     },
     {
@@ -26001,7 +26895,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5257",
+      "source_location": "L5516",
       "weight": 1
     },
     {
@@ -26010,7 +26904,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5288",
+      "source_location": "L5547",
       "weight": 1
     },
     {
@@ -26019,7 +26913,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5288",
+      "source_location": "L5547",
       "weight": 1
     },
     {
@@ -26028,7 +26922,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5288",
+      "source_location": "L5547",
       "weight": 1
     },
     {
@@ -26037,7 +26931,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5288",
+      "source_location": "L5547",
       "weight": 1
     },
     {
@@ -26046,7 +26940,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5288",
+      "source_location": "L5547",
       "weight": 1
     },
     {
@@ -26055,7 +26949,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L5288",
+      "source_location": "L5547",
       "weight": 1
     },
     {
@@ -26064,7 +26958,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L5288",
+      "source_location": "L5547",
       "weight": 1
     },
     {
@@ -26073,7 +26967,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5337",
+      "source_location": "L5596",
       "weight": 1
     },
     {
@@ -26082,7 +26976,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5337",
+      "source_location": "L5596",
       "weight": 1
     },
     {
@@ -26091,7 +26985,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5337",
+      "source_location": "L5596",
       "weight": 1
     },
     {
@@ -26100,7 +26994,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5337",
+      "source_location": "L5596",
       "weight": 1
     },
     {
@@ -26109,7 +27003,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5337",
+      "source_location": "L5596",
       "weight": 1
     },
     {
@@ -26118,7 +27012,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26127,7 +27021,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26136,7 +27030,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26145,7 +27039,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26154,7 +27048,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26163,7 +27057,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26172,7 +27066,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26181,7 +27075,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26190,7 +27084,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26199,7 +27093,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L5387",
+      "source_location": "L5646",
       "weight": 1
     },
     {
@@ -26208,7 +27102,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5466",
+      "source_location": "L5725",
       "weight": 1
     },
     {
@@ -26217,7 +27111,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5466",
+      "source_location": "L5725",
       "weight": 1
     },
     {
@@ -26226,7 +27120,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5466",
+      "source_location": "L5725",
       "weight": 1
     },
     {
@@ -26235,7 +27129,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5466",
+      "source_location": "L5725",
       "weight": 1
     },
     {
@@ -26244,7 +27138,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5492",
+      "source_location": "L5751",
       "weight": 1
     },
     {
@@ -26253,7 +27147,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5492",
+      "source_location": "L5751",
       "weight": 1
     },
     {
@@ -26262,7 +27156,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5498",
+      "source_location": "L5757",
       "weight": 1
     },
     {
@@ -26271,7 +27165,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5498",
+      "source_location": "L5757",
       "weight": 1
     },
     {
@@ -26280,7 +27174,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5498",
+      "source_location": "L5757",
       "weight": 1
     },
     {
@@ -26289,7 +27183,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5498",
+      "source_location": "L5757",
       "weight": 1
     },
     {
@@ -26298,7 +27192,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5505",
+      "source_location": "L5764",
       "weight": 1
     },
     {
@@ -26307,7 +27201,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5505",
+      "source_location": "L5764",
       "weight": 1
     },
     {
@@ -26316,7 +27210,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L5505",
+      "source_location": "L5764",
       "weight": 1
     },
     {
@@ -26325,7 +27219,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5538",
+      "source_location": "L5797",
       "weight": 1
     },
     {
@@ -26334,7 +27228,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5538",
+      "source_location": "L5797",
       "weight": 1
     },
     {
@@ -26343,7 +27237,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L5538",
+      "source_location": "L5797",
       "weight": 1
     },
     {
@@ -26352,7 +27246,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5555",
+      "source_location": "L5814",
       "weight": 1
     },
     {
@@ -26361,7 +27255,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5555",
+      "source_location": "L5814",
       "weight": 1
     },
     {
@@ -26370,7 +27264,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5580",
+      "source_location": "L5839",
       "weight": 1
     },
     {
@@ -26379,7 +27273,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5580",
+      "source_location": "L5839",
       "weight": 1
     },
     {
@@ -26388,7 +27282,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5580",
+      "source_location": "L5839",
       "weight": 1
     },
     {
@@ -26397,7 +27291,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L5580",
+      "source_location": "L5839",
       "weight": 1
     },
     {
@@ -26406,7 +27300,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5601",
+      "source_location": "L5860",
       "weight": 1
     },
     {
@@ -26415,7 +27309,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5601",
+      "source_location": "L5860",
       "weight": 1
     },
     {
@@ -26424,7 +27318,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5601",
+      "source_location": "L5860",
       "weight": 1
     },
     {
@@ -26433,7 +27327,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5620",
+      "source_location": "L5879",
       "weight": 1
     },
     {
@@ -26442,7 +27336,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5620",
+      "source_location": "L5879",
       "weight": 1
     },
     {
@@ -26451,7 +27345,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5638",
+      "source_location": "L5897",
       "weight": 1
     },
     {
@@ -26460,7 +27354,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5642",
+      "source_location": "L5901",
       "weight": 1
     },
     {
@@ -26469,7 +27363,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5642",
+      "source_location": "L5901",
       "weight": 1
     },
     {
@@ -26478,7 +27372,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5642",
+      "source_location": "L5901",
       "weight": 1
     },
     {
@@ -30294,6 +31188,24 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": ".agents/skills/e2e-testing/SKILL.md",
+      "source_location": "L1",
+      "weight": 0.8
+    },
+    {
+      "source": "file:.agents/skills/unslop/SKILL.md",
+      "target": "file:.agents/skills/unslop/scripts/snapshot.mjs",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/SKILL.md",
+      "source_location": "L1",
+      "weight": 0.8
+    },
+    {
+      "source": "file:.agents/skills/unslop/SKILL.md",
+      "target": "file:.agents/skills/unslop/scripts/story.mjs",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": ".agents/skills/unslop/SKILL.md",
       "source_location": "L1",
       "weight": 0.8
     },

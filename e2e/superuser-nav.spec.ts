@@ -599,6 +599,65 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     expect(runtimeErrors).toEqual([]);
   });
 
+  test('Section 3 unslop Article & BOM Master updates physical carton blueprint live and filters ledger cleanly', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const section3 = page.locator('details.su-unslop-articles-registry[data-registry-id="articles"]');
+    await expect(section3).toBeVisible();
+    await expect(section3).toHaveAttribute('open', '');
+    await expect(page.locator('#su-unslop-bom-preview')).toBeVisible();
+
+    const rows = page.locator('#su-unslop-articles-table .su-unslop-article-row');
+    const rowCount = await rows.count();
+    expect(rowCount).toBeGreaterThan(2);
+
+    // Click the second row to inspect it and verify the blueprint + 1,000-pair batch math + form sync live
+    const secondRow = rows.nth(1);
+    const secondName = (await secondRow.getAttribute('data-product-name')) || '';
+    const secondCarton = Math.max(1, Number((await secondRow.getAttribute('data-carton')) || 50));
+    await secondRow.click();
+
+    await expect(secondRow).toHaveClass(/is-selected/);
+    await expect(page.locator('#su-unslop-preview-name')).toHaveText(secondName);
+    await expect(page.locator('#admin-prod-name')).toHaveValue(secondName);
+    await expect(page.locator('#su-unslop-calc-cartons')).toHaveText(Math.ceil(1000 / secondCarton).toLocaleString());
+
+    // Live edit carton density and verify instant blueprint update
+    await page.fill('#admin-prod-carton', '25');
+    await expect(page.locator('#su-unslop-carton-stencil')).toHaveText('25 prs/ctn');
+    await expect(page.locator('#su-unslop-calc-cartons')).toHaveText('40');
+
+    // Clear selection restores new spec mode
+    await page.click('#btn-admin-reset-product');
+    await expect(page.locator('#su-unslop-form-title')).toHaveText('New article specification');
+    await expect(page.locator('#btn-admin-reset-product')).toBeHidden();
+
+    // Live search filter reduces visible rows
+    await page.fill('#admin-prod-search', secondName);
+    const visibleAfterSearch = await page
+      .locator('#su-unslop-articles-table .su-unslop-article-row:not([hidden])')
+      .count();
+    expect(visibleAfterSearch).toBeGreaterThanOrEqual(1);
+    expect(visibleAfterSearch).toBeLessThanOrEqual(rowCount);
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
   test('Inward Register locks article & colour from order and requires Received From', async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));

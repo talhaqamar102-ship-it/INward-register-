@@ -1,11 +1,11 @@
 # C4: SQLite WAL Database & 17-Table Schema (src/db.js)
 
-Cohesion Score: `0.58` • Total Nodes: 31
+Cohesion Score: `0.57` • Total Nodes: 31
 
 ## Nodes in Community
 
 - **src/db.js** (`file:src/db.js`) — `src/db.js:L1` (degree: 43)
-- **SQLite Table: cartons** (`table:cartons`) — `src/db.js:L153` (degree: 38)
+- **SQLite Table: cartons** (`table:cartons`) — `src/db.js:L153` (degree: 40)
 - **initDatabase()** (`fn:src/db.js:initDatabase`) — `src/db.js:L20-L386` (degree: 30)
 - **SQLite Table: alterations** (`table:alterations`) — `src/db.js:L141` (degree: 29)
 - **SQLite Table: customers** (`table:customers`) — `src/db.js:L38` (degree: 26)

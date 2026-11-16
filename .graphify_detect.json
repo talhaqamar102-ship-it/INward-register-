@@ -1,6 +1,6 @@
 {
-  "total_files": 408,
-  "total_words": 416932,
+  "total_files": 418,
+  "total_words": 437983,
   "files": {
     "code": [
       ".agents/skills/ck/commands/forget.mjs",
@@ -13,6 +13,9 @@
       ".agents/skills/ck/commands/shared.mjs",
       ".agents/skills/ck/hooks/session-start.mjs",
       ".agents/skills/council-multi-model/scripts/review-with-codex.js",
+      ".agents/skills/unslop/scripts/snapshot.mjs",
+      ".agents/skills/unslop/scripts/story-path.mjs",
+      ".agents/skills/unslop/scripts/story.mjs",
       "Program.cs",
       "e2e/start-test-server.mjs",
       "e2e/superuser-nav.spec.ts",
@@ -205,6 +208,13 @@
       ".agents/skills/strategic-compact/SKILL.md",
       ".agents/skills/tdd-workflow/SKILL.md",
       ".agents/skills/unified-memory/SKILL.md",
+      ".agents/skills/unslop/SKILL.md",
+      ".agents/skills/unslop/references/effects.md",
+      ".agents/skills/unslop/references/refs.md",
+      ".agents/skills/unslop/references/rtl.md",
+      ".agents/skills/unslop/references/signs.md",
+      ".agents/skills/unslop/references/tokens.md",
+      ".agents/skills/unslop/references/visuals.md",
       ".agents/skills/verification-loop/SKILL.md",
       ".agents/skills/windows-desktop-e2e/SKILL.md",
       ".agents/workflows/aside.md",

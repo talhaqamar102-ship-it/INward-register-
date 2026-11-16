@@ -728,6 +728,16 @@
       "file:.agents/skills/strategic-compact/SKILL.md",
       "file:.agents/skills/tdd-workflow/SKILL.md",
       "file:.agents/skills/unified-memory/SKILL.md",
+      "file:.agents/skills/unslop/SKILL.md",
+      "file:.agents/skills/unslop/references/effects.md",
+      "file:.agents/skills/unslop/references/refs.md",
+      "file:.agents/skills/unslop/references/rtl.md",
+      "file:.agents/skills/unslop/references/signs.md",
+      "file:.agents/skills/unslop/references/tokens.md",
+      "file:.agents/skills/unslop/references/visuals.md",
+      "file:.agents/skills/unslop/scripts/snapshot.mjs",
+      "file:.agents/skills/unslop/scripts/story-path.mjs",
+      "file:.agents/skills/unslop/scripts/story.mjs",
       "file:.agents/skills/verification-loop/SKILL.md",
       "file:.agents/skills/windows-desktop-e2e/SKILL.md",
       "file:.agents/workflows/aside.md",
@@ -995,6 +1005,15 @@
       "fn:.agents/skills/council-multi-model/scripts/review-with-codex.js:runReview",
       "fn:.agents/skills/council-multi-model/scripts/review-with-codex.js:runStdinReview",
       "fn:.agents/skills/council-multi-model/scripts/review-with-codex.js:main",
+      "fn:.agents/skills/unslop/scripts/snapshot.mjs:browserKit",
+      "fn:.agents/skills/unslop/scripts/story-path.mjs:resolveStoryFile",
+      "fn:.agents/skills/unslop/scripts/story.mjs:browserKit",
+      "fn:.agents/skills/unslop/scripts/story.mjs:letters",
+      "fn:.agents/skills/unslop/scripts/story.mjs:layer",
+      "fn:.agents/skills/unslop/scripts/story.mjs:put",
+      "fn:.agents/skills/unslop/scripts/story.mjs:audit",
+      "fn:.agents/skills/unslop/scripts/story.mjs:spacing",
+      "fn:.agents/skills/unslop/scripts/story.mjs:details",
       "fn:e2e/superuser-nav.spec.ts:authenticateAsSuperUser",
       "fn:hyperframes-video/prepare-assets.mjs:downloadFonts",
       "fn:hyperframes-video/prepare-assets.mjs:generateAudioAssets",
@@ -1105,11 +1124,34 @@
       "dom:#btn-buyer-filter-RANDOM",
       "dom:#btn-buyer-filter-THOROUGH",
       "dom:#articles",
+      "dom:#su-unslop-bom-preview",
+      "dom:#su-unslop-preview-id",
+      "dom:#su-unslop-preview-name",
+      "dom:#su-unslop-preview-buyer",
+      "dom:#su-unslop-preview-stencil",
+      "dom:#su-unslop-preview-stickers-vis",
+      "dom:#su-unslop-pair-label-count",
+      "dom:#su-unslop-carton-stencil",
+      "dom:#su-unslop-batch-calc",
+      "dom:#su-unslop-calc-cartons-badge",
+      "dom:#su-unslop-calc-cartons",
+      "dom:#su-unslop-calc-polybags",
+      "dom:#su-unslop-calc-silica",
+      "dom:#su-unslop-calc-stickers",
+      "dom:#admin-prod-edit-id",
+      "dom:#su-unslop-form-title",
+      "dom:#su-unslop-mode-tag",
+      "dom:#btn-admin-reset-product",
       "dom:#admin-prod-name",
       "dom:#admin-prod-cust",
       "dom:#admin-prod-stickers",
       "dom:#admin-prod-carton",
       "dom:#btn-admin-save-product",
+      "dom:#su-unslop-visible-count",
+      "dom:#admin-prod-search",
+      "dom:#admin-prod-buyer-filter",
+      "dom:#su-unslop-articles-table",
+      "dom:#su-unslop-empty-state",
       "dom:#makers_pos",
       "dom:#admin-add-maker-input",
       "dom:#btn-admin-add-maker",
@@ -1139,14 +1181,14 @@
     ]
   },
   "cohesion": {
-    "0": 0.72,
+    "0": 0.71,
     "1": 0.63,
     "2": 0.6,
     "3": 0.61,
-    "4": 0.58,
+    "4": 0.57,
     "5": 0.52,
     "6": 0.69,
-    "7": 0.74
+    "7": 0.75
   },
   "gods": [
     {
@@ -1158,7 +1200,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 326
+      "degree": 335
     },
     {
       "id": "file:src/components/superUserView.ts",
@@ -1169,7 +1211,7 @@
       "source_location": "L1",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 93
+      "degree": 116
     },
     {
       "id": "file:src/utils/requisitionLogic.ts",
@@ -1210,10 +1252,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4178-L4954",
+      "source_location": "L4178-L5213",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 53
+      "degree": 54
     },
     {
       "id": "class:src/services/packingService.js:PackingService",
@@ -1268,7 +1310,7 @@
       "source_location": "L153",
       "community": 4,
       "community_label": "SQLite WAL Database & 17-Table Schema (src/db.js)",
-      "degree": 38
+      "degree": 40
     },
     {
       "id": "fn:src/main.ts:attachPackingHandlers",

@@ -2220,69 +2220,337 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       </details>`;
     })()}
 
-      <!-- Collapsible Registry 3: Glove Product / Article Master -->
-      <details class="su-collapsible-registry" data-registry-id="articles" ${isRegOpen('articles', true) ? 'open' : ''}>
-        <summary>
+      <!-- Collapsible Registry 3: Glove Article & Packaging BOM Master (Crafted with heydamir/unslop) -->
+      ${(() => {
+        const productsList = Array.isArray(ov.products) ? ov.products : [];
+        const customersList = Array.isArray(ov.customers) ? ov.customers : [];
+        const cartonCounts = productsList.map((p: any) => Math.max(1, Number(p.pairs_per_carton || 50)));
+        const stickerCounts = productsList.map((p: any) => Math.max(1, Number(p.stickers_per_pair || 2)));
+        const minCarton = cartonCounts.length ? Math.min(...cartonCounts) : 50;
+        const maxCarton = cartonCounts.length ? Math.max(...cartonCounts) : 50;
+        const avgCarton = cartonCounts.length
+          ? Math.round(cartonCounts.reduce((acc: number, v: number) => acc + v, 0) / cartonCounts.length)
+          : 50;
+        const sortedCartons = [...cartonCounts].sort((a, b) => a - b);
+        const medianCarton = sortedCartons.length ? sortedCartons[Math.floor(sortedCartons.length / 2)] : 50;
+        const minStickers = stickerCounts.length ? Math.min(...stickerCounts) : 2;
+        const maxStickers = stickerCounts.length ? Math.max(...stickerCounts) : 2;
+        const uniqueBuyers = new Set(productsList.map((p: any) => p.customer_id).filter(Boolean)).size;
+
+        const leadProduct = productsList[0] || {
+          id: 'GLV-SPEC',
+          name: 'Standard Work Glove',
+          customer_id: customersList[0]?.id || '',
+          customer_name: customersList[0]?.name || 'Buyer account',
+          polybag_per_pair: 1,
+          silica_gel_per_pair: 1,
+          stickers_per_pair: 2,
+          pairs_per_carton: 50
+        };
+        const leadPolybag = Math.max(1, Number(leadProduct.polybag_per_pair || 1));
+        const leadSilica = Math.max(1, Number(leadProduct.silica_gel_per_pair || 1));
+        const leadStickers = Math.max(1, Number(leadProduct.stickers_per_pair || 2));
+        const leadCarton = Math.max(1, Number(leadProduct.pairs_per_carton || 50));
+        const batchPairs = 1000;
+        const leadBatchCartons = Math.ceil(batchPairs / leadCarton);
+        const leadBatchPolybags = batchPairs * leadPolybag;
+        const leadBatchSilica = batchPairs * leadSilica;
+        const leadBatchStickers = batchPairs * leadStickers;
+        const stickerTagCount = Math.min(4, leadStickers);
+
+        return `
+      <details class="su-collapsible-registry su-unslop-articles-registry" data-registry-id="articles" ${isRegOpen('articles', true) ? 'open' : ''}>
+        <summary class="su-unslop-summary">
           <span class="su-registry-summary-main">
-            <span class="su-registry-step-badge">03</span>
-            <span class="su-registry-title-text">3. Glove Article &amp; Packaging BOM Master (${ov.products.length} Articles)</span>
+            <span class="su-unslop-index-mark">03</span>
+            <span class="su-unslop-summary-copy">
+              <span class="su-registry-title-text">3. Glove Article &amp; Packaging BOM Master (${productsList.length} Articles)</span>
+              <span class="su-unslop-subtitle">Per-pair polybag, silica sachet, barcode sticker, and export carton specifications</span>
+            </span>
           </span>
           <span class="su-registry-summary-meta">
-            <span class="admin-meta-caption">Per-Pair Accessory Ratios</span>
-            <span class="su-registry-toggle-pill" aria-hidden="true">
+            <span class="su-unslop-summary-readout">${productsList.length} specs · ${uniqueBuyers} buyers · median ${medianCarton} prs/ctn</span>
+            <span class="su-registry-toggle-pill su-unslop-toggle-pill" aria-hidden="true">
               <span class="su-toggle-when-closed">Expand &#9662;</span>
               <span class="su-toggle-when-open">Collapse &#9652;</span>
             </span>
           </span>
         </summary>
-        <div class="su-collapsible-body">
-          <div class="su-article-form-grid">
-            <div class="form-group">
-              <label for="admin-prod-name">Article Name</label>
-              <input type="text" id="admin-prod-name" class="form-input" placeholder="e.g. Stealth Pro V2" />
+
+        <div class="su-collapsible-body su-unslop-body">
+          <!-- Asymmetric Spec Ledger Header (Quiet chrome, size + tabular hierarchy, zero equal bento cards) -->
+          <div class="su-unslop-ledger-strip">
+            <div class="su-unslop-ledger-lead">
+              <span class="su-unslop-meta-label">Catalog specification</span>
+              <div class="su-unslop-ledger-value">${productsList.length} glove articles across ${uniqueBuyers} buyer accounts</div>
+              <span class="su-unslop-meta-note">Average pack density ${avgCarton} pairs per export carton · click any row below to inspect its carton kit</span>
             </div>
-            <div class="form-group">
-              <label for="admin-prod-cust">Buyer</label>
-              <select id="admin-prod-cust" class="form-select">
-                ${ov.customers.map((c: any) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
-              </select>
+            <div class="su-unslop-ledger-cell">
+              <span class="su-unslop-meta-label">Pair unit ratio</span>
+              <div class="su-unslop-ledger-figure">1 : 1 : ${minStickers === maxStickers ? minStickers : `${minStickers}–${maxStickers}`}</div>
+              <span class="su-unslop-meta-note">Polybag · silica gel · barcode labels</span>
             </div>
-            <div class="form-group">
-              <label for="admin-prod-stickers">Stickers/Pr</label>
-              <input type="number" id="admin-prod-stickers" class="form-input" value="2" min="1" />
+            <div class="su-unslop-ledger-cell">
+              <span class="su-unslop-meta-label">Master carton span</span>
+              <div class="su-unslop-ledger-figure is-accent">${minCarton === maxCarton ? `${minCarton} pairs` : `${minCarton}–${maxCarton} pairs`}</div>
+              <span class="su-unslop-meta-note">${Math.ceil(batchPairs / maxCarton)} to ${Math.ceil(batchPairs / minCarton)} cartons per 1,000 pairs</span>
             </div>
-            <div class="form-group">
-              <label for="admin-prod-carton">Pairs/Ctn</label>
-              <input type="number" id="admin-prod-carton" class="form-input" value="50" min="1" />
-            </div>
-            <button type="button" class="btn-primary" id="btn-admin-save-product">Save Article</button>
           </div>
-          <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
-            <table class="data-table">
-              <thead>
-                <tr><th>Product ID</th><th>Article</th><th>Buyer</th><th class="text-right">Polybag</th><th class="text-right">Silica</th><th class="text-right">Stickers</th><th class="text-right">Prs/Ctn</th></tr>
-              </thead>
-              <tbody>
-                ${ov.products
-                  .map(
-                    (p: any) => `
-                  <tr>
-                    <td class="font-bold">${escapeHtml(p.id)}</td>
-                    <td class="font-bold">${escapeHtml(p.name)}</td>
-                    <td>${escapeHtml(p.customer_name || p.customer_id)}</td>
-                    <td class="text-right">${p.polybag_per_pair}</td>
-                    <td class="text-right">${p.silica_gel_per_pair}</td>
-                    <td class="text-right">${p.stickers_per_pair}</td>
-                    <td class="text-right font-bold">${p.pairs_per_carton}</td>
-                  </tr>
-                `
-                  )
-                  .join('')}
-              </tbody>
-            </table>
+
+          <div class="su-unslop-workbench">
+            <!-- Left Craft Column: Physical Carton & Pair Kit Blueprint + Spec Form -->
+            <div class="su-unslop-left-col">
+              <!-- The One Bright Moment: Live Physical Carton & 1-Pair Polybag Kit Object Preview -->
+              <section class="su-unslop-object-stage" id="su-unslop-bom-preview" aria-label="Physical master carton and pair pack specification preview">
+                <div class="su-unslop-stage-head">
+                  <div class="su-unslop-stage-id-block">
+                    <span class="su-unslop-meta-label">Pack blueprint · <span id="su-unslop-preview-id">${escapeHtml(leadProduct.id)}</span></span>
+                    <h4 class="su-unslop-stage-title" id="su-unslop-preview-name">${escapeHtml(leadProduct.name)}</h4>
+                    <span class="su-unslop-stage-buyer" id="su-unslop-preview-buyer">${escapeHtml(leadProduct.customer_name || leadProduct.customer_id)}</span>
+                  </div>
+                  <span class="su-unslop-stencil-keycap is-lead" id="su-unslop-preview-stencil">${leadPolybag}P · ${leadSilica}S · ${leadStickers}L → ${leadCarton}/ctn</span>
+                </div>
+
+                <div class="su-unslop-studio-scene">
+                  <!-- Physical Object 1: 1-Pair Clear Polybag Unit -->
+                  <div class="su-unslop-polybag-unit">
+                    <div class="su-unslop-polybag-pouch">
+                      <span class="su-unslop-polybag-seal">Peel seal · 1 pair</span>
+                      <div class="su-unslop-glove-diagram" aria-hidden="true">
+                        <svg width="58" height="58" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M18 52V33c0-3 2-5 4-5v-10a2.5 2.5 0 0 1 5 0v12h2V12a2.5 2.5 0 0 1 5 0v18h2V13a2.5 2.5 0 0 1 5 0v17h2V18a2.5 2.5 0 0 1 5 0v18l2.5-3.5a2.5 2.5 0 0 1 4.1 2.8L46 47c-1.4 2.8-3.8 5-7.5 5H18Z"></path>
+                          <path d="M18 45h22"></path>
+                          <path d="M23 32h18"></path>
+                        </svg>
+                      </div>
+                      <div class="su-unslop-polybag-inserts">
+                        <span class="su-unslop-silica-sachet">
+                          <span class="su-unslop-sachet-dot" aria-hidden="true"></span>
+                          <span>${leadSilica}× silica</span>
+                        </span>
+                        <div class="su-unslop-barcode-stack" id="su-unslop-preview-stickers-vis">
+                          ${Array.from({ length: stickerTagCount }, (_, i) => `
+                            <span class="su-unslop-barcode-tag">
+                              <span class="su-unslop-barcode-bars" aria-hidden="true"></span>
+                              <span>Tag ${i + 1}</span>
+                            </span>
+                          `).join('')}
+                        </div>
+                      </div>
+                    </div>
+                    <span class="su-unslop-object-caption">1 pair sleeve · <span id="su-unslop-pair-label-count">${leadStickers}</span> ${leadStickers === 1 ? 'sticker' : 'stickers'}</span>
+                  </div>
+
+                  <!-- Physical Object 2: Master Corrugated Export Carton -->
+                  <div class="su-unslop-carton-unit">
+                    <div class="su-unslop-carton-box">
+                      <div class="su-unslop-carton-top">
+                        <span class="su-unslop-carton-tape"></span>
+                      </div>
+                      <div class="su-unslop-carton-front">
+                        <div class="su-unslop-carton-stencil-mark">
+                          <span class="su-unslop-stencil-kicker">Export master</span>
+                          <span class="su-unslop-stencil-figure" id="su-unslop-carton-stencil">${leadCarton} prs/ctn</span>
+                        </div>
+                        <div class="su-unslop-carton-flutes" aria-hidden="true">
+                          <span></span><span></span><span></span><span></span>
+                        </div>
+                      </div>
+                    </div>
+                    <span class="su-unslop-object-caption">Corrugated case · 5-ply</span>
+                  </div>
+                </div>
+
+                <!-- Live 1,000-Pair Batch Consumption Strip -->
+                <div class="su-unslop-batch-calc" id="su-unslop-batch-calc">
+                  <div class="su-unslop-batch-head">
+                    <span>Consumables for 1,000-pair run</span>
+                    <span class="su-unslop-batch-highlight"><span id="su-unslop-calc-cartons-badge">${leadBatchCartons}</span> export cartons</span>
+                  </div>
+                  <div class="su-unslop-batch-grid">
+                    <div class="su-unslop-batch-metric">
+                      <span class="su-unslop-batch-num is-accent" id="su-unslop-calc-cartons">${leadBatchCartons}</span>
+                      <span class="su-unslop-batch-unit">Cartons</span>
+                    </div>
+                    <div class="su-unslop-batch-metric">
+                      <span class="su-unslop-batch-num" id="su-unslop-calc-polybags">${leadBatchPolybags.toLocaleString()}</span>
+                      <span class="su-unslop-batch-unit">Polybags</span>
+                    </div>
+                    <div class="su-unslop-batch-metric">
+                      <span class="su-unslop-batch-num" id="su-unslop-calc-silica">${leadBatchSilica.toLocaleString()}</span>
+                      <span class="su-unslop-batch-unit">Silica gel</span>
+                    </div>
+                    <div class="su-unslop-batch-metric">
+                      <span class="su-unslop-batch-num" id="su-unslop-calc-stickers">${leadBatchStickers.toLocaleString()}</span>
+                      <span class="su-unslop-batch-unit">Stickers</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Editor Panel (Hidden edit-id kept outside .su-article-form-grid so layout checks inspect visible controls only) -->
+              <div class="su-unslop-form-card">
+                <input type="hidden" id="admin-prod-edit-id" value="" data-polybag="1" data-silica="1" />
+                <div class="su-unslop-form-head">
+                  <div>
+                    <h4 class="su-unslop-form-title" id="su-unslop-form-title">New article specification</h4>
+                    <span class="su-unslop-meta-note">Saved specifications sync immediately to Order Creation and Stage 1 BOMs</span>
+                  </div>
+                  <div class="su-unslop-form-head-actions">
+                    <span class="su-unslop-stencil-keycap" id="su-unslop-mode-tag">New spec</span>
+                    <button type="button" id="btn-admin-reset-product" class="su-unslop-ghost-btn" hidden>Clear selection</button>
+                  </div>
+                </div>
+
+                <div class="su-article-form-grid">
+                  <div class="form-group">
+                    <label for="admin-prod-name">Article name</label>
+                    <input type="text" id="admin-prod-name" class="form-input" placeholder="e.g. Stealth Pro V2" />
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-prod-cust">Buyer account</label>
+                    <select id="admin-prod-cust" class="form-select">
+                      ${customersList.map((c: any) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-prod-stickers">Stickers per pair</label>
+                    <input type="number" id="admin-prod-stickers" class="form-input" value="2" min="1" />
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-prod-carton">Pairs per carton</label>
+                    <input type="number" id="admin-prod-carton" class="form-input" value="50" min="1" />
+                  </div>
+                  <button type="button" class="btn-primary" id="btn-admin-save-product">Save article specification</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Craft Panel: Full 16-Article Specification Ledger -->
+            <div class="su-unslop-catalog-card">
+              <div class="su-unslop-toolbar">
+                <div class="su-unslop-toolbar-top">
+                  <div>
+                    <h4 class="su-unslop-catalog-title">Article specification ledger</h4>
+                    <span class="su-unslop-meta-note">Ratio keycaps follow polybag · silica · barcode label · export carton order</span>
+                  </div>
+                  <span class="su-unslop-visible-count" id="su-unslop-visible-count">${productsList.length} of ${productsList.length} articles</span>
+                </div>
+
+                <div class="su-unslop-filter-row">
+                  <div class="su-unslop-search-wrap">
+                    <svg class="su-unslop-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input
+                      type="search"
+                      id="admin-prod-search"
+                      class="form-input su-unslop-search-input"
+                      placeholder="Search article or SKU"
+                      aria-label="Search article specifications"
+                    />
+                  </div>
+                  <select id="admin-prod-buyer-filter" class="form-select su-unslop-buyer-select" aria-label="Filter articles by buyer">
+                    <option value="ALL">All buyers (${customersList.length})</option>
+                    ${customersList.map((c: any) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
+                  </select>
+                  <div class="su-unslop-density-filters" role="group" aria-label="Filter by carton density">
+                    <button type="button" class="su-unslop-density-btn is-active" data-density-filter="all" aria-pressed="true">All</button>
+                    <button type="button" class="su-unslop-density-btn" data-density-filter="compact" aria-pressed="false">&le;40/ctn</button>
+                    <button type="button" class="su-unslop-density-btn" data-density-filter="standard" aria-pressed="false">50/ctn</button>
+                    <button type="button" class="su-unslop-density-btn" data-density-filter="bulk" aria-pressed="false">&ge;60/ctn</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive su-unslop-table-scroll">
+                <table class="data-table su-unslop-table" id="su-unslop-articles-table">
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Article and buyer</th>
+                      <th>Pair kit formula</th>
+                      <th>Carton density</th>
+                      <th class="text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${productsList
+                      .map((p: any, idx: number) => {
+                        const poly = Math.max(1, Number(p.polybag_per_pair || 1));
+                        const sil = Math.max(1, Number(p.silica_gel_per_pair || 1));
+                        const stk = Math.max(1, Number(p.stickers_per_pair || 2));
+                        const ctn = Math.max(1, Number(p.pairs_per_carton || 50));
+                        const ctnsPer1k = Math.ceil(1000 / ctn);
+                        const densityPct = Math.max(12, Math.min(100, Math.round((ctn / Math.max(1, maxCarton)) * 100)));
+                        const buyerName = String(p.customer_name || p.customer_id || '');
+                        return `
+                      <tr
+                        class="su-unslop-article-row ${idx === 0 ? 'is-selected' : ''}"
+                        tabindex="0"
+                        data-product-id="${escapeHtml(p.id)}"
+                        data-product-name="${escapeHtml(p.name)}"
+                        data-customer-id="${escapeHtml(p.customer_id)}"
+                        data-customer-name="${escapeHtml(buyerName)}"
+                        data-polybag="${poly}"
+                        data-silica="${sil}"
+                        data-stickers="${stk}"
+                        data-carton="${ctn}"
+                      >
+                        <td class="su-unslop-sku-cell">
+                          <span class="su-unslop-sku">${escapeHtml(p.id)}</span>
+                        </td>
+                        <td>
+                          <div class="su-unslop-article-name">${escapeHtml(p.name)}</div>
+                          <div class="su-unslop-buyer-sub">${escapeHtml(buyerName)}</div>
+                        </td>
+                        <td>
+                          <div class="su-unslop-formula-cell">
+                            <span class="su-unslop-stencil-keycap">${poly}P · ${sil}S · ${stk}L</span>
+                            <span class="su-unslop-formula-sub">${poly} bag, ${sil} silica, ${stk} ${stk === 1 ? 'label' : 'labels'}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div class="su-unslop-density-cell">
+                            <div class="su-unslop-density-meta">
+                              <span class="su-unslop-density-prs">${ctn} prs/ctn</span>
+                              <span class="su-unslop-ctns-per-1k">${ctnsPer1k} ctns / 1k</span>
+                            </div>
+                            <div class="su-unslop-density-track" aria-hidden="true">
+                              <div class="su-unslop-density-fill" style="width: ${densityPct}%"></div>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="text-right">
+                          <div class="su-unslop-row-actions">
+                            <button
+                              type="button"
+                              class="su-unslop-row-btn btn-unslop-inspect-article"
+                              data-product-id="${escapeHtml(p.id)}"
+                              aria-label="Inspect and edit ${escapeHtml(p.name)}"
+                            >Inspect</button>
+                            <button
+                              type="button"
+                              class="su-unslop-row-btn is-order btn-unslop-order-article"
+                              data-product-name="${escapeHtml(p.name)}"
+                              data-customer-name="${escapeHtml(buyerName)}"
+                              aria-label="Use ${escapeHtml(p.name)} in Master Order Creation"
+                            >To order</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                      })
+                      .join('')}
+                  </tbody>
+                </table>
+              </div>
+              <div class="su-unslop-empty-state" id="su-unslop-empty-state" hidden>
+                No glove article matches that filter
+              </div>
+            </div>
           </div>
         </div>
-      </details>
+      </details>`;
+      })()}
 
       <!-- Collapsible Registry 4: Contractors / Makers & PO Dropdowns -->
       <details class="su-collapsible-registry" data-registry-id="makers_pos" ${isRegOpen('makers_pos', false) ? 'open' : ''}>
