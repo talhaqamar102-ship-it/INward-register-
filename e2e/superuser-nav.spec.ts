@@ -730,4 +730,99 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
 
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('User Management: centered confirmation popup with Admin password authorizes user deletion and blocks self-delete', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    let expectingExpected401 = false;
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        const text = msg.text();
+        if (expectingExpected401 && text.includes('status of 401')) {
+          return;
+        }
+        runtimeErrors.push(`console.error: ${text}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="users"]');
+
+    // Signed-in Super User's own Delete button is disabled (self-delete lock)
+    const ownRow = page.locator('tr', { hasText: TEST_ADMIN.username });
+    await expect(ownRow).toBeVisible();
+    await expect(ownRow.locator('button[data-admin-delete-user]')).toBeDisabled();
+
+    // Create a new user account to delete
+    await page.fill('#admin-user-name', 'Delete Target Operator');
+    await page.fill('#admin-user-username', 'delete.target.user');
+    await page.fill('#admin-user-password', 'ValidPass123!');
+    await page.selectOption('#admin-user-role', 'INWARD_CLERK');
+    await page.click('#btn-admin-add-system-user');
+
+    const targetRow = page.locator('tr', { hasText: 'delete.target.user' });
+    await expect(targetRow).toBeVisible();
+    const deleteBtn = targetRow.locator('button[data-admin-delete-user]');
+    await expect(deleteBtn).toBeEnabled();
+
+    // Zero horizontal overflow with Delete action column present
+    const overflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth
+    }));
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+
+    // Click Delete -> opens centered confirmation popup requiring Admin password
+    await deleteBtn.click();
+    const modal = page.locator('#global-modal.open');
+    await expect(modal).toBeVisible();
+    const modalBox = await modal.locator('.modal-box').boundingBox();
+    expect(modalBox).not.toBeNull();
+    const modalCenterX = modalBox!.x + modalBox!.width / 2;
+    const modalCenterY = modalBox!.y + modalBox!.height / 2;
+    expect(Math.abs(modalCenterX - 720)).toBeLessThanOrEqual(20);
+    expect(Math.abs(modalCenterY - 450)).toBeLessThanOrEqual(40);
+    await expect(page.locator('#modal-body')).toContainText('delete.target.user');
+    const adminPwInput = page.locator('#confirm-admin-password');
+    await expect(adminPwInput).toBeVisible();
+    await expect(adminPwInput).toBeFocused();
+
+    // Blank Admin password shows inline validation error and keeps modal open
+    await page.click('#confirm-dialog-confirm');
+    await expect(adminPwInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#confirm-admin-password-error')).toContainText('Enter your Admin password');
+    await expect(modal).toBeVisible();
+
+    // Wrong Admin password keeps modal open and shows server error inline (expects 401 Unauthorized)
+    await adminPwInput.fill('Wrong-Admin-Pass');
+    expectingExpected401 = true;
+    try {
+      await Promise.all([
+        page.waitForResponse(res => res.url().includes('/api/admin/users/') && res.request().method() === 'DELETE' && res.status() === 401),
+        page.click('#confirm-dialog-confirm')
+      ]);
+      await expect(page.locator('#confirm-admin-password-error')).toHaveText('Incorrect Admin password. User was not deleted.');
+    } finally {
+      expectingExpected401 = false;
+    }
+    await expect(adminPwInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(modal).toBeVisible();
+    await expect(targetRow).toBeVisible();
+
+    // Correct Admin password deletes the user, closes popup, and removes row
+    await adminPwInput.fill(TEST_ADMIN.password);
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes('/api/admin/users/') && res.request().method() === 'DELETE' && res.status() === 200),
+      page.click('#confirm-dialog-confirm')
+    ]);
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+    await expect(page.locator('tr', { hasText: 'delete.target.user' })).toHaveCount(0);
+
+    expect(runtimeErrors).toEqual([]);
+  });
 });

@@ -1658,6 +1658,7 @@ function renderScreenAdmin(): string {
       poList: state.dropdownOptions.poList
     },
     systemUsers: state.systemUsers,
+    currentUserId: state.currentUser?.userId,
     auditTrail: state.auditTrail,
     adminOverview: state.adminOverview,
     lastBackupPath: state.lastBackupPath,
@@ -4184,6 +4185,13 @@ function attachAdminHandlers(): void {
     });
   });
 
+  document.querySelectorAll<HTMLButtonElement>('[data-admin-delete-user]').forEach(button => {
+    button.addEventListener('click', () => {
+      const userId = button.dataset.adminDeleteUser;
+      if (userId) void window.adminDeleteSystemUser(userId, button);
+    });
+  });
+
   document.querySelectorAll('[data-admin-tab-jump]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const tab = (e.currentTarget as HTMLElement).getAttribute('data-admin-tab-jump') as any;
@@ -4856,6 +4864,7 @@ declare global {
     adminCloseOrderShort: (orderId: string, triggerEl?: HTMLElement | null) => void;
     adminAddSystemUser: (triggerEl?: HTMLElement | null) => void;
     adminResetSystemUserPassword: (userId: string, triggerEl?: HTMLElement | null) => void;
+    adminDeleteSystemUser: (userId: string, triggerEl?: HTMLElement | null) => Promise<void>;
     adminQuickReceiveGrnForOrder: (orderId: string) => void;
     adminQuickCreateReqForOrder: (orderId: string) => void;
     adminOpenReqInScreen: (reqNumber: string, targetScreen: string) => void;
@@ -5258,6 +5267,85 @@ window.adminResetSystemUserPassword = async function(userId: string, triggerEl?:
       }
     }
   );
+};
+
+window.adminDeleteSystemUser = async function(userId: string, triggerEl?: HTMLElement | null) {
+  const targetUser = state.systemUsers.find(u => u.userId === userId);
+  if (state.currentUser?.userId === userId) {
+    showToast('You cannot delete your own active Super User account.');
+    return;
+  }
+
+  resolvePendingConfirmDialog(false);
+  const accountLabel = targetUser
+    ? `${targetUser.name} (@${targetUser.username} • ${targetUser.role})`
+    : userId;
+  const html = buildConfirmDialogHtml({
+    message: `Delete user account ${accountLabel}?`,
+    detail: 'This permanently deletes the account and revokes all of its active sessions. Enter your Admin password to authorize deletion.',
+    confirmLabel: 'Delete User',
+    cancelLabel: 'Cancel',
+    tone: 'danger',
+    passwordField: {
+      id: 'confirm-admin-password',
+      label: 'Admin Password',
+      placeholder: 'Enter your Super User password',
+      hint: 'Required to authorize permanent account deletion.'
+    }
+  });
+  openModal('Confirm Delete User Account', html, false, {
+    hideGlobalFooter: true,
+    returnFocusTarget: triggerEl instanceof HTMLElement ? triggerEl : undefined
+  });
+
+  const pwInput = document.getElementById('confirm-admin-password') as HTMLInputElement | null;
+  const confirmBtn = document.getElementById('confirm-dialog-confirm') as HTMLButtonElement | null;
+  pwInput?.addEventListener('input', () => clearFieldValidationError(pwInput));
+  pwInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmBtn?.click();
+    }
+  });
+
+  confirmBtn?.addEventListener('click', () => {
+    const adminPassword = pwInput?.value || '';
+    if (!adminPassword) {
+      applyFieldValidationErrors([[pwInput, 'Enter your Admin password to confirm user deletion.']]);
+      showToast('Enter your Admin password to confirm user deletion.');
+      return;
+    }
+
+    void runAdminAction(`admin:delete-user:${userId}`, confirmBtn, async () => {
+      try {
+        const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminPassword })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Incorrect Admin password. User was not deleted.');
+        }
+        state.systemUsers = Array.isArray(result.data?.users)
+          ? result.data.users
+          : state.systemUsers.filter(u => u.userId !== userId);
+        logAuditEvent(
+          'USER_DELETE',
+          targetUser?.username || userId,
+          targetUser?.role || 'USER',
+          'Deleted by Super User'
+        );
+        closeModal();
+        showToast(`Deleted user account ${targetUser ? targetUser.name : userId}.`);
+        renderApp();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unable to delete user account.';
+        applyFieldValidationErrors([[pwInput, msg]]);
+        showToast(msg);
+      }
+    });
+  });
 };
 
 window.adminQuickReceiveGrnForOrder = function(orderId: string) {

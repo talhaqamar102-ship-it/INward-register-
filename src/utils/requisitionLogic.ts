@@ -2222,7 +2222,8 @@ export type MesActionType =
   | 'FINAL_QC_REJECT'
   | 'STAGE_5_CARTON_SEAL'
   | 'ALTERATION_CYCLE_UPDATE'
-  | 'SCRAP_CONDEMN';
+  | 'SCRAP_CONDEMN'
+  | 'USER_DELETE';
 
 export const ROLE_PERMISSIONS: Record<MesUserRole, MesActionType[]> = {
   SUPER_USER: [
@@ -2240,7 +2241,8 @@ export const ROLE_PERMISSIONS: Record<MesUserRole, MesActionType[]> = {
     'FINAL_QC_REJECT',
     'STAGE_5_CARTON_SEAL',
     'ALTERATION_CYCLE_UPDATE',
-    'SCRAP_CONDEMN'
+    'SCRAP_CONDEMN',
+    'USER_DELETE'
   ],
   INWARD_CLERK: ['GRN_RECEIVE', 'REQ_ISSUE'],
   PACKING_SUPERVISOR: ['REQ_CREATE', 'WIP_STAGE_ADVANCE', 'STAGE_5_CARTON_SEAL'],
@@ -3673,12 +3675,20 @@ export function renderRequisitionWipAnalyticsChart(params: {
   `;
 }
 
+export interface ConfirmDialogPasswordFieldOptions {
+  id?: string;
+  label: string;
+  placeholder?: string;
+  hint?: string;
+}
+
 export interface ConfirmDialogHtmlOptions {
   message: string;
   detail?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: 'danger' | 'warning';
+  passwordField?: ConfirmDialogPasswordFieldOptions;
 }
 
 /** Builds escaped confirmation dialog body markup for #global-modal. */
@@ -3687,10 +3697,28 @@ export function buildConfirmDialogHtml(options: ConfirmDialogHtmlOptions): strin
   const detailBlock = options.detail
     ? `<p class="su-confirm-detail">${escapeHtml(options.detail)}</p>`
     : '';
+  const pwFieldId = options.passwordField?.id || 'confirm-admin-password';
+  const passwordBlock = options.passwordField
+    ? `
+      <div class="form-group su-confirm-password-group">
+        <label for="${escapeHtml(pwFieldId)}">${escapeHtml(options.passwordField.label)} <span class="su-required-mark" aria-hidden="true">*</span></label>
+        <input
+          type="password"
+          id="${escapeHtml(pwFieldId)}"
+          class="form-input"
+          autocomplete="current-password"
+          aria-required="true"
+          placeholder="${escapeHtml(options.passwordField.placeholder || 'Enter Admin password')}"
+        />
+        ${options.passwordField.hint ? `<span class="form-hint">${escapeHtml(options.passwordField.hint)}</span>` : ''}
+      </div>
+    `
+    : '';
   return `
     <div class="su-confirm-dialog">
       <p class="su-confirm-message">${escapeHtml(options.message)}</p>
       ${detailBlock}
+      ${passwordBlock}
       <div class="su-confirm-actions">
         <button type="button" class="btn-outline" id="confirm-dialog-cancel" data-modal-cancel>${escapeHtml(options.cancelLabel || 'Cancel')}</button>
         <button type="button" class="${confirmClass}" id="confirm-dialog-confirm">${escapeHtml(options.confirmLabel || 'Confirm')}</button>

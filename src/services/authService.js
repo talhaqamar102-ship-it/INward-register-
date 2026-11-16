@@ -172,6 +172,76 @@ export const AuthService = {
   },
 
   deleteUser(userId) {
+    db.prepare('DELETE FROM mes_sessions WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM mes_users WHERE user_id = ?').run(userId);
+  },
+
+  deleteUserByAdmin({ targetUserId, adminUserId, adminPassword }) {
+    const normalizedTargetId = String(targetUserId || '').trim();
+    const normalizedAdminId = String(adminUserId || '').trim();
+    const rawAdminPassword = String(adminPassword || '');
+
+    if (!normalizedTargetId) {
+      const err = new Error('Target user ID is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!rawAdminPassword) {
+      const err = new Error('Enter your Admin password to confirm user deletion.');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (normalizedTargetId === normalizedAdminId) {
+      const err = new Error('You cannot delete your own currently signed-in Super User account.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const adminRow = db.prepare(`
+        SELECT * FROM mes_users
+        WHERE user_id = ? AND active = 1 AND role = 'SUPER_USER'
+      `).get(normalizedAdminId);
+      if (!adminRow) {
+        const err = new Error('Admin session is invalid.');
+        err.statusCode = 401;
+        throw err;
+      }
+
+      const actualHash = scryptSync(rawAdminPassword, adminRow.password_salt, PASSWORD_HASH_BYTES);
+      const expectedHash = Buffer.from(adminRow.password_hash, 'hex');
+      if (actualHash.length !== expectedHash.length || !timingSafeEqual(actualHash, expectedHash)) {
+        const err = new Error('Incorrect Admin password. User was not deleted.');
+        err.statusCode = 401;
+        throw err;
+      }
+
+      const targetRow = db.prepare('SELECT * FROM mes_users WHERE user_id = ?').get(normalizedTargetId);
+      if (!targetRow) {
+        const err = new Error('User account was not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      if (targetRow.role === 'SUPER_USER') {
+        const superCount = Number(
+          db.prepare(`SELECT COUNT(*) AS count FROM mes_users WHERE role = 'SUPER_USER' AND active = 1`).get().count
+        );
+        if (superCount <= 1) {
+          const err = new Error('Cannot delete the last remaining Super User account.');
+          err.statusCode = 400;
+          throw err;
+        }
+      }
+
+      db.prepare('DELETE FROM mes_sessions WHERE user_id = ?').run(normalizedTargetId);
+      db.prepare('DELETE FROM mes_users WHERE user_id = ?').run(normalizedTargetId);
+      db.exec('COMMIT');
+      return publicUser(targetRow);
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
   }
 };

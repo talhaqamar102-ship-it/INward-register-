@@ -12,6 +12,7 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
   let inwardCookie;
   let adminUsername;
   let adminPassword;
+  let adminUserId;
   let packingCookie;
   const testUserIds = [];
   const testTokens = [];
@@ -29,6 +30,7 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
       station: 'Test'
     });
     const adminSession = AuthService.createSession(admin.userId);
+    adminUserId = admin.userId;
     adminCookie = `mes_session=${adminSession.token}`;
     testUserIds.push(admin.userId);
     testTokens.push(adminSession.token);
@@ -187,6 +189,67 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
     assert.equal(AuthService.verifyCredentials(username, oldPassword), null);
     assert.ok(AuthService.verifyCredentials(username, 'New-Secure-Password'));
     assert.equal(AuthService.getSessionUser(session.token), null);
+  });
+
+  test('API authentication: Super User can delete user only with valid Admin password and cannot self-delete', async () => {
+    const suffix = randomUUID();
+    const username = `del-${suffix}`;
+    const userPassword = `Del-${suffix}-Password`;
+    const targetUser = AuthService.createUser({
+      name: 'Delete Target Operator',
+      username,
+      password: userPassword,
+      role: 'INWARD_CLERK',
+      station: 'Dock #1'
+    });
+    const targetSession = AuthService.createSession(targetUser.userId);
+    testUserIds.push(targetUser.userId);
+    testTokens.push(targetSession.token);
+
+    const targetEndpoint = `${baseUrl}/api/admin/users/${encodeURIComponent(targetUser.userId)}`;
+
+    const denied = await apiFetch(targetEndpoint, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword })
+    }, inwardCookie);
+    assert.equal(denied.status, 403);
+
+    const blankPassword = await apiFetch(targetEndpoint, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword: '' })
+    });
+    assert.equal(blankPassword.status, 400);
+
+    const wrongPassword = await apiFetch(targetEndpoint, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword: 'Wrong-Admin-Password' })
+    });
+    assert.equal(wrongPassword.status, 401);
+    assert.ok(AuthService.listUsers().some(u => u.userId === targetUser.userId));
+
+    const selfDelete = await apiFetch(`${baseUrl}/api/admin/users/${encodeURIComponent(adminUserId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword })
+    });
+    assert.equal(selfDelete.status, 400);
+    assert.ok(AuthService.listUsers().some(u => u.userId === adminUserId));
+
+    const deleted = await apiFetch(targetEndpoint, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword })
+    });
+    assert.equal(deleted.status, 200);
+    const deletedJson = await deleted.json();
+    assert.equal(deletedJson.success, true);
+    assert.equal(deletedJson.data.deleted, true);
+    assert.equal(deletedJson.data.user.userId, targetUser.userId);
+    assert.equal(AuthService.getSessionUser(targetSession.token), null);
+    assert.equal(AuthService.listUsers().some(u => u.userId === targetUser.userId), false);
   });
 
   test('API: /api/inventory/gloves returns seeded glove inventory', async () => {

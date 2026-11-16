@@ -1573,6 +1573,26 @@ test('Phase 4.2: confirm dialog HTML escapes hostile payloads and form validator
   assert.ok(html.includes('id="confirm-dialog-confirm"'), 'Includes explicit Confirm button');
   assert.ok(html.includes('btn-danger'), 'Danger tone applies btn-danger class');
 
+  const pwDialogHtml = buildConfirmDialogHtml({
+    message: `Delete user <img src=x onerror=alert(1)>?`,
+    detail: 'Permanent delete.',
+    confirmLabel: 'Delete User',
+    cancelLabel: 'Cancel',
+    tone: 'danger',
+    passwordField: {
+      id: 'confirm-admin-password',
+      label: 'Admin Password "test"',
+      placeholder: 'Enter Admin <password>',
+      hint: 'Required to authorize deletion.'
+    }
+  });
+  assert.doesNotMatch(pwDialogHtml, /<img\b/i, 'Password confirm dialog escapes message HTML');
+  assert.ok(pwDialogHtml.includes('id="confirm-admin-password"'), 'Renders expected password field ID');
+  assert.ok(pwDialogHtml.includes('type="password"'), 'Renders password input type');
+  assert.ok(pwDialogHtml.includes('aria-required="true"'), 'Marks admin password input as aria-required');
+  assert.ok(pwDialogHtml.includes('Admin Password &quot;test&quot;'), 'Escapes password label');
+  assert.ok(pwDialogHtml.includes('Enter Admin &lt;password&gt;'), 'Escapes password placeholder');
+
   assert.deepEqual(validatePendingOrderInputs({ maker: '', article: '' }), {
     maker: 'Select a Contractor / Maker.',
     article: 'Select an Article.'

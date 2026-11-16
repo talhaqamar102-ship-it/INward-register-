@@ -62,6 +62,7 @@ export interface SuperUserRenderContext {
     poList: string[];
   };
   systemUsers?: SystemUserRecord[];
+  currentUserId?: string;
   auditTrail?: AuditTrailEntry[];
   adminOverview: {
     dbHealth: {
@@ -2652,7 +2653,7 @@ function renderUsersTab(ctx: SuperUserRenderContext): string {
         <div class="table-responsive">
           <table class="data-table su-user-table">
             <thead>
-              <tr><th>Operator</th><th>Username</th><th>Role</th><th>Station</th><th>Status</th><th>Authorized Actions</th><th>Set Sign-in Password</th></tr>
+              <tr><th>Operator</th><th>Username</th><th>Role</th><th>Station</th><th>Status</th><th>Authorized Actions</th><th>Set Sign-in Password &amp; Actions</th></tr>
             </thead>
             <tbody>
               ${systemUsers.map(user => {
@@ -2660,6 +2661,7 @@ function renderUsersTab(ctx: SuperUserRenderContext): string {
                 const summaryPreview = perms.length > 0
                   ? `${perms.length} action${perms.length === 1 ? '' : 's'} (${escapeHtml(perms.slice(0, 2).join(', '))}${perms.length > 2 ? ', +' + (perms.length - 2) + ' more' : ''})`
                   : 'No permissions';
+                const isCurrentUser = Boolean(ctx.currentUserId && user.userId === ctx.currentUserId);
                 return `
                 <tr>
                   <td class="font-bold">${escapeHtml(user.name)}</td>
@@ -2681,6 +2683,13 @@ function renderUsersTab(ctx: SuperUserRenderContext): string {
                         autocomplete="new-password" aria-label="New sign-in password for ${escapeHtml(user.username)}"
                         placeholder="At least 8 characters" />
                       <button type="button" class="btn-outline" data-admin-reset-password="${escapeHtml(user.userId)}">Update</button>
+                      <button
+                        type="button"
+                        class="btn-danger"
+                        data-admin-delete-user="${escapeHtml(user.userId)}"
+                        aria-label="Delete user ${escapeHtml(user.username)}"
+                        ${isCurrentUser ? 'disabled title="Cannot delete your own active Super User account"' : ''}
+                      >Delete</button>
                     </div>
                   </td>
                 </tr>

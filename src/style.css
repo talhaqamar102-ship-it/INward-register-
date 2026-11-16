@@ -1714,7 +1714,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.4;
-  color: var(--su-areq-dark);
+  color: var(--su-areq-dark, #991B1B);
 }
 
 .su-user-password-control + .su-form-error {
@@ -1722,8 +1722,9 @@ body {
 }
 
 .superuser-command-center .form-input[aria-invalid="true"],
-.superuser-command-center .form-select[aria-invalid="true"] {
-  border-color: var(--su-areq-primary);
+.superuser-command-center .form-select[aria-invalid="true"],
+.su-confirm-dialog .form-input[aria-invalid="true"] {
+  border-color: var(--su-areq-primary, #DC2626);
 }
 
 .superuser-command-center .main-viewport {
@@ -1913,14 +1914,25 @@ body {
 
 .su-user-password-control {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) auto;
+  grid-template-columns: minmax(150px, 1fr) auto auto;
   align-items: center;
   gap: 6px;
-  min-width: 260px;
+  min-width: 320px;
 }
 
-.su-user-password-control .btn-outline {
+.su-user-password-control .btn-outline,
+.su-user-password-control .btn-danger {
   white-space: nowrap;
+}
+
+.su-confirm-password-group {
+  margin-top: 4px;
+}
+
+.su-confirm-password-group .su-required-mark {
+  color: var(--su-areq-dark, #991B1B);
+  font-weight: 700;
+  margin-left: 2px;
 }
 
 .superuser-command-center .admin-workspace-layout {

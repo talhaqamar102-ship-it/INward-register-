@@ -114,6 +114,7 @@
       "iface:src/utils/requisitionLogic.ts:PackingRequisitionSlipParams",
       "iface:src/utils/requisitionLogic.ts:GrnSlipParams",
       "iface:src/utils/requisitionLogic.ts:RequisitionAnalyticsPoint",
+      "iface:src/utils/requisitionLogic.ts:ConfirmDialogPasswordFieldOptions",
       "iface:src/utils/requisitionLogic.ts:ConfirmDialogHtmlOptions",
       "iface:src/utils/requisitionLogic.ts:FocusSelectorTargetInput",
       "fn:src/utils/requisitionLogic.ts:getActiveGloveSizes",
@@ -225,6 +226,7 @@
       "route:GET:/api/admin/overview",
       "route:GET:/api/admin/users",
       "route:POST:/api/admin/users",
+      "route:DELETE:/api/admin/users/:userId",
       "route:GET:/api/admin/audit-trail",
       "route:POST:/api/admin/inventory/gloves",
       "route:POST:/api/admin/inventory/materials",
@@ -907,7 +909,7 @@
       "source_location": "L1",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 86
+      "degree": 87
     },
     {
       "id": "file:src/routes/api.js",
@@ -918,7 +920,7 @@
       "source_location": "L1",
       "community": 2,
       "community_label": "Express API & HTTP Server Layer (server.ts, api.js)",
-      "degree": 66
+      "degree": 67
     },
     {
       "id": "class:src/services/packingService.js:PackingService",
@@ -970,7 +972,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2999",
+      "source_location": "L3000",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 35
@@ -1003,7 +1005,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4163",
+      "source_location": "L4164",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 32
