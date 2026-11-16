@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -17,6 +18,9 @@ import {
   applyPendingOrderSelection,
   evaluateRequisitionIssuance,
   determineOrderActiveStage,
+  isPackingAwaitingFinalQc,
+  isStage5ReadyForCartons,
+  computeWipRolledYieldPct,
   canExecuteStage5CartonPacking,
   buildPackingRequisitionSlipHtml,
   buildMaterialRequisitionSlipHtml,
@@ -48,7 +52,16 @@ import {
   buildRequisitionAnalyticsSeries,
   getSuperUserStatusBadgeClass,
   renderRequisitionWipAnalyticsChart,
+  buildConfirmDialogHtml,
+  validatePendingOrderInputs,
+  validateCustomerMasterInputs,
+  validateProductMasterInputs,
+  validateSystemUserInputs,
+  validatePasswordResetInput,
+  buildFocusRestoreSelector,
+  getDefaultStationForRole,
   createEmptySizes,
+  getStartupRequisitionNumber,
   PendingOrder,
   OrderWipState
 } from './requisitionLogic';
@@ -71,12 +84,13 @@ test('R1, 2.8, 3.8, 4.6, 4.7: authoritative size set constant supports standard 
   assert.equal(DEFAULT_MES_POLICY_CONFIG.alterationWorkflowMode, 'FULL_AREQ_CYCLE_AND_SCRAP');
 });
 
-test('1.2: normalizeSuperUserTab redirects legacy tab IDs to canonical 4 sub-views', () => {
+test('1.2: normalizeSuperUserTab redirects legacy tab IDs to canonical views', () => {
   assert.equal(normalizeSuperUserTab('dashboard'), 'dashboard');
   assert.equal(normalizeSuperUserTab('traceability'), 'tracking');
   assert.equal(normalizeSuperUserTab('ledger'), 'tracking');
   assert.equal(normalizeSuperUserTab('orders'), 'creation');
   assert.equal(normalizeSuperUserTab('admin'), 'creation');
+  assert.equal(normalizeSuperUserTab('user-management'), 'users');
   assert.equal(normalizeSuperUserTab('analytics'), 'reports');
 });
 
@@ -121,6 +135,26 @@ test('unified requisition number generates M- and A- prefixes from same req numb
   assert.equal(getAlterationReqNumber(base), 'A-REQ-2026-0001');
   assert.equal(getMaterialReqNumber('M-REQ-2026-0001'), 'M-REQ-2026-0001');
   assert.equal(getAlterationReqNumber('M-REQ-2026-0001'), 'A-REQ-2026-0001');
+});
+
+test('startup restores a saved active requisition even when it matches the default REQ number', () => {
+  const persistedReqNumbers = ['REQ-0001', 'REQ-0002'];
+  assert.equal(
+    getStartupRequisitionNumber('REQ-0001', { plannedQty: 0 }, persistedReqNumbers),
+    'REQ-0001'
+  );
+  assert.equal(
+    getStartupRequisitionNumber('REQ-DEFAULT', { plannedQty: 0 }, persistedReqNumbers),
+    'REQ-0001'
+  );
+  assert.equal(
+    getStartupRequisitionNumber(
+      'REQ-0001',
+      { plannedQty: 100, parentOrderId: 'ORD-2026-001' },
+      persistedReqNumbers
+    ),
+    null
+  );
 });
 
 test('selecting a pending order created by super user automatically fills maker and article blanks', () => {
@@ -289,6 +323,28 @@ test('3.4 & 3.5: non-tautological Floor WIP calculation detects artificially inj
   });
   assert.equal(balanced.actualFloorWipPairs, 190);
   assert.equal(balanced.varianceDelta, 0);
+
+  const stageDefects = computeActualStageWipPairs({
+    isIssued: true,
+    issuedPairs: 1000,
+    stage1In: 1000,
+    stage1Passed: 900,
+    stage2In: 900,
+    stage2Passed: 850,
+    stage2Defects: 50,
+    stage3In: 850,
+    stage3Passed: 800,
+    stage3Defects: 50,
+    stage4In: 800,
+    stage4Passed: 800,
+    packedStage5Pairs: 0,
+    inAlterationPairs: 200,
+    scrappedPairs: 0
+  });
+  assert.equal(stageDefects.stage2Bucket, 0, 'Stage 2 defects must not be double-counted as floor WIP');
+  assert.equal(stageDefects.stage3Bucket, 0, 'Stage 3 defects must not be double-counted as floor WIP');
+  assert.equal(stageDefects.actualFloorWipPairs, 800);
+  assert.equal(stageDefects.varianceDelta, 0);
 
   // Artificially inject 15 unaccounted missing pairs on the floor
   const corrupted = computeActualStageWipPairs({
@@ -622,18 +678,78 @@ test('R2 & 12.3: zero raw hex colors exist in superUserView.ts and requisitionLo
   const superUserHtml = renderRequisitionWipAnalyticsChart({ series: sampleSeries, mode: 'super-user' });
 
   assert.equal(packingHallHtml.includes('var(--su-'), false);
+  assert.equal(packingHallHtml.includes('var(--border-default)'), false);
   assert.equal(packingHallHtml.includes('var(--ink-900)'), true);
   assert.equal(superUserHtml.includes('var(--su-complete-primary)'), true);
+  assert.equal(superUserHtml.includes('var(--border-default)'), false);
 
-  // Verify zero raw hex color codes in superUserView.ts and requisitionLogic.ts
+  // Proportional bar height & accessible chart structure test (7,116 vs 887 on shared 140px plot track)
+  const mixedScaleChart = renderRequisitionWipAnalyticsChart({
+    series: [
+      {
+        reqNumber: 'REQ-2026-0001',
+        parentOrderId: 'ORD-2026-001',
+        article: 'Model A1',
+        mreqNo: 'M-REQ-2026-0001',
+        altReqNo: 'A-REQ-2026-0001',
+        plannedDemandPairs: 887,
+        issuedFloorPairs: 887,
+        stage1To3WipPairs: 0,
+        stage4FirstPackedPairs: 820,
+        actualPackedPairs: 0,
+        alterationAndScrapPairs: 67,
+        unpackedBalancePairs: 887,
+        packedCompletionPct: 0,
+        firstPackedPct: 92,
+        activeStage: 'STEP_4',
+        reqLifecycleStatus: 'AWAITING QC',
+        isSelected: true
+      },
+      {
+        reqNumber: 'REQ-2026-0002',
+        parentOrderId: 'ORD-2026-002',
+        article: 'Model A2',
+        mreqNo: 'M-REQ-2026-0002',
+        altReqNo: 'A-REQ-2026-0002',
+        plannedDemandPairs: 7116,
+        issuedFloorPairs: 0,
+        stage1To3WipPairs: 0,
+        stage4FirstPackedPairs: 0,
+        actualPackedPairs: 0,
+        alterationAndScrapPairs: 0,
+        unpackedBalancePairs: 7116,
+        packedCompletionPct: 0,
+        firstPackedPct: 0,
+        activeStage: 'STEP_1',
+        reqLifecycleStatus: 'PENDING ISSUE',
+        isSelected: false
+      }
+    ],
+    activeReqNumber: 'REQ-2026-0001',
+    mode: 'packing-hall'
+  });
+
+  assert.ok(mixedScaleChart.includes('data-testid="wip-chart-plot"'));
+  assert.ok(mixedScaleChart.includes('height: 140px;'));
+  assert.ok(mixedScaleChart.includes('data-series="planned" data-value="7116"') && mixedScaleChart.includes('height: 140px;'), 'max value 7116 must fill full 140px plot height');
+  assert.match(mixedScaleChart, /data-series="planned" data-value="7116"[^>]*style="[^"]*height:\s*140px/);
+  assert.match(mixedScaleChart, /data-series="planned" data-value="887"[^>]*style="[^"]*height:\s*17px/);
+  assert.ok(mixedScaleChart.includes('role="img"'), 'bars must declare role="img"');
+  assert.ok(mixedScaleChart.includes('<table class="sr-only">'), 'chart must expose a screen-reader data table');
+
+  // Verify zero raw hex color codes in superUserView.ts, requisitionLogic.ts, and packingHallView.ts
   const suViewPath = path.resolve(process.cwd(), 'src/components/superUserView.ts');
   const reqLogicPath = path.resolve(process.cwd(), 'src/utils/requisitionLogic.ts');
+  const packingViewPath = path.resolve(process.cwd(), 'src/components/packingHallView.ts');
   const suViewSrc = fs.readFileSync(suViewPath, 'utf8');
   const reqLogicSrc = fs.readFileSync(reqLogicPath, 'utf8');
+  const packingViewSrc = fs.readFileSync(packingViewPath, 'utf8');
 
   const hexRegex = /(?<!&)#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})\b/g;
   assert.deepEqual(suViewSrc.match(hexRegex) || [], [], 'superUserView.ts must contain zero raw hex color literals');
   assert.deepEqual(reqLogicSrc.match(hexRegex) || [], [], 'requisitionLogic.ts must contain zero raw hex color literals');
+  assert.deepEqual(packingViewSrc.match(hexRegex) || [], [], 'packingHallView.ts must contain zero raw hex color literals');
+  assert.equal(packingViewSrc.includes('--su-'), false, 'packingHallView.ts must remain strictly monochrome without --su-* tokens');
 });
 
 test('2.10, 3.1, 3.4, 3.7, 11.1: OrderTraceabilityItem exposes all canonical fields and non-tautological Dock Gate catches dock discrepancies', () => {
@@ -716,7 +832,7 @@ test('11.6 & 4.2: Chronological 10-step 600-pair replay proves pre-GRN-3 over-is
   assert.equal(replay.forcedDockVarianceRollup.reconciliation.deltaPairs, 15);
 });
 
-test('5.1-8.5, 6.6, 9.6, 12.2: Super User 4-view DOM rendering, <150ms Tier-1->Tier-2 expansion latency, WCAG >=4.5:1 contrast, and Phased Rollout Record', () => {
+test('5.1-8.5, 6.6, 9.6, 12.2: Super User 5-view DOM rendering, <150ms Tier-1->Tier-2 expansion latency, WCAG >=4.5:1 contrast, and Phased Rollout Record', () => {
   const scenario = createDemo600PairScenario('COMPLETED');
   const rollupSummary = buildSuperUserOrderRollups({
     pendingOrders: [scenario.order],
@@ -775,7 +891,54 @@ test('5.1-8.5, 6.6, 9.6, 12.2: Super User 4-view DOM rendering, <150ms Tier-1->T
   assert.ok(v1Html.includes('data-testid="su-pulse-cards-grid"'), '5.1 Pulse Cards Strip present');
   assert.ok(v1Html.includes('data-testid="su-exceptions-strip"'), '5.2 Exceptions Strip present');
   assert.ok(v1Html.includes('id="su-active-orders-pulse-section"'), '5.3 Active Master Orders Pulse Table present');
+  assert.ok(v1Html.includes('aria-label="Super User Navigation"'), 'Super User navigation uses accessible landmark nav');
+  assert.ok(!v1Html.includes('role="tab"'), 'Super User sidebar avoids fragile tablist ARIA');
+  assert.ok(!v1Html.includes('data-short-label='), 'Collapsed sidebar uses icons instead of single-letter badges');
+  assert.ok(v1Html.includes('aria-label="Dashboard" data-admin-tab="dashboard" aria-current="page"'), 'Active nav item exposes aria-current="page"');
+  assert.ok(!v1Html.includes('title="Order Creation"'), 'Expanded nav omits redundant title tooltips');
+  assert.ok(!v1Html.includes('id="btn-admin-lock"') && !v1Html.includes('Lock Admin Session'), 'Duplicate lock buttons removed');
+  const v1CollapsedHtml = renderSuperUserScreen({ ...baseCtx, activeTab: 'dashboard', adminNavCollapsed: true });
+  assert.ok(v1CollapsedHtml.includes('aria-label="Dashboard"'), 'Collapsed Super User navigation keeps accessible button names');
+  assert.ok(v1CollapsedHtml.includes('title="Order Creation"'), 'Collapsed nav shows title tooltips on hover');
+  assert.ok(v1Html.includes('id="btn-load-demo-600-inprogress"'), 'Demo in-progress button present');
+  assert.ok(v1Html.includes('id="btn-load-demo-600-complete"'), 'Demo complete button present');
   assert.ok(v1Html.includes('id="btn-load-demo-600-variance"'), '11.6 Deliberate Variance button present');
+  assert.ok(v1Html.includes('id="btn-remove-demo-600"'), 'Remove demo button present when demo order loaded');
+  assert.match(v1Html, /<details class="su-demo-drawer" open>/, 'Demo drawer opens automatically when demo order is loaded');
+  assert.ok(v1Html.includes('class="su-stage-bar-btn"'), 'Dashboard stage bars render semantic buttons when orders exist');
+  for (const expectedFilter of ['ALL', 'RECEIVING', 'WIP', 'HOLD_QC', 'COMPLETED']) {
+    assert.match(
+      v1Html,
+      new RegExp(`<button[^>]*class="su-stage-bar-btn"[^>]*data-tracking-filter="${expectedFilter}"`, 's'),
+      `Stage bar button includes data-tracking-filter="${expectedFilter}"`
+    );
+  }
+  assert.ok(!v1Html.includes("document.querySelector('[data-admin-tab"), 'Stage bars no longer use inline onclick tab querySelector');
+  const emptySummary = buildSuperUserOrderRollups({ pendingOrders: [], grnList: [], requisitions: [], defectList: [] });
+  assert.equal(buildRequisitionAnalyticsSeries(emptySummary).length, 1, 'Default buildRequisitionAnalyticsSeries keeps fallback point for Packing Hall');
+  assert.equal(buildRequisitionAnalyticsSeries(emptySummary)[0].reqNumber, 'REQ-0001');
+  assert.deepEqual(buildRequisitionAnalyticsSeries(emptySummary, undefined, true), [], 'allowEmpty=true returns empty series when no requisitions exist');
+  const v2EmptyHtml = renderSuperUserScreen({ ...baseCtx, activeTab: 'tracking', pendingOrders: [], rollupSummary: emptySummary });
+  const wipChartStart = v2EmptyHtml.indexOf('data-testid="wip-analytics-dashboard"');
+  const wipChartEnd = v2EmptyHtml.indexOf('</section>', wipChartStart);
+  const v2EmptyChartHtml = v2EmptyHtml.slice(wipChartStart, wipChartEnd);
+  assert.ok(wipChartStart !== -1 && wipChartEnd > wipChartStart, 'WIP analytics panel renders when empty');
+  assert.ok(v2EmptyChartHtml.includes('0 Active REQs'), 'Empty Live Tracking shows 0 Active REQs in WIP Analytics');
+  assert.ok(v2EmptyChartHtml.includes('No active Packing Hall requisitions yet'), 'Empty Live Tracking renders empty-state message in WIP Analytics');
+  assert.ok(!v2EmptyChartHtml.includes('REQ-0001') && !v2EmptyHtml.includes('Awaiting Req') && !v2EmptyHtml.includes('ORD-PENDING'), 'Empty Live Tracking does not fabricate a fake REQ-0001 chart entry');
+  assert.ok(v2EmptyHtml.includes('class="form-input su-tracking-search-input"'), 'Widened Live Tracking search input class applied');
+  assert.match(v2EmptyHtml, /id="admin-tracking-buyer-filter"[^>]*disabled/s, 'Empty Buyer filter select is disabled');
+  assert.ok(v2EmptyHtml.includes('No Buyers yet'), 'Empty Buyer filter displays "No Buyers yet"');
+  assert.match(v2EmptyHtml, /id="admin-tracking-maker-filter"[^>]*disabled/s, 'Empty Contractor filter select is disabled');
+  assert.ok(v2EmptyHtml.includes('No Contractors yet'), 'Empty Contractor filter displays "No Contractors yet"');
+  const v1ClosedDemoHtml = renderSuperUserScreen({ ...baseCtx, activeTab: 'dashboard', pendingOrders: [], rollupSummary: emptySummary, locationSearch: '' });
+  assert.match(v1ClosedDemoHtml, /<details class="su-demo-drawer">/, 'Demo drawer is collapsed by default without demo order or ?demo=1');
+  assert.ok(v1ClosedDemoHtml.includes('class="su-empty-cta-box"'), 'Dashboard renders empty state box when zero orders exist');
+  assert.ok(v1ClosedDemoHtml.includes('data-admin-tab-jump="orders"'), 'Dashboard zero-order empty state includes Order Creation CTA');
+  assert.ok(!v1ClosedDemoHtml.includes('class="su-stage-bar-btn"'), 'Dashboard omits stage bar chart when zero orders exist');
+  const v1QueryDemoHtml = renderSuperUserScreen({ ...baseCtx, activeTab: 'dashboard', pendingOrders: [], rollupSummary: emptySummary, locationSearch: '?demo=1' });
+  assert.match(v1QueryDemoHtml, /<details class="su-demo-drawer" open>/, 'Demo drawer opens when ?demo=1 is present');
+  assert.ok(v1QueryDemoHtml.includes('id="btn-load-demo-600-inprogress"') && v1QueryDemoHtml.includes('id="btn-load-demo-600-complete"') && v1QueryDemoHtml.includes('id="btn-load-demo-600-variance"'));
   assert.ok(v1Html.includes('Received (GRN)') || v1Html.includes('Dock Available'), 'R3 canonical terminology');
   assert.ok(v1Html.includes('RECONCILED &#10003;') || v1Html.includes('RECONCILED ✓'));
 
@@ -797,18 +960,77 @@ test('5.1-8.5, 6.6, 9.6, 12.2: Super User 4-view DOM rendering, <150ms Tier-1->T
   assert.ok(v2ExpandedHtml.includes('Supply Stream: Inward GRN Batches'));
   assert.ok(v2ExpandedHtml.includes('Execution Stream: Packing Hall Requisitions'));
 
-  // View 3: Order & Batch Creation + 12.2 Phased Rollout Record
+  // View 3: Order & Batch Creation + Phased Rollout Record
   const v3Html = renderSuperUserScreen({ ...baseCtx, activeTab: 'creation' });
-  assert.ok(v3Html.includes('Create Master Pending Order') || v3Html.includes('pending-order'));
-  assert.ok(v3Html.includes('7. Phased Rollout Record'));
+  assert.ok(v3Html.includes('1. Super User Master Order Creation'));
+  assert.ok(v3Html.includes('2. Customer &amp; Buyer Master Registry'));
+  assert.ok(v3Html.includes('3. Glove Article &amp; Packaging BOM Master'));
+  assert.ok(v3Html.includes('4. Contractors / Makers'));
+  assert.ok(v3Html.includes('5. Immutable Audit Trail Ledger'));
+  assert.ok(v3Html.includes('6. SQLite WAL Database &amp; Snapshot Administration'));
+  assert.match(v3Html, /id="admin-pending-order-id"[^>]*placeholder="Assigned on save"[^>]*readonly/);
+  assert.match(v3Html, /id="admin-pending-order-maker"[^>]*required aria-required="true"/);
+  assert.match(v3Html, /id="admin-pending-order-article"[^>]*required aria-required="true"/);
+  assert.ok(v3Html.includes('class="su-required-mark"'));
+  assert.ok(v3Html.includes('Save &amp; Issue Master Order'));
+  assert.ok(v3Html.includes('id="btn-admin-reset-pending-order"'));
+  assert.ok(v3Html.includes('Reset Form'));
+  assert.ok(v3Html.includes('Phased Rollout Record (Phase A'));
+  assert.ok(!v3Html.includes('7. Phased Rollout Record'));
+  assert.ok(!v3Html.includes('Checklist 12.2'));
+  assert.ok(!v3Html.includes('System Users &amp; Role-Based Access Control'));
   assert.equal(PHASED_ROLLOUT_RECORD.length, 3);
   assert.equal(PHASED_ROLLOUT_RECORD[0].phase, 'Phase A');
   assert.equal(PHASED_ROLLOUT_RECORD[1].phase, 'Phase B');
   assert.equal(PHASED_ROLLOUT_RECORD[2].phase, 'Phase C');
 
+  const usersHtml = renderSuperUserScreen({
+    ...baseCtx,
+    activeTab: 'users',
+    systemUsers: [{
+      userId: 'USR-TEST-001',
+      username: 'operator.test',
+      name: 'Test Operator',
+      role: 'INWARD_CLERK',
+      station: 'Dock #1',
+      active: true
+    }]
+  });
+  assert.ok(usersHtml.includes('data-admin-tab="users"'));
+  assert.ok(usersHtml.includes('aria-label="New sign-in password for operator.test"'));
+  assert.ok(usersHtml.includes('data-admin-reset-password="USR-TEST-001"'));
+  assert.ok(usersHtml.includes('<select id="admin-user-station" class="form-select">'));
+  assert.ok(usersHtml.includes('<option value="Dock #1">Inward Register (Dock #1)</option>'));
+  assert.ok(usersHtml.includes('<option value="Packing Hall #1" selected>Packing Hall</option>'));
+  assert.ok(usersHtml.includes('class="su-perm-disclosure"'), 'Users table uses disclosure toggle instead of truncating Authorized Actions');
+  assert.equal(getDefaultStationForRole('SUPER_USER'), 'Super User');
+  assert.equal(getDefaultStationForRole('INWARD_CLERK'), 'Dock #1');
+  assert.equal(getDefaultStationForRole('PACKING_SUPERVISOR'), 'Packing Hall #1');
+  assert.equal(getDefaultStationForRole('QC_INSPECTOR'), 'Final QC');
+  assert.equal(getDefaultStationForRole('ALTERATION_LEAD'), 'Alteration Bay');
+  const unassignedStationHtml = renderSuperUserScreen({
+    ...baseCtx,
+    activeTab: 'users',
+    systemUsers: [{
+      userId: 'USR-TEST-002',
+      username: 'operator.blank',
+      name: 'Blank Station User',
+      role: 'QC_INSPECTOR',
+      station: '',
+      active: true
+    }]
+  });
+  assert.ok(unassignedStationHtml.includes('<td>Unassigned</td>'), 'Blank user station renders Unassigned fallback');
+
   // View 4: Analytics & Printable Slips
   const v4Html = renderSuperUserScreen({ ...baseCtx, activeTab: 'reports' });
   assert.ok(v4Html.includes('Export Report CSV'));
+  assert.ok(v4Html.includes('class="su-report-sheet-wrap"'), 'Report preview uses .su-report-sheet-wrap');
+  for (const activeReport of ['order_grn_balance', 'req_traceability', 'contractor_scrap', 'final_qc_dispatch'] as const) {
+    const repHtml = renderSuperUserScreen({ ...baseCtx, activeTab: 'reports', activeReport });
+    assert.ok(repHtml.includes('<strong>Reconciliation Rule:</strong>'), `${activeReport} shows Reconciliation Rule banner`);
+    assert.ok(!repHtml.includes('Acceptance Criteria'), `${activeReport} removes legacy Acceptance Criteria label`);
+  }
 
   // 9.6 WCAG AA contrast check (>= 4.5:1) for all Super User semantic badge pairs in src/style.css
   const styleSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/style.css'), 'utf8');
@@ -831,18 +1053,71 @@ test('5.1-8.5, 6.6, 9.6, 12.2: Super User 4-view DOM rendering, <150ms Tier-1->T
     return (brightest + 0.05) / (darkest + 0.05);
   };
 
-  const badgePairs = [
-    { name: 'su-complete', fg: '#166534', bg: '#F0FDF4' },
-    { name: 'su-progress', fg: '#1E40AF', bg: '#EFF6FF' },
-    { name: 'su-hold', fg: '#92400E', bg: '#FFFBEB' },
-    { name: 'su-defect', fg: '#991B1B', bg: '#FEF2F2' },
-    { name: 'su-rework', fg: '#9A3412', bg: '#FFF7ED' },
-    { name: 'su-qcgate', fg: '#5B21B6', bg: '#F5F3FF' }
+  const rootMatch = styleSrc.match(/:root\s*\{([^}]*)\}/);
+  assert.ok(rootMatch, ':root CSS token block present in src/style.css');
+  const suMatch = styleSrc.match(/\.superuser-command-center\s*\{([^}]*)\}/);
+  assert.ok(suMatch, '.superuser-command-center token block present in src/style.css');
+
+  const cssVars: Record<string, string> = {};
+  for (const block of [rootMatch![1], suMatch![1]]) {
+    for (const m of block.matchAll(/--([a-z0-9-]+)\s*:\s*([^;]+);/gi)) {
+      cssVars[m[1]] = m[2].trim();
+    }
+  }
+  const resolveToken = (name: string, depth = 0): string => {
+    assert.ok(depth < 8, `Circular CSS variable reference for --${name}`);
+    const raw = cssVars[name];
+    assert.ok(raw, `Expected CSS variable --${name} in src/style.css`);
+    const ref = raw.match(/^var\(--([a-z0-9-]+)\)$/i);
+    if (ref) return resolveToken(ref[1], depth + 1);
+    assert.match(raw, /^#[0-9a-fA-F]{6}$/, `Token --${name} resolves to 6-digit hex (got ${raw})`);
+    return raw;
+  };
+
+  const badgeTokenPairs = [
+    { name: 'su-complete', fg: 'su-complete-dark', bg: 'su-complete-bg' },
+    { name: 'su-req', fg: 'su-req-primary', bg: 'su-req-bg' },
+    { name: 'su-grn', fg: 'su-grn-deep', bg: 'su-grn-bg' },
+    { name: 'su-areq', fg: 'su-areq-dark', bg: 'su-areq-bg' },
+    { name: 'su-mreq', fg: 'su-mreq-dark', bg: 'su-mreq-bg' }
   ];
-  for (const pair of badgePairs) {
-    const ratio = contrastRatio(pair.fg, pair.bg);
+  for (const pair of badgeTokenPairs) {
+    const ratio = contrastRatio(resolveToken(pair.fg), resolveToken(pair.bg));
     assert.ok(ratio >= 4.5, `9.6 WCAG AA contrast for ${pair.name} is ${ratio.toFixed(2)}:1 (must be >= 4.5:1)`);
   }
+  assert.match(
+    styleSrc,
+    /\.superuser-command-center\s+\.su-badge-areq,\s*\.superuser-command-center\s+\.su-badge-variance\s*\{[^}]*color:\s*var\(--su-areq-dark\)/s,
+    'Alert/variance badges use high-contrast --su-areq-dark text token'
+  );
+
+  assert.match(styleSrc, /--text-muted:\s*var\(--ink-600\)/, 'Muted text uses the higher-contrast neutral token');
+  assert.match(styleSrc, /--su-text-muted:\s*var\(--ink-600\)/, 'Super User muted text shares the base neutral token');
+  const suMutedHex = resolveToken('su-text-muted');
+  assert.equal(suMutedHex, resolveToken('ink-600'), '--su-text-muted resolves to --ink-600');
+  for (const bgToken of ['su-bg-primary', 'su-bg-secondary', 'su-bg-tertiary']) {
+    const bgHex = resolveToken(bgToken);
+    const ratio = contrastRatio(suMutedHex, bgHex);
+    assert.ok(ratio >= 4.5, `Muted text (--su-text-muted=${suMutedHex}) on --${bgToken}=${bgHex} contrast is ${ratio.toFixed(2)}:1 (>= 4.5:1)`);
+  }
+  assert.match(
+    styleSrc,
+    /\.superuser-command-center\s+\.admin-tracking-filter-btn\s*\{[^}]*font-size:\s*12px/s,
+    'Tracking filter buttons meet the 12px minimum readable size'
+  );
+  assert.ok(!v2CollapsedHtml.includes('admin-tracking-filter-btn" data-tracking-filter="ALL" style='), 'Tracking filter buttons avoid inline 11px styling');
+  assert.match(styleSrc, /:where\(button, a, \[tabindex\], input, select, textarea\):focus-visible/, 'Interactive controls have a visible keyboard focus style');
+  assert.match(styleSrc, /@media \(pointer: coarse\)/, 'Coarse-pointer targets receive larger hit areas');
+  assert.match(styleSrc, /@media \(prefers-reduced-motion: reduce\)/, 'Motion respects the reduced-motion preference');
+  assert.match(styleSrc, /\.status-pill-amber\s*\{[^}]*border-style:\s*dashed/s, 'Amber status is distinguishable by shape');
+  assert.match(styleSrc, /\.status-pill-red\s*\{[^}]*border:\s*2px solid/s, 'Red status is distinguishable by border weight');
+
+  const mainSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/main.ts'), 'utf8');
+  assert.match(mainSrc, /setAttribute\('role', 'status'\)/, 'Toast content is exposed as a status message');
+  assert.match(mainSrc, /role="dialog" aria-modal="true"/, 'Modal declares dialog semantics');
+  assert.match(mainSrc, /event\.key === 'Escape'/, 'Modal closes from the Escape key');
+  assert.match(mainSrc, /modalReturnFocusElement\.focus\(\)/, 'Closing a modal returns focus to its opener');
+  assert.match(mainSrc, /class="checklist-box" aria-label=/, 'QC checklist controls have accessible names');
 });
 
 test('10.1, 10.2, 10.3, 10.4, 4.2 (Server-Side SQLite): transactional Dock issuance, RBAC 403, Stage 5 AQL gate, Void/Short-Close, and immutable audit_trail triggers', async () => {
@@ -853,13 +1128,11 @@ test('10.1, 10.2, 10.3, 10.4, 4.2 (Server-Side SQLite): transactional Dock issua
 
   dbMod.initDatabase();
   dbMod.seedDemoSheet();
-
-  // Ensure idempotent clean slate for ORD-SQL-600 test rows
-  db.prepare(`DELETE FROM grn_req_allocations WHERE order_id = 'ORD-SQL-600'`).run();
-  db.prepare(`DELETE FROM store_receivings WHERE order_id = 'ORD-SQL-600' OR rcv_number IN ('GRN-SQL-1', 'GRN-SQL-2')`).run();
-  db.prepare(`DELETE FROM packing_wip WHERE req_number IN ('REQ-SQL-1', 'REQ-SQL-2')`).run();
-  db.prepare(`DELETE FROM glove_requisitions WHERE req_number IN ('REQ-SQL-1', 'REQ-SQL-2')`).run();
-  db.prepare(`DELETE FROM pending_orders WHERE order_id = 'ORD-SQL-600'`).run();
+  const fixtureSuffix = randomUUID();
+  const grn1 = `GRN-SQL-${fixtureSuffix}-1`;
+  const grn2 = `GRN-SQL-${fixtureSuffix}-2`;
+  const req1 = `REQ-SQL-${fixtureSuffix}-1`;
+  const req2 = `REQ-SQL-${fixtureSuffix}-2`;
 
   // 10.4 Server-side RBAC enforcement returns HTTP 403 for unauthorized role
   assert.throws(
@@ -867,9 +1140,8 @@ test('10.1, 10.2, 10.3, 10.4, 4.2 (Server-Side SQLite): transactional Dock issua
     (err: any) => err.statusCode === 403 && /RBAC Forbidden/.test(err.message)
   );
 
-  // Create a parent order (600 pairs) and receive GRN-SQL-1 (250) + GRN-SQL-2 (200) = 450 Dock Pool
-  PackingService.upsertPendingOrderAdmin({
-    orderId: 'ORD-SQL-600',
+  // Create a parent order (600 pairs) and receive two GRNs totaling 450 Dock Pool pairs.
+  const createdOrder = PackingService.createPendingOrderAdmin({
     buyer: 'Test Buyer',
     maker: 'Hall A',
     po: 'PO-SQL-600',
@@ -877,28 +1149,29 @@ test('10.1, 10.2, 10.3, 10.4, 4.2 (Server-Side SQLite): transactional Dock issua
     totalQty: 600,
     sizes: { '7': 60, '8': 150, '9': 180, '10': 150, '11': 60 }
   });
+  const orderId = createdOrder.orderId;
 
   PackingService.createReceiving({
-    rcvNumber: 'GRN-SQL-1',
+    rcvNumber: grn1,
     rcvDate: '2026-11-04',
-    orderId: 'ORD-SQL-600',
+    orderId,
     makerContractor: 'Hall A',
     articleName: 'Model SQL',
     rcvdPairs: 250
   });
   PackingService.createReceiving({
-    rcvNumber: 'GRN-SQL-2',
+    rcvNumber: grn2,
     rcvDate: '2026-11-04',
-    orderId: 'ORD-SQL-600',
+    orderId,
     makerContractor: 'Hall A',
     articleName: 'Model SQL',
     rcvdPairs: 200
   });
 
-  // 10.1 Transactional Dock Pool issuance: Issue REQ-SQL-1 for 300 pairs (draws 250 from GRN-SQL-1 + 50 from GRN-SQL-2)
+  // 10.1 Transactional Dock Pool issuance: issue 300 pairs across both GRNs.
   const issue1 = PackingService.issueOrderRequisitionTransactional({
-    orderId: 'ORD-SQL-600',
-    reqNumber: 'REQ-SQL-1',
+    orderId,
+    reqNumber: req1,
     requestedPairs: 300,
     actor: 'Clerk A',
     role: 'INWARD_CLERK'
@@ -907,12 +1180,12 @@ test('10.1, 10.2, 10.3, 10.4, 4.2 (Server-Side SQLite): transactional Dock issua
   assert.equal(issue1.remainingDockPoolPairs, 150);
   assert.equal(issue1.allocations.length, 2);
 
-  // Attempting to issue REQ-SQL-2 for 200 pairs BEFORE GRN-SQL-3 (150) is received MUST FAIL in SQLite transaction
+  // Attempting to issue another 200 pairs before another GRN arrives MUST FAIL.
   assert.throws(
     () =>
       PackingService.issueOrderRequisitionTransactional({
-        orderId: 'ORD-SQL-600',
-        reqNumber: 'REQ-SQL-2',
+        orderId,
+        reqNumber: req2,
         requestedPairs: 200,
         actor: 'Clerk B',
         role: 'INWARD_CLERK'
@@ -920,26 +1193,26 @@ test('10.1, 10.2, 10.3, 10.4, 4.2 (Server-Side SQLite): transactional Dock issua
     (err: any) => /Insufficient Dock Pool balance/.test(err.message)
   );
 
-  // 4.2 Server-side Stage 5 Gate: set step4_packing_good = 300 on REQ-SQL-1 and confirm Stage 5 is LOCKED before AQL 1.5 Pass
-  PackingService.overrideWipAdmin('REQ-SQL-1', { step4Good: 300, finalQcStatus: 'PENDING' });
+  // 4.2 Server-side Stage 5 Gate: confirm Stage 5 is locked before AQL 1.5 Pass.
+  PackingService.overrideWipAdmin(req1, { step4Good: 300, finalQcStatus: 'PENDING' });
   assert.throws(
     () =>
       PackingService.executeStep5SecondPacking(
-        'REQ-SQL-1',
+        req1,
         50,
         { enforcePreStage5AqlGate: true }
       ),
     (err: any) => /LOCKED: Stage 5 Master Carton Packing/.test(err.message)
   );
 
-  // 10.2 Void guard: GRN-SQL-1 is already allocated, so voiding it is blocked
+  // 10.2 Void guard: an allocated GRN cannot be voided.
   assert.throws(
-    () => PackingService.voidReceivingGrn('GRN-SQL-1', { reason: 'Duplicate entry', role: 'SUPER_USER' }),
+    () => PackingService.voidReceivingGrn(grn1, { reason: 'Duplicate entry', role: 'SUPER_USER' }),
     (err: any) => /Cannot void GRN/.test(err.message)
   );
 
-  // 10.2 Void guard: REQ-SQL-1 has 0 step1_checking_good, so voiding it succeeds and releases 300 pairs back to GRN bins
-  const voidReq = PackingService.voidGloveRequisition('REQ-SQL-1', {
+  // 10.2 Void guard: a not-yet-started requisition can be voided.
+  const voidReq = PackingService.voidGloveRequisition(req1, {
     reason: 'Issued to wrong hall',
     actor: 'M. Tariq',
     role: 'SUPER_USER'
@@ -948,7 +1221,7 @@ test('10.1, 10.2, 10.3, 10.4, 4.2 (Server-Side SQLite): transactional Dock issua
   assert.equal(voidReq.void_reason, 'Issued to wrong hall');
 
   // 3.8 Short-close order with mandatory reason
-  const sc = PackingService.shortClosePendingOrder('ORD-SQL-600', {
+  const sc = PackingService.shortClosePendingOrder(orderId, {
     reason: 'Contractor short-shipped final lot',
     actor: 'M. Tariq',
     role: 'SUPER_USER'
@@ -966,5 +1239,454 @@ test('10.1, 10.2, 10.3, 10.4, 4.2 (Server-Side SQLite): transactional Dock issua
     () => db.prepare('DELETE FROM audit_trail WHERE id = ?').run(trail[0].id),
     (err: any) => /Immutable Audit Trail: DELETE is forbidden/.test(err.message)
   );
+
+  db.prepare(`DELETE FROM grn_req_allocations WHERE order_id = ?`).run(orderId);
+  db.prepare(`DELETE FROM store_receivings WHERE order_id = ? OR rcv_number IN (?, ?)`).run(orderId, grn1, grn2);
+  db.prepare(`DELETE FROM packing_wip WHERE req_number IN (?, ?)`).run(req1, req2);
+  db.prepare(`DELETE FROM glove_requisitions WHERE req_number IN (?, ?)`).run(req1, req2);
+  db.prepare(`DELETE FROM pending_orders WHERE order_id = ?`).run(orderId);
 });
 
+test('Final QC readiness & Rolled Throughput Yield helpers handle all edge cases cleanly', () => {
+  // Pending > 0 is NOT awaiting Final QC yet
+  assert.equal(
+    isPackingAwaitingFinalQc({ stage4In: 820, stage4Passed: 400, stage4Pending: 420, finalQcApproved: false, outputPairs: 0 }),
+    false
+  );
+  // 100% Stage 4 done, Final QC unapproved, 0 output -> awaiting Final QC
+  assert.equal(
+    isPackingAwaitingFinalQc({ stage4In: 820, stage4Passed: 820, stage4Pending: 0, finalQcApproved: false, outputPairs: 0 }),
+    true
+  );
+  // Approved Final QC -> NOT awaiting Final QC, IS ready for Stage 5 cartons
+  assert.equal(
+    isPackingAwaitingFinalQc({ stage4In: 820, stage4Passed: 820, stage4Pending: 0, finalQcApproved: true, outputPairs: 0 }),
+    false
+  );
+  assert.equal(
+    isStage5ReadyForCartons({ stage4In: 820, stage4Passed: 820, stage4Pending: 0, finalQcApproved: true, outputPairs: 0 }),
+    true
+  );
+  // Fully packed Stage 5 -> neither awaiting QC nor waiting for Stage 5
+  assert.equal(
+    isPackingAwaitingFinalQc({ stage4In: 820, stage4Passed: 820, stage4Pending: 0, finalQcApproved: true, outputPairs: 820 }),
+    false
+  );
+  assert.equal(
+    isStage5ReadyForCartons({ stage4In: 820, stage4Passed: 820, stage4Pending: 0, finalQcApproved: true, outputPairs: 820 }),
+    false
+  );
+
+  // Rolled Throughput Yield (RTY): all zeros -> 0.0%
+  assert.equal(computeWipRolledYieldPct({ stage1Passed: 0, stage1Defects: 0, stage2Passed: 0, stage2Defects: 0, stage3Passed: 0, stage3Defects: 0 }), '0.0%');
+  // Stage 1 only -> 850 / 887 = 95.8%
+  assert.equal(computeWipRolledYieldPct({ stage1Passed: 850, stage1Defects: 37, stage2Passed: 0, stage2Defects: 0, stage3Passed: 0, stage3Defects: 0 }), '95.8%');
+  // Hand-verified REQ-2026-0001 across Stages 1-3 -> (850/887)*(840/850)*(820/840) = 92.4%
+  assert.equal(
+    computeWipRolledYieldPct({
+      stage1Passed: 850, stage1Defects: 37,
+      stage2Passed: 840, stage2Defects: 10,
+      stage3Passed: 820, stage3Defects: 20
+    }),
+    '92.4%'
+  );
+  // Perfect yield clamps at 100.0%
+  assert.equal(
+    computeWipRolledYieldPct({ stage1Passed: 100, stage1Defects: 0, stage2Passed: 100, stage2Defects: 0, stage3Passed: 100, stage3Defects: 0 }),
+    '100.0%'
+  );
+});
+
+test('Monochrome Print Guard: @media print and .printable-slip-box contain zero --su-* tokens or non-monochrome hex colors', () => {
+  const cssPath = path.resolve(process.cwd(), 'src/style.css');
+  const css = fs.readFileSync(cssPath, 'utf8');
+
+  function extractBlocks(input: string, header: RegExp): string[] {
+    const out: string[] = [];
+    const re = new RegExp(header.source, 'g');
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(input))) {
+      let i = input.indexOf('{', m.index);
+      if (i === -1) continue;
+      let depth = 1;
+      const start = i + 1;
+      while (depth && ++i < input.length) {
+        depth += input[i] === '{' ? 1 : input[i] === '}' ? -1 : 0;
+      }
+      out.push(input.slice(start, i));
+    }
+    return out;
+  }
+
+  const blocks = [
+    ...extractBlocks(css, /@media\s+print/),
+    ...extractBlocks(css, /\.printable-slip-box[^{]*/)
+  ];
+  assert.ok(blocks.length >= 2, 'Expected @media print and .printable-slip-box blocks in src/style.css');
+
+  const allowedMonochromeHex = new Set(['#000', '#000000', '#fff', '#ffffff']);
+  for (const block of blocks) {
+    assert.equal(
+      /--su-/.test(block),
+      false,
+      `Print block must not reference --su-* tokens: ${block.slice(0, 120)}`
+    );
+    const hexes = block.match(/#[0-9A-Fa-f]{3,8}\b/g) || [];
+    for (const hex of hexes) {
+      assert.ok(
+        allowedMonochromeHex.has(hex.toLowerCase()),
+        `Non-monochrome hex color ${hex} found inside print block`
+      );
+    }
+  }
+});
+
+test('Phase 4.1: Super User view escapes hostile payloads and replaces inline handlers with data-* attributes', () => {
+  const xssOrderId = `ORD-X'"><img src=x onerror=alert(1)>`;
+  const xssBuyer = `<script>window.__xss=1</script>' onclick="alert(2)`;
+  const xssMaker = `Maker" onmouseover="alert(3)<svg onload=alert(4)>`;
+  const xssPo = `PO'"><script>alert(5)</script>`;
+  const xssArticle = `Art<img src=x onerror=alert(6)>'&"`;
+  const xssColor = `<iframe src=javascript:alert(7)>`;
+  const xssGrn = `GRN-01'"><svg onload=alert(8)>`;
+  const xssSearch = `"><img src=x onerror=alert(9)>`;
+
+  const hostileOrder: PendingOrder = {
+    orderId: xssOrderId,
+    buyer: xssBuyer,
+    maker: xssMaker,
+    po: xssPo,
+    article: xssArticle,
+    color: xssColor,
+    sizes: { '7': 100, '8': 0, '9': 0, '10': 0, '11': 0 },
+    totalQty: 100
+  };
+  const hostileGrn = {
+    sr: 1,
+    grnCode: xssGrn,
+    date: '04-11-2026<script>',
+    pendingOrderId: xssOrderId,
+    maker: xssMaker,
+    article: xssArticle,
+    rcvdPairs: 100,
+    sizes: { '7': 100, '8': 0, '9': 0, '10': 0, '11': 0 },
+    status: 'COMPLETE'
+  };
+  const hostileReq: OrderWipState = {
+    reqNumber: 'REQ-0777',
+    parentOrderId: xssOrderId,
+    allocatedGrnRefs: [{ grnCode: xssGrn, pairs: 100 }],
+    article: xssArticle,
+    po: xssPo,
+    maker: xssMaker,
+    buyer: xssBuyer,
+    plannedQty: 100,
+    issueStatus: 'Issued by Inward Register',
+    sizes: { '7': 100, '8': 0, '9': 0, '10': 0, '11': 0 },
+    stage1In: 100,
+    stage1Passed: 90,
+    stage1Defects: 10,
+    stage2In: 90,
+    stage2Passed: 90,
+    stage2Defects: 0,
+    stage3In: 90,
+    stage3Passed: 90,
+    stage3Defects: 0,
+    mreqNo: 'M-REQ-0777',
+    altReqNo: 'A-REQ-0777',
+    mreqQty: '90 Sets',
+    mreqStatus: 'Ready',
+    stage4In: 90,
+    stage4Passed: 90,
+    stage4Pending: 0,
+    stage5Cartons: '0 Cartons',
+    stage5Pending: '2 Cartons',
+    lineEfficiency: '90.0%',
+    outputPairs: 0,
+    outputCartons: 0,
+    inAlteration: 10,
+    scrappedPairs: 0,
+    finalQcApproved: false,
+    alterationCycleCount: 1
+  };
+
+  const hostileSummary = buildSuperUserOrderRollups({
+    pendingOrders: [hostileOrder],
+    grnList: [hostileGrn],
+    requisitions: [hostileReq],
+    defectList: []
+  });
+
+  const hostileCtx: SuperUserRenderContext = {
+    activeTab: 'dashboard',
+    activeReport: 'order_grn_balance',
+    trackingSearch: xssSearch,
+    trackingStatusFilter: 'ALL',
+    trackingBuyerFilter: xssBuyer,
+    trackingMakerFilter: xssMaker,
+    trackingPage: 1,
+    trackingPageSize: 15,
+    expandedOrderIds: { [xssOrderId]: true },
+    pendingOrders: [hostileOrder],
+    dropdownOptions: {
+      makers: [xssMaker],
+      customers: [xssBuyer],
+      articles: [xssArticle],
+      poList: [xssPo]
+    },
+    systemUsers: [
+      {
+        userId: 'USR-XSS',
+        username: `op'"><script>alert(1)</script>`,
+        name: `Operator <img src=x onerror=alert(1)>`,
+        role: 'INWARD_CLERK',
+        station: `Dock "<svg onload=alert(1)>`,
+        active: true
+      }
+    ],
+    auditTrail: [
+      createAuditTrailEntry({
+        seq: 1,
+        actor: `Admin <script>alert(1)</script>`,
+        role: 'SUPER_USER',
+        action: 'ORDER_CREATE',
+        entityId: xssOrderId,
+        beforeSummary: `<img src=x onerror=alert(1)>`,
+        afterSummary: `Done '"><script>alert(1)</script>`
+      })
+    ],
+    adminOverview: {
+      dbHealth: {
+        journalMode: `wal<script>`,
+        integrity: 'ok',
+        tableCounts: { 'pending_orders<img src=x>': 1 },
+        totalTables: 1
+      },
+      customers: [
+        {
+          id: `C-1'"><script>`,
+          name: xssBuyer,
+          country: `SE"><img src=x>`,
+          inspection_preference: `RANDOM<script>`
+        }
+      ],
+      products: [
+        {
+          id: `P-1'"><svg onload=1>`,
+          name: xssArticle,
+          customer_id: 'C-1',
+          customer_name: xssBuyer,
+          polybag_per_pair: 1,
+          silica_gel_per_pair: 1,
+          stickers_per_pair: 2,
+          pairs_per_carton: 50
+        }
+      ],
+      receivings: [],
+      alterations: [],
+      scrapLedger: []
+    },
+    lastBackupPath: `/tmp/"><script>alert(1)</script>`,
+    highlightedRefCode: xssGrn,
+    rollupSummary: hostileSummary
+  };
+
+  const views: Array<{ label: string; html: string }> = [
+    { label: 'dashboard', html: renderSuperUserScreen({ ...hostileCtx, activeTab: 'dashboard' }) },
+    { label: 'tracking', html: renderSuperUserScreen({ ...hostileCtx, activeTab: 'tracking', trackingBuyerFilter: 'ALL', trackingMakerFilter: 'ALL', trackingSearch: '' }) },
+    { label: 'tracking-search-input', html: renderSuperUserScreen({ ...hostileCtx, activeTab: 'tracking' }) },
+    { label: 'orders', html: renderSuperUserScreen({ ...hostileCtx, activeTab: 'orders' }) },
+    { label: 'users', html: renderSuperUserScreen({ ...hostileCtx, activeTab: 'users' }) },
+    ...(['order_grn_balance', 'req_traceability', 'contractor_scrap', 'final_qc_dispatch'] as const).map(activeReport => ({
+      label: `report-${activeReport}`,
+      html: renderSuperUserScreen({ ...hostileCtx, activeTab: 'reports', activeReport })
+    }))
+  ];
+
+  for (const view of views) {
+    assert.doesNotMatch(
+      view.html,
+      /<script|<img\b|<iframe|<svg[^>]*onload/i,
+      `${view.label} must escape hostile HTML tags`
+    );
+
+    const tagRegex = /<([a-zA-Z][a-zA-Z0-9:-]*)(\s+(?:[^"'<>]|"[^"]*"|'[^']*')*)?\s*\/?>/g;
+    let tagMatch: RegExpExecArray | null;
+    while ((tagMatch = tagRegex.exec(view.html)) !== null) {
+      const tagName = tagMatch[1].toLowerCase();
+      const attrString = tagMatch[2] || '';
+      const attrRegex = /([a-zA-Z_:][a-zA-Z0-9_.:-]*)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
+      let attrMatch: RegExpExecArray | null;
+      while ((attrMatch = attrRegex.exec(attrString)) !== null) {
+        const attrName = attrMatch[1].toLowerCase();
+        assert.ok(
+          !attrName.startsWith('on'),
+          `${view.label} rendered disallowed event attribute "${attrName}" on <${tagName}>: ${tagMatch[0]}`
+        );
+      }
+    }
+  }
+
+  // Also verify with benign data that zero literal "on*=" substrings appear anywhere
+  const cleanHtml = renderSuperUserScreen({
+    ...hostileCtx,
+    activeTab: 'dashboard',
+    trackingSearch: '',
+    trackingBuyerFilter: 'ALL',
+    trackingMakerFilter: 'ALL',
+    expandedOrderIds: {},
+    pendingOrders: [],
+    dropdownOptions: { makers: [], customers: [], articles: [], poList: [] },
+    systemUsers: [],
+    auditTrail: [],
+    lastBackupPath: '',
+    highlightedRefCode: undefined,
+    rollupSummary: buildSuperUserOrderRollups({ pendingOrders: [], grnList: [], requisitions: [], defectList: [] })
+  });
+  assert.doesNotMatch(
+    cleanHtml,
+    /\son(?:click|change|input|submit|error|load|mouseover)\s*=/i,
+    'clean rendered HTML must not emit inline event attributes'
+  );
+
+  const dashHtml = views[0].html;
+  assert.ok(dashHtml.includes('data-su-action="inspect-order"'), 'Uses data-su-action for order inspection');
+  assert.ok(dashHtml.includes('&lt;script&gt;window.__xss=1&lt;/script&gt;'), 'Escapes hostile buyer script text');
+});
+
+test('Phase 4.2: confirm dialog HTML escapes hostile payloads and form validators enforce inline field rules', () => {
+  const html = buildConfirmDialogHtml({
+    message: `Delete Master Order ORD-X'"><img src=x onerror=alert(1)>?`,
+    detail: `Removes <script>alert(2)</script> permanently.`,
+    confirmLabel: 'Delete Order',
+    cancelLabel: 'Keep Order',
+    tone: 'danger'
+  });
+
+  assert.doesNotMatch(html, /<script|<img\b/i, 'Confirm dialog must escape hostile HTML payloads');
+  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'), 'Escapes hostile entity ID in confirm message');
+  assert.ok(html.includes('&lt;script&gt;alert(2)&lt;/script&gt;'), 'Escapes hostile detail text');
+  assert.ok(html.includes('id="confirm-dialog-cancel"'), 'Includes explicit Cancel button');
+  assert.ok(html.includes('data-modal-cancel'), 'Cancel button binds data-modal-cancel');
+  assert.ok(html.includes('id="confirm-dialog-confirm"'), 'Includes explicit Confirm button');
+  assert.ok(html.includes('btn-danger'), 'Danger tone applies btn-danger class');
+
+  assert.deepEqual(validatePendingOrderInputs({ maker: '', article: '' }), {
+    maker: 'Select a Contractor / Maker.',
+    article: 'Select an Article.'
+  });
+  assert.deepEqual(validatePendingOrderInputs({ maker: 'Hall B', article: 'Model A1' }), {});
+
+  assert.deepEqual(validateCustomerMasterInputs({ name: '   ' }), {
+    name: 'Enter a customer / buyer name.'
+  });
+  assert.deepEqual(validateCustomerMasterInputs({ name: 'Alpine Safety' }), {});
+
+  assert.deepEqual(
+    validateProductMasterInputs({ name: '', stickersPerPair: 0, pairsPerCarton: 0 }),
+    {
+      name: 'Enter an article name.',
+      stickersPerPair: 'Enter at least 1 sticker per pair.',
+      pairsPerCarton: 'Enter at least 1 pair per carton.'
+    }
+  );
+  assert.deepEqual(
+    validateProductMasterInputs({ name: 'Model A1', stickersPerPair: 2, pairsPerCarton: 50 }),
+    {}
+  );
+
+  assert.deepEqual(
+    validateSystemUserInputs({ name: '', username: '', password: '123' }),
+    {
+      name: 'Enter the operator name.',
+      username: 'Enter a sign-in username.',
+      password: 'Password must be at least 8 characters.'
+    }
+  );
+  assert.deepEqual(
+    validateSystemUserInputs({ name: 'H. Malik', username: 'h.malik', password: 'Password1!' }),
+    {}
+  );
+
+  assert.equal(validatePasswordResetInput('short'), 'Password must be at least 8 characters.');
+  assert.equal(validatePasswordResetInput('ValidPass123!'), null);
+});
+
+test('Phase 4.3: buildFocusRestoreSelector derives stable escaped selectors for interactive controls across renderApp()', () => {
+  assert.equal(
+    buildFocusRestoreSelector({ id: 'btn-admin-nav-toggle', dataset: {} }),
+    '#btn-admin-nav-toggle'
+  );
+  assert.equal(
+    buildFocusRestoreSelector({ dataset: { adminTab: 'tracking' } }),
+    '[data-admin-tab="tracking"]'
+  );
+  assert.equal(
+    buildFocusRestoreSelector({
+      dataset: { suAction: 'toggle-order-expand', orderId: `ORD-X'"><img src=x>` }
+    }),
+    `[data-su-action="toggle-order-expand"][data-order-id="ORD-X'\\"><img src=x>"]`
+  );
+  assert.equal(
+    buildFocusRestoreSelector({
+      classList: ['admin-tracking-filter-btn', 'btn-outline'],
+      dataset: { trackingFilter: 'COMPLETED' }
+    }),
+    '.admin-tracking-filter-btn[data-tracking-filter="COMPLETED"]'
+  );
+  assert.equal(
+    buildFocusRestoreSelector({
+      dataset: { suAction: 'tracking-page', page: '2' }
+    }),
+    '[data-su-action="tracking-page"][data-page="2"]'
+  );
+  assert.equal(
+    buildFocusRestoreSelector({
+      dataset: { reportId: 'contractor_scrap' }
+    }),
+    '[data-report-id="contractor_scrap"]'
+  );
+  assert.equal(
+    buildFocusRestoreSelector({
+      dataset: { screen: 'screen-admin' }
+    }),
+    '.module-nav-btn[data-screen="screen-admin"]'
+  );
+  assert.equal(buildFocusRestoreSelector({ dataset: {} }), null);
+});
+
+test('Phase 4.4: Customer Master and Article/BOM Master forms use responsive CSS grid classes instead of hardcoded inline column ratios', () => {
+  const styleCss = fs.readFileSync(path.join(process.cwd(), 'src', 'style.css'), 'utf8');
+  assert.match(styleCss, /\.su-customer-form-grid[\s\S]*grid-template-columns:/);
+  assert.match(styleCss, /\.su-article-form-grid[\s\S]*grid-template-columns:/);
+
+  const html = renderSuperUserScreen({
+    activeTab: 'orders',
+    activeReport: 'order_grn_balance',
+    trackingSearch: '',
+    trackingStatusFilter: 'ALL',
+    expandedOrderIds: {},
+    pendingOrders: [],
+    dropdownOptions: { makers: ['Hall B'], customers: ['Northwind Safety Ltd'], articles: ['Model A1'], poList: [] },
+    systemUsers: [],
+    auditTrail: [],
+    adminOverview: {
+      dbHealth: { journalMode: 'wal', integrity: 'ok', tableCounts: {}, totalTables: 0 },
+      customers: [{ id: 'CUST-1', name: 'Northwind Safety Ltd', country: 'UK', inspection_preference: 'RANDOM' }],
+      products: [{ id: 'PROD-1', name: 'Model A1', customer_id: 'CUST-1', customer_name: 'Northwind Safety Ltd', polybag_per_pair: 1, silica_gel_per_pair: 1, stickers_per_pair: 2, pairs_per_carton: 50 }],
+      receivings: [],
+      alterations: [],
+      scrapLedger: []
+    },
+    lastBackupPath: '',
+    rollupSummary: buildSuperUserOrderRollups({ pendingOrders: [], grnList: [], requisitions: [], defectList: [] })
+  });
+
+  assert.ok(html.includes('class="su-customer-form-grid"'), 'Customer Master form uses .su-customer-form-grid');
+  assert.ok(html.includes('class="su-article-form-grid"'), 'Article & BOM Master form uses .su-article-form-grid');
+  assert.doesNotMatch(
+    html,
+    /grid-template-columns:\s*(?:1\.1fr|1\.2fr)/,
+    'Master forms must not use brittle fixed inline fr track lists'
+  );
+});

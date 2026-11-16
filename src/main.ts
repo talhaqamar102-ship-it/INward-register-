@@ -7,6 +7,7 @@
 import {
   SizeBreakdown,
   PendingOrder,
+  STANDARD_GLOVE_SIZES,
   OrderWipState,
   AuditTrailEntry,
   createEmptySizes,
@@ -19,6 +20,8 @@ import {
   evaluateRequisitionIssuance,
   determineOrderActiveStage,
   canExecuteStage5CartonPacking,
+  computeWipRolledYieldPct,
+  isPackingAwaitingFinalQc,
   formatBatchSequence,
   isReqAwaitingFinalQc,
   buildSuperUserOrderRollups,
@@ -30,7 +33,18 @@ import {
   renderRequisitionWipAnalyticsChart,
   createDemo600PairScenario,
   createAuditTrailEntry,
-  normalizeSuperUserTab
+  normalizeSuperUserTab,
+  getStartupRequisitionNumber,
+  escapeHtml,
+  ConfirmDialogHtmlOptions,
+  buildConfirmDialogHtml,
+  validatePendingOrderInputs,
+  validateCustomerMasterInputs,
+  validateProductMasterInputs,
+  validateSystemUserInputs,
+  validatePasswordResetInput,
+  buildFocusRestoreSelector,
+  getDefaultStationForRole
 } from './utils/requisitionLogic';
 import {
   renderSuperUserScreen,
@@ -39,6 +53,7 @@ import {
   SuperUserReportType,
   SystemUserRecord
 } from './components/superUserView';
+import { renderPackingHallScreen } from './components/packingHallView';
 
 interface GRNRecord {
   sr: number;
@@ -80,11 +95,83 @@ interface CartonRecord {
   status: string;
 }
 
+type StandardSizeKey = typeof STANDARD_GLOVE_SIZES[number];
+
+interface GrnRemainingCaps {
+  sizeRemaining: Record<StandardSizeKey, number>;
+  totalRemaining: number;
+}
+
 const DEFAULT_REQ_NUMBER = 'REQ-0001';
+const SAVED_TAILORS_STORAGE_KEY = 'meridian-works-saved-tailors';
+
+/** Build a blank REQ-0001 Packing Hall WIP state without stale order/article/size fields. */
+function createEmptyPackingWipState() {
+  return {
+    selectedBatch: DEFAULT_REQ_NUMBER,
+    parentOrderId: '',
+    po: '',
+    article: '',
+    plannedQty: 0,
+    issueStatus: 'Pending Inward Issue' as 'Pending Inward Issue' | 'Issued by Inward Register',
+    sizes: createEmptySizes(),
+    wipBatch: DEFAULT_REQ_NUMBER,
+    stage1In: 0,
+    stage1Passed: 0,
+    stage1Defects: 0,
+    stage2In: 0,
+    stage2Passed: 0,
+    stage2Defects: 0,
+    stage3In: 0,
+    stage3Passed: 0,
+    stage3Defects: 0,
+    mreqNo: getMaterialReqNumber(DEFAULT_REQ_NUMBER),
+    altReqNo: getAlterationReqNumber(DEFAULT_REQ_NUMBER),
+    mreqQty: '0 Sets',
+    mreqStatus: 'Ready',
+    stage4In: 0,
+    stage4Passed: 0,
+    stage4Pending: 0,
+    stage5Cartons: '0 Cartons (0 Prs)',
+    stage5Pending: '0 Cartons',
+    lineEfficiency: '0.0%',
+    outputPairs: 0,
+    outputCartons: 0,
+    inAlteration: 0,
+    scrappedPairs: 0,
+    finalQcApproved: false
+  };
+}
+
+function loadSavedTailors(): string[] {
+  try {
+    const stored = window.localStorage.getItem(SAVED_TAILORS_STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) {
+      console.warn('Saved tailor list is not an array; ignoring stored value.');
+      return [];
+    }
+    return Array.from(new Set(parsed
+      .filter((name): name is string => typeof name === 'string')
+      .map(name => name.trim())
+      .filter(Boolean)));
+  } catch (error) {
+    console.warn('Unable to load saved tailor names:', error);
+    return [];
+  }
+}
 
 // Clean Initial State (All mockup records removed; ready for real data entry)
 const state = {
   activeScreen: 'screen-grn',
+  authMode: 'checking' as 'checking' | 'setup' | 'login' | 'ready' | 'error',
+  authError: '',
+  currentUser: null as SystemUserRecord | null,
+  hasCompletedInitialSync: false,
+  isInitialSyncing: false,
+  isManualSync: false,
+  syncError: '',
 
   // Clean Data Stores
   grnList: [] as GRNRecord[],
@@ -121,6 +208,7 @@ const state = {
     tailor: '',
     qty: ''
   },
+  savedTailors: loadSavedTailors(),
 
   qcOrder: {
     po: '',
@@ -137,42 +225,10 @@ const state = {
 
   // Multi-order WIP registry: each order/requisition independently stores its stage progress
   ordersWipMap: {} as Record<string, any>,
+  persistedReqNumbers: [] as string[],
 
   // 5-Stage WIP Packing Hall State (Single Requisition with M and A prefixes, zero mockup values)
-  packingWip: {
-    selectedBatch: DEFAULT_REQ_NUMBER,
-    parentOrderId: '',
-    po: '',
-    article: '',
-    plannedQty: 0,
-    issueStatus: 'Pending Inward Issue' as 'Pending Inward Issue' | 'Issued by Inward Register',
-    sizes: createEmptySizes(),
-    wipBatch: DEFAULT_REQ_NUMBER,
-    stage1In: 0,
-    stage1Passed: 0,
-    stage1Defects: 0,
-    stage2In: 0,
-    stage2Passed: 0,
-    stage2Defects: 0,
-    stage3In: 0,
-    stage3Passed: 0,
-    stage3Defects: 0,
-    mreqNo: getMaterialReqNumber(DEFAULT_REQ_NUMBER),
-    altReqNo: getAlterationReqNumber(DEFAULT_REQ_NUMBER),
-    mreqQty: '0 Sets',
-    mreqStatus: 'Ready',
-    stage4In: 0,
-    stage4Passed: 0,
-    stage4Pending: 0,
-    stage5Cartons: '0 Cartons (0 Prs)',
-    stage5Pending: '0 Cartons',
-    lineEfficiency: '0.0%',
-    outputPairs: 0,
-    outputCartons: 0,
-    inAlteration: 0,
-    scrappedPairs: 0,
-    finalQcApproved: false
-  },
+  packingWip: createEmptyPackingWipState(),
 
   // Dynamic dropdown options populated from backend SQLite database
   dropdownOptions: {
@@ -212,11 +268,7 @@ const state = {
     defectBatchIds: [getAlterationReqNumber(DEFAULT_REQ_NUMBER)]
   },
 
-  // Secret 7-Click Super User Admin Gate & Console State
-  secretClickCount: 0,
-  showPasswordPrompt: false,
-  passwordError: '',
-  isAdminUnlocked: false,
+  adminNavCollapsed: false,
   adminActiveTab: 'dashboard' as SuperUserTab,
   adminActiveReport: 'order_grn_balance' as SuperUserReportType,
   adminTrackingSearch: '',
@@ -227,13 +279,7 @@ const state = {
   adminTrackingPageSize: 10,
   adminHighlightedRefCode: '',
   adminExpandedOrders: {} as Record<string, boolean>,
-  systemUsers: [
-    { userId: 'USR-01', name: 'M. Tariq (Plant Director)', role: 'SUPER_USER', station: 'Command Center', active: true },
-    { userId: 'USR-02', name: 'A. Raza (Dock Clerk)', role: 'INWARD_CLERK', station: 'Dock Receiving', active: true },
-    { userId: 'USR-03', name: 'S. Mahmood (Hall Supervisor)', role: 'PACKING_SUPERVISOR', station: 'Packing Hall #1', active: true },
-    { userId: 'USR-04', name: 'F. Iqbal (AQL Lead)', role: 'QC_INSPECTOR', station: 'Final QC Gate', active: true },
-    { userId: 'USR-05', name: 'K. Hussain (Rework Lead)', role: 'ALTERATION_LEAD', station: 'Alteration Bay #2', active: true }
-  ] as SystemUserRecord[],
+  systemUsers: [] as SystemUserRecord[],
   auditTrail: [] as AuditTrailEntry[],
   lastBackupPath: '',
   adminOverview: {
@@ -250,6 +296,202 @@ const state = {
     scrapLedger: [] as any[]
   }
 };
+
+function getGrnRemainingCaps(orderId: string): GrnRemainingCaps | null {
+  const order = state.pendingOrders.find(candidate => candidate.orderId === orderId);
+  if (!order?.sizes) return null;
+  const plannedTotal = STANDARD_GLOVE_SIZES.reduce((sum, size) => sum + Number(order.sizes?.[size] || 0), 0);
+  if (plannedTotal <= 0) return null;
+
+  const receivedBySize = createEmptySizes();
+  let receivedTotal = 0;
+  for (const grn of state.grnList) {
+    if (grn.pendingOrderId !== orderId || grn.isVoided || grn.status.toUpperCase() === 'VOIDED') continue;
+    receivedTotal += Math.max(0, Number(grn.rcvdPairs) || 0);
+    for (const size of STANDARD_GLOVE_SIZES) {
+      receivedBySize[size] += Math.max(0, Number(grn.sizes?.[size]) || 0);
+    }
+  }
+
+  const sizeRemaining = {} as Record<StandardSizeKey, number>;
+  for (const size of STANDARD_GLOVE_SIZES) {
+    sizeRemaining[size] = Math.max(0, Number(order.sizes[size] || 0) - receivedBySize[size]);
+  }
+
+  return {
+    sizeRemaining,
+    totalRemaining: Math.max(0, plannedTotal - receivedTotal)
+  };
+}
+
+function formatGrnRemainingCaps(caps: GrnRemainingCaps, enteredSizes: SizeBreakdown): string {
+  const remainingBySize = STANDARD_GLOVE_SIZES
+    .map(size => `${size}: ${Math.max(0, caps.sizeRemaining[size] - Number(enteredSizes[size] || 0)).toLocaleString()}`)
+    .join(' | ');
+  const remainingTotal = Math.max(0, caps.totalRemaining - calculateSizeTotal(enteredSizes));
+  return `Remaining after current entry: ${remainingBySize} | Total: ${remainingTotal.toLocaleString()} pairs`;
+}
+
+function getOrderStockState(orderId: string): {
+  totalReceived: number;
+  totalIssued: number;
+  availablePairs: number;
+  pendingReqPairs: number;
+  unclaimedPairs: number;
+  remainingOrderSizes: SizeBreakdown;
+  remainingOrderTotal: number;
+  receivedSizes: SizeBreakdown;
+  hasServerCounts: boolean;
+} {
+  const order = state.pendingOrders.find(candidate => candidate.orderId === orderId);
+  if (order && order.availableDockPairs !== undefined) {
+    const remainingOrderSizes = { ...createEmptySizes(), ...(order.remainingOrderSizes || order.sizes || {}) };
+    return {
+      totalReceived: Number(order.receivedPairs || 0),
+      totalIssued: Number(order.issuedPairs || 0),
+      availablePairs: Math.max(0, Number(order.availableDockPairs || 0)),
+      pendingReqPairs: Math.max(0, Number(order.pendingReqPairs || 0)),
+      unclaimedPairs: Math.max(0, Number(order.unclaimedDockPairs ?? order.availableDockPairs ?? 0)),
+      remainingOrderSizes,
+      remainingOrderTotal: calculateSizeTotal(remainingOrderSizes),
+      receivedSizes: { ...createEmptySizes(), ...(order.receivedSizes || {}) },
+      hasServerCounts: true
+    };
+  }
+
+  let totalReceived = 0;
+  const receivedSizes = createEmptySizes();
+  for (const grn of state.grnList) {
+    if (grn.isVoided || grn.status.toUpperCase() === 'VOIDED') continue;
+    if (orderId && grn.pendingOrderId !== orderId) continue;
+    totalReceived += Math.max(0, Number(grn.rcvdPairs) || 0);
+    for (const size of STANDARD_GLOVE_SIZES) {
+      receivedSizes[size] += Math.max(0, Number(grn.sizes?.[size]) || 0);
+    }
+  }
+
+  let totalIssued = 0;
+  let pendingReqPairs = 0;
+  const requestedSizes = createEmptySizes();
+  const wipItems = Object.values(state.ordersWipMap);
+  for (const item of wipItems) {
+    if (!item || (item as any).isVoided) continue;
+    if (orderId && item.parentOrderId !== orderId) continue;
+    const qty = Number(item.plannedQty || calculateSizeTotal(item.sizes) || 0);
+    for (const size of STANDARD_GLOVE_SIZES) {
+      requestedSizes[size] += Number(item.sizes?.[size] || 0);
+    }
+    if (item.issueStatus === 'Issued by Inward Register') {
+      totalIssued += Number(item.stage1In || qty);
+    } else {
+      pendingReqPairs += qty;
+    }
+  }
+  if (!orderId && wipItems.length === 0) {
+    totalIssued = state.issuedPairsTotal;
+  }
+
+  const remainingOrderSizes = createEmptySizes();
+  for (const size of STANDARD_GLOVE_SIZES) {
+    remainingOrderSizes[size] = Math.max(0, Number(order?.sizes?.[size] || 0) - requestedSizes[size]);
+  }
+  const availablePairs = Math.max(0, totalReceived - totalIssued);
+  const unclaimedPairs = Math.max(0, availablePairs - pendingReqPairs);
+
+  return {
+    totalReceived,
+    totalIssued,
+    availablePairs,
+    pendingReqPairs,
+    unclaimedPairs,
+    remainingOrderSizes,
+    remainingOrderTotal: calculateSizeTotal(remainingOrderSizes),
+    receivedSizes,
+    hasServerCounts: false
+  };
+}
+
+function getTotalIssuedPairs(): number {
+  const wipItems = Object.values(state.ordersWipMap);
+  if (wipItems.length > 0) {
+    return wipItems.reduce((sum: number, item: any) => {
+      if (!item || item.isVoided || item.issueStatus !== 'Issued by Inward Register') return sum;
+      return sum + Number(item.stage1In || item.plannedQty || 0);
+    }, 0);
+  }
+  return state.issuedPairsTotal;
+}
+
+function bindComplementaryStageInputs(goodInputId: string, defectInputId: string, available: number): void {
+  const goodInput = document.getElementById(goodInputId) as HTMLInputElement | null;
+  const defectInput = document.getElementById(defectInputId) as HTMLInputElement | null;
+  if (!goodInput || !defectInput) return;
+
+  goodInput.min = defectInput.min = '0';
+  goodInput.max = defectInput.max = String(available);
+  goodInput.value = String(available);
+  defectInput.value = '0';
+
+  goodInput.addEventListener('input', () => {
+    const good = Math.min(available, Math.max(0, Number(goodInput.value) || 0));
+    goodInput.value = String(good);
+    defectInput.value = String(available - good);
+  });
+  defectInput.addEventListener('input', () => {
+    const defects = Math.min(available, Math.max(0, Number(defectInput.value) || 0));
+    defectInput.value = String(defects);
+    goodInput.value = String(available - defects);
+  });
+}
+
+function readComplementaryStageInputs(goodInputId: string, defectInputId: string, available: number): { good: number; defects: number } | null {
+  const good = Number((document.getElementById(goodInputId) as HTMLInputElement | null)?.value);
+  const defects = Number((document.getElementById(defectInputId) as HTMLInputElement | null)?.value);
+  if (
+    !Number.isInteger(good) || !Number.isInteger(defects) ||
+    good < 0 || defects < 0 || good + defects !== available
+  ) {
+    showToast(`Passed and defect pairs must total the ${available} pairs available in this stage.`);
+    return null;
+  }
+  return { good, defects };
+}
+
+function remainingStagePairs(input: number, passed: number, defects: number): number {
+  return Math.max(0, Number(input || 0) - Number(passed || 0) - Number(defects || 0));
+}
+
+function saveTailorName(name: string): void {
+  const trimmed = name.trim();
+  if (!trimmed || state.savedTailors.some(tailor => tailor.toLocaleLowerCase() === trimmed.toLocaleLowerCase())) return;
+  state.savedTailors.push(trimmed);
+  try {
+    window.localStorage.setItem(SAVED_TAILORS_STORAGE_KEY, JSON.stringify(state.savedTailors));
+  } catch (error) {
+    console.warn('Unable to persist saved tailor name:', error);
+  }
+}
+
+function recordStageDefects(origin: string, quantity: number, defectClass: string): void {
+  if (quantity <= 0) return;
+  const alterationReq = getAlterationReqNumber(state.packingWip.selectedBatch);
+  if (!state.dropdownOptions.defectBatchIds.includes(alterationReq)) {
+    state.dropdownOptions.defectBatchIds.unshift(alterationReq);
+  }
+  state.defectList.unshift({
+    id: alterationReq,
+    date: '31-10-2026',
+    origin,
+    article: state.packingWip.article || '---',
+    po: state.packingWip.po || '---',
+    defectClass,
+    qty: `${quantity} Prs`,
+    tailor: 'Supervisor A',
+    status: 'In Rework',
+    route: 'Auto-Return to Stage 1 Checking',
+    actionText: 'Update'
+  });
+}
 
 function logAuditEvent(
   action: AuditTrailEntry['action'],
@@ -282,6 +524,8 @@ const LOGO_SVG = `
 </svg>
 `;
 
+let modalReturnFocusElement: HTMLElement | null = null;
+
 // Helper: Show toast notification
 function showToast(message: string): void {
   let container = document.getElementById('toast-container');
@@ -289,11 +533,18 @@ function showToast(message: string): void {
     container = document.createElement('div');
     container.id = 'toast-container';
     container.className = 'toast-container';
+    container.setAttribute('role', 'status');
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-atomic', 'true');
     document.body.appendChild(container);
   }
   const toast = document.createElement('div');
   toast.className = 'toast-message';
-  toast.innerHTML = `<span>✓</span><span>${message}</span>`;
+  const icon = document.createElement('span');
+  icon.textContent = '✓';
+  const text = document.createElement('span');
+  text.textContent = message;
+  toast.append(icon, text);
   container.appendChild(toast);
   setTimeout(() => {
     toast.remove();
@@ -311,17 +562,43 @@ function getDirectPrintStage(): HTMLElement {
   return stage;
 }
 
+let pendingConfirmResolve: ((confirmed: boolean) => void) | null = null;
+const pendingAdminActionKeys = new Set<string>();
+
+function resolvePendingConfirmDialog(confirmed: boolean): void {
+  if (!pendingConfirmResolve) return;
+  const resolve = pendingConfirmResolve;
+  pendingConfirmResolve = null;
+  resolve(confirmed);
+}
+
 // Modal management
-function openModal(title: string, htmlContent: string, isPrintable: boolean = true): void {
+function openModal(
+  title: string,
+  htmlContent: string,
+  isPrintable: boolean = true,
+  options?: { hideGlobalFooter?: boolean; returnFocusTarget?: HTMLElement | null }
+): void {
   const modal = document.getElementById('global-modal') as HTMLElement;
   const modalTitle = document.getElementById('modal-title') as HTMLElement;
   const modalBody = document.getElementById('modal-body') as HTMLElement;
   const printBtn = document.getElementById('modal-btn-print') as HTMLElement;
   if (modal && modalTitle && modalBody) {
+    if (!modal.classList.contains('open')) {
+      modalReturnFocusElement = options?.returnFocusTarget
+        || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    }
     modalTitle.textContent = title;
     modalBody.innerHTML = htmlContent;
+    modal.classList.toggle('hide-global-footer', Boolean(options?.hideGlobalFooter));
+    modal.setAttribute('aria-hidden', 'false');
     modal.classList.add('open');
     if (printBtn) printBtn.style.display = isPrintable ? 'inline-flex' : 'none';
+    const firstModalControl = Array.from(modalBody.querySelectorAll<HTMLElement>(
+      'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href]'
+    )).find(element => element.getClientRects().length > 0);
+    (firstModalControl || modal.querySelector<HTMLElement>('#modal-btn-close') ||
+      modal.querySelector<HTMLElement>('.modal-box'))?.focus();
 
     if (isPrintable) {
       const preview = modalBody.querySelector('#doc-preview-container') as HTMLElement | null;
@@ -334,12 +611,164 @@ function openModal(title: string, htmlContent: string, isPrintable: boolean = tr
 
 function closeModal(): void {
   const modal = document.getElementById('global-modal');
-  if (modal) modal.classList.remove('open');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.classList.remove('hide-global-footer');
+    modal.setAttribute('aria-hidden', 'true');
+  }
   document.body.classList.remove('printing-slip');
+  const stage = document.getElementById('direct-print-stage');
+  if (stage) stage.innerHTML = '';
+  if (modalReturnFocusElement?.isConnected) modalReturnFocusElement.focus();
+  modalReturnFocusElement = null;
+  resolvePendingConfirmDialog(false);
 }
 
-// Synchronous native print engine (preserves browser user gesture activation)
-function printDocument(_title: string, htmlContent: string): void {
+/** Opens an accessible confirmation dialog inside #global-modal and resolves true/false. */
+function openConfirmDialog(
+  options: ConfirmDialogHtmlOptions & { title: string; returnFocusTarget?: HTMLElement | null }
+): Promise<boolean> {
+  resolvePendingConfirmDialog(false);
+  const html = buildConfirmDialogHtml(options);
+  openModal(options.title, html, false, {
+    hideGlobalFooter: true,
+    returnFocusTarget: options.returnFocusTarget
+  });
+  return new Promise<boolean>((resolve) => {
+    pendingConfirmResolve = resolve;
+    document.getElementById('confirm-dialog-confirm')?.addEventListener('click', () => {
+      resolvePendingConfirmDialog(true);
+      closeModal();
+    });
+  });
+}
+
+/** Confirms a destructive admin action first, then runs it with in-flight action gating. */
+async function confirmAndRunAdminAction<T>(
+  actionKey: string,
+  triggerEl: HTMLElement | null | undefined,
+  confirmOptions: ConfirmDialogHtmlOptions & { title: string },
+  action: () => Promise<T>
+): Promise<T | undefined> {
+  if (pendingAdminActionKeys.has(actionKey)) return undefined;
+  pendingAdminActionKeys.add(actionKey);
+  try {
+    const confirmed = await openConfirmDialog({
+      ...confirmOptions,
+      returnFocusTarget: triggerEl instanceof HTMLElement ? triggerEl : undefined
+    });
+    if (!confirmed) return undefined;
+    pendingAdminActionKeys.delete(actionKey);
+    return await runAdminAction(actionKey, triggerEl, action);
+  } finally {
+    pendingAdminActionKeys.delete(actionKey);
+  }
+}
+
+/** Gates concurrent async Super User mutations per actionKey and marks trigger button busy. */
+async function runAdminAction<T>(
+  actionKey: string,
+  triggerEl: HTMLElement | null | undefined,
+  action: () => Promise<T>
+): Promise<T | undefined> {
+  if (pendingAdminActionKeys.has(actionKey)) return undefined;
+  pendingAdminActionKeys.add(actionKey);
+  const buttonEl = triggerEl instanceof HTMLButtonElement
+    ? triggerEl
+    : triggerEl?.closest('button') || null;
+  const wasDisabled = Boolean(buttonEl?.disabled);
+  if (buttonEl) {
+    buttonEl.disabled = true;
+    buttonEl.setAttribute('aria-busy', 'true');
+  }
+  try {
+    return await action();
+  } finally {
+    pendingAdminActionKeys.delete(actionKey);
+    if (buttonEl?.isConnected) {
+      buttonEl.disabled = wasDisabled;
+      buttonEl.removeAttribute('aria-busy');
+    }
+  }
+}
+
+function findValidationErrorContainer(field: HTMLElement): HTMLElement | null {
+  return field.closest('.form-group, td') || field.parentElement;
+}
+
+function clearFieldValidationError(field: HTMLElement | null): void {
+  if (!field) return;
+  field.removeAttribute('aria-invalid');
+  const errId = field.getAttribute('data-validation-error-id');
+  if (errId) {
+    document.getElementById(errId)?.remove();
+    const existingDescribedBy = (field.getAttribute('aria-describedby') || '')
+      .split(/\s+/)
+      .filter(token => token && token !== errId);
+    if (existingDescribedBy.length) {
+      field.setAttribute('aria-describedby', existingDescribedBy.join(' '));
+    } else {
+      field.removeAttribute('aria-describedby');
+    }
+    field.removeAttribute('data-validation-error-id');
+  }
+  const container = findValidationErrorContainer(field);
+  container?.querySelectorAll('.su-form-error[data-for-field]')?.forEach(el => {
+    const key = el.getAttribute('data-for-field');
+    if (key === field.id || key === field.dataset.adminUserPassword) {
+      el.remove();
+    }
+  });
+}
+
+function setFieldValidationError(field: HTMLElement | null, message: string): void {
+  if (!field) return;
+  clearFieldValidationError(field);
+  const fieldKey = field.id || `pw-${field.dataset.adminUserPassword || 'field'}`;
+  const errorId = `${fieldKey}-error`;
+  const errorSpan = document.createElement('span');
+  errorSpan.id = errorId;
+  errorSpan.className = 'su-form-error';
+  errorSpan.setAttribute('role', 'alert');
+  errorSpan.setAttribute('data-for-field', field.id || field.dataset.adminUserPassword || fieldKey);
+  errorSpan.textContent = message;
+
+  const container = findValidationErrorContainer(field);
+  const passwordControl = field.closest('.su-user-password-control');
+  if (passwordControl && container && passwordControl.parentElement === container) {
+    passwordControl.insertAdjacentElement('afterend', errorSpan);
+  } else if (container) {
+    container.appendChild(errorSpan);
+  } else {
+    field.insertAdjacentElement('afterend', errorSpan);
+  }
+
+  field.setAttribute('aria-invalid', 'true');
+  field.setAttribute('data-validation-error-id', errorId);
+  const prevDescribedBy = (field.getAttribute('aria-describedby') || '')
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!prevDescribedBy.includes(errorId)) {
+    prevDescribedBy.push(errorId);
+  }
+  field.setAttribute('aria-describedby', prevDescribedBy.join(' '));
+}
+
+function applyFieldValidationErrors(entries: Array<[HTMLElement | null, string | undefined]>): boolean {
+  let firstInvalidField: HTMLElement | null = null;
+  for (const [field, message] of entries) {
+    if (!field) continue;
+    clearFieldValidationError(field);
+    if (message) {
+      setFieldValidationError(field, message);
+      if (!firstInvalidField) firstInvalidField = field;
+    }
+  }
+  firstInvalidField?.focus();
+  return firstInvalidField !== null;
+}
+
+function printDocument(title: string, htmlContent: string): void {
   const preview = document.getElementById('doc-preview-container');
   const printContent = htmlContent || (preview ? preview.innerHTML : (document.getElementById('modal-body')?.innerHTML || ''));
   if (!printContent) {
@@ -347,94 +776,197 @@ function printDocument(_title: string, htmlContent: string): void {
   }
 
   const stage = getDirectPrintStage();
-  stage.innerHTML = printContent;
-  document.body.classList.add('printing-slip');
+  const cleanupInPagePrint = () => {
+    document.body.classList.remove('printing-slip');
+    stage.innerHTML = '';
+  };
+  const fallbackInPagePrint = () => {
+    stage.innerHTML = printContent;
+    document.body.classList.add('printing-slip');
+    window.focus();
+    window.addEventListener('afterprint', cleanupInPagePrint, { once: true });
+    window.addEventListener('focus', cleanupInPagePrint, { once: true });
+    try {
+      window.print();
+    } catch (error) {
+      cleanupInPagePrint();
+      console.warn('In-page print fallback failed:', error);
+    }
+  };
+  let printWindow: Window | null = null;
+  try {
+    printWindow = window.open('', '_blank');
+  } catch (error) {
+    console.warn('Unable to open standalone print window; using in-page print fallback:', error);
+  }
+  if (printWindow) {
+    try {
+      const stylesheetLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
+        .map(link => `<link rel="stylesheet" href="${escapeHtml(link.href)}">`)
+        .join('');
+      let printStarted = false;
+      const startStandalonePrint = () => {
+        if (printStarted || printWindow?.closed) return;
+        printStarted = true;
+        try {
+          printWindow?.focus();
+          printWindow?.print();
+        } catch (error) {
+          console.warn('Standalone print failed; using in-page print fallback:', error);
+          printWindow?.close();
+          fallbackInPagePrint();
+        }
+      };
+      printWindow.addEventListener('afterprint', () => printWindow.close(), { once: true });
+      printWindow.addEventListener('load', startStandalonePrint, { once: true });
+      printWindow.document.open();
+      printWindow.document.write(`<!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>${escapeHtml(title)}</title>
+            ${stylesheetLinks}
+            <style>
+              @page { size: A4 portrait; margin: 10mm 12mm 12mm; }
+              html, body { margin: 0; padding: 0; background: white; color: black; }
+              body { font: 11pt Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              @media print { body { margin: 0; } }
+            </style>
+          </head>
+          <body>${printContent}</body>
+        </html>`);
+      printWindow.document.close();
+      cleanupInPagePrint();
+      if (printWindow.document.readyState === 'complete') {
+        window.setTimeout(startStandalonePrint, 0);
+      }
+      return;
+    } catch (error) {
+      console.warn('Standalone print window failed; using in-page print fallback:', error);
+      printWindow.close();
+    }
+  }
 
-  window.focus();
-  window.print();
+  fallbackInPagePrint();
 }
 
-// Minimal Navigation Switcher Bar (3-Zone Uncluttered Contract)
+function screenForRole(role: SystemUserRecord['role']): string {
+  const roleScreens: Record<SystemUserRecord['role'], string> = {
+    SUPER_USER: 'screen-admin',
+    INWARD_CLERK: 'screen-grn',
+    PACKING_SUPERVISOR: 'screen-packing',
+    QC_INSPECTOR: 'screen-qc',
+    ALTERATION_LEAD: 'screen-repair'
+  };
+  return roleScreens[role];
+}
+
+function stationName(role: SystemUserRecord['role']): string {
+  const names: Record<SystemUserRecord['role'], string> = {
+    SUPER_USER: 'Super User',
+    INWARD_CLERK: 'Inward Register',
+    PACKING_SUPERVISOR: 'Packing Hall',
+    QC_INSPECTOR: 'Final QC',
+    ALTERATION_LEAD: 'Alteration Bay'
+  };
+  return names[role];
+}
+
+function renderAuthScreen(): string {
+  if (state.authMode === 'checking') {
+    return '<main class="auth-screen"><section class="auth-card"><h1>Meridian Works MES</h1><p>Checking sign-in status…</p></section></main>';
+  }
+
+  if (state.authMode === 'error') {
+    return `
+      <main class="auth-screen">
+        <section class="auth-card" aria-labelledby="auth-title">
+          <h1 id="auth-title">Meridian Works MES</h1>
+          <p class="auth-error" role="alert">${escapeHtml(state.authError)}</p>
+          <button type="button" class="btn-primary" id="btn-auth-retry">Try Again</button>
+        </section>
+      </main>
+    `;
+  }
+
+  const isSetup = state.authMode === 'setup';
+  return `
+    <main class="auth-screen">
+      <section class="auth-card" aria-labelledby="auth-title">
+        <div class="auth-brand">${LOGO_SVG}<span>MERIDIAN WORKS</span></div>
+        <h1 id="auth-title">${isSetup ? 'Create the first Super User' : 'Sign in to your station'}</h1>
+        <p>${isSetup
+          ? 'Set up the initial administrator account. This one-time step unlocks user and station management.'
+          : 'Use the username and password provided by your Super User.'}</p>
+        ${state.authError ? `<p class="auth-error" role="alert">${escapeHtml(state.authError)}</p>` : ''}
+        <form id="auth-form" novalidate>
+          ${isSetup ? `
+            <label class="auth-field">Operator name
+              <input id="auth-name" name="name" autocomplete="name" required />
+            </label>
+          ` : ''}
+          <label class="auth-field">Username
+            <input id="auth-username" name="username" autocomplete="username" required />
+          </label>
+          <label class="auth-field">Password
+            <input id="auth-password" name="password" type="password" autocomplete="${isSetup ? 'new-password' : 'current-password'}" required />
+          </label>
+          ${isSetup ? `
+            <label class="auth-field">Confirm password
+              <input id="auth-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" required />
+            </label>
+          ` : ''}
+          <button type="submit" class="btn-primary">${isSetup ? 'Create Super User' : 'Sign In'}</button>
+        </form>
+        ${isSetup ? '<p class="auth-hint">Use at least 8 characters. Passwords are stored as salted hashes.</p>' : ''}
+      </section>
+    </main>
+  `;
+}
+
+// Each signed-in account sees only its assigned station; Super Users can return to their control center.
 function renderModuleSwitcher(): string {
+  if (!state.currentUser) return '';
   const hasData = state.grnList.length > 0 || state.defectList.length > 0 || state.cartons.length > 0 || state.packingWip.plannedQty > 0;
+  const isSuperUser = state.currentUser.role === 'SUPER_USER';
+  const viewingOtherScreen = isSuperUser && state.activeScreen !== 'screen-admin';
+  const screenRoles: Record<string, SystemUserRecord['role']> = {
+    'screen-grn': 'INWARD_CLERK',
+    'screen-packing': 'PACKING_SUPERVISOR',
+    'screen-repair': 'ALTERATION_LEAD',
+    'screen-qc': 'QC_INSPECTOR',
+    'screen-admin': 'SUPER_USER'
+  };
 
   return `
     <header class="module-switcher-bar">
+      <a href="#main-content" class="skip-to-content">Skip to main content</a>
       <div class="header-brand" title="Meridian Works">
         ${LOGO_SVG}
         <span class="brand-title">MERIDIAN WORKS</span>
       </div>
-      <nav class="module-switcher-left" aria-label="Main Modules">
-        <button class="module-nav-btn ${state.activeScreen === 'screen-grn' ? 'active' : ''}" data-screen="screen-grn">
-          <span>Inward Register</span>
-        </button>
-        <button class="module-nav-btn ${state.activeScreen === 'screen-packing' ? 'active' : ''}" data-screen="screen-packing">
-          <span>Packing Hall</span>
-        </button>
-        <button class="module-nav-btn ${state.activeScreen === 'screen-repair' ? 'active' : ''}" data-screen="screen-repair">
-          <span>Alteration Bay</span>
-        </button>
-        <button class="module-nav-btn ${state.activeScreen === 'screen-qc' ? 'active' : ''}" data-screen="screen-qc">
-          <span>Final QC</span>
-        </button>
-        <button class="module-nav-btn ${state.activeScreen === 'screen-admin' ? 'active' : ''}" data-screen="screen-admin">
-          <span>Super User</span>
-        </button>
-      </nav>
+      <div class="module-switcher-left">
+        <span class="station-label">${escapeHtml(stationName(viewingOtherScreen
+          ? (screenRoles[state.activeScreen] || state.currentUser.role)
+          : state.currentUser.role))}</span>
+        ${viewingOtherScreen ? '<button class="btn-outline" id="btn-return-admin">Return to Super User</button>' : ''}
+      </div>
       <div class="module-switcher-right">
-        <button class="btn-outline" style="padding: 5px 10px; font-size: 11.5px;" id="btn-open-doc-center">
-          Printable Slips
-        </button>
-        ${hasData ? `
+        ${isSuperUser || state.currentUser.role === 'INWARD_CLERK' ? `
+          <button class="btn-outline" style="padding: 5px 10px; font-size: 11.5px;" id="btn-open-doc-center">
+            Printable Slips
+          </button>
+        ` : ''}
+        ${isSuperUser && hasData ? `
           <button class="btn-outline" style="padding: 5px 10px; font-size: 11.5px;" id="btn-clear-all-data">
             Clear Data
           </button>
         ` : ''}
+        <span class="signed-in-user">${escapeHtml(state.currentUser.name)}</span>
+        <button class="btn-outline" id="btn-session-lock">${isSuperUser ? 'Lock Session' : 'Sign Out'}</button>
       </div>
     </header>
-  `;
-}
-
-// Secret 7-Click Password Gate Overlay
-function renderSecretPasswordOverlay(): string {
-  if (!state.showPasswordPrompt) return '';
-  return `
-    <div class="secret-auth-overlay" id="secret-auth-overlay">
-      <div class="secret-auth-card">
-        <div class="secret-auth-header">
-          <span class="secret-auth-title">MERIDIAN WORKS &mdash; SYSTEM ADMINISTRATION</span>
-          <span class="secret-auth-tag">RESTRICTED</span>
-        </div>
-        <div class="secret-auth-body">
-          <p style="margin: 0 0 14px; font-size: 12.5px; color: var(--ink-600); line-height: 1.5;">
-            Enter the Super User authorization passphrase to unlock master system configuration and database administration.
-          </p>
-          <div>
-            <label style="font-size: 11px; font-weight: 700; color: var(--ink-800); text-transform: uppercase; letter-spacing: 0.03em;">Authorization Passphrase</label>
-            <input
-              type="password"
-              id="secret-admin-password-input"
-              class="secret-auth-input"
-              placeholder="Enter passphrase"
-              autocomplete="off"
-            />
-            ${state.passwordError ? `
-              <div style="color: var(--ink-950); font-size: 11.5px; font-weight: 600; margin-top: 6px;">
-                ${state.passwordError}
-              </div>
-            ` : ''}
-          </div>
-        </div>
-        <div class="secret-auth-footer">
-          <button class="btn-outline" id="btn-cancel-secret-auth">
-            Cancel
-          </button>
-          <button class="btn-primary" id="btn-submit-secret-auth">
-            Authenticate
-          </button>
-        </div>
-      </div>
-    </div>
   `;
 }
 
@@ -472,33 +1004,40 @@ function getCurrentRollupSummary() {
 // SCREEN 1: Inward Goods Receiving (Dock #1)
 // ==========================================
 function renderScreenGRN(): string {
-  const sumRcvd = state.grnList.reduce((acc, row) => acc + row.rcvdPairs, 0);
+  const sumRcvd = state.grnList
+    .filter(row => !row.isVoided && row.status.toUpperCase() !== 'VOIDED')
+    .reduce((acc, row) => acc + row.rcvdPairs, 0);
   const currentSizeTotal = calculateSizeTotal(state.grnForm.sizes);
+  const grnCaps = getGrnRemainingCaps(state.grnForm.pendingOrderId);
   const wip = state.packingWip;
   const baseReq = normalizeBaseReqNumber(wip.selectedBatch);
   const mReq = getMaterialReqNumber(baseReq);
   const aReq = getAlterationReqNumber(baseReq);
   const askingPairs = wip.plannedQty || calculateSizeTotal(wip.sizes);
+  const orderStock = getOrderStockState(wip.parentOrderId || '');
   const evalIssue = evaluateRequisitionIssuance({
     askingPairs,
     askingSizes: wip.sizes,
-    totalReceivedPairs: sumRcvd,
-    alreadyIssuedPairs: state.issuedPairsTotal
+    totalReceivedPairs: orderStock.totalReceived,
+    alreadyIssuedPairs: orderStock.totalIssued
   });
+  const totalIssuedPairs = getTotalIssuedPairs();
+  const queueReqs = Object.values(state.ordersWipMap).filter((item: any) => item && !item.isVoided);
+  const activeQueueList = queueReqs.length > 0 ? queueReqs : [wip];
   const rollupSummary = getCurrentRollupSummary();
 
   return `
     <div class="sub-header-bar">
-      <div class="sub-header-title">
+      <h1 class="sub-header-title">
         Inward Goods Receiving Register (Dock #1) &mdash; Multi-Batch GRN Receiving (GRN-0001, GRN-0002...)
-      </div>
+      </h1>
       <div class="sub-header-right">
         <span class="system-date-label">Date: 31-10-2026</span>
       </div>
     </div>
 
     <!-- Main Content Area -->
-    <main class="main-viewport">
+    <main id="main-content" class="main-viewport" tabindex="-1">
       <!-- Clean Input Form Card: Pending Order Dropdown (Super User) + Received Only (No PO, No Order Qty) -->
       <section class="form-card">
         <div class="form-row">
@@ -558,15 +1097,20 @@ function renderScreenGRN(): string {
             </thead>
             <tbody>
               <tr>
-                <td><input type="number" aria-label="Size 7 / S Pairs" class="size-matrix-input grn-size-val" data-size="7" min="0" placeholder="0" value="${state.grnForm.sizes['7'] || ''}" /></td>
-                <td><input type="number" aria-label="Size 8 / M Pairs" class="size-matrix-input grn-size-val" data-size="8" min="0" placeholder="0" value="${state.grnForm.sizes['8'] || ''}" /></td>
-                <td><input type="number" aria-label="Size 9 / L Pairs" class="size-matrix-input grn-size-val" data-size="9" min="0" placeholder="0" value="${state.grnForm.sizes['9'] || ''}" /></td>
-                <td><input type="number" aria-label="Size 10 / XL Pairs" class="size-matrix-input grn-size-val" data-size="10" min="0" placeholder="0" value="${state.grnForm.sizes['10'] || ''}" /></td>
-                <td><input type="number" aria-label="Size 11 / XXL Pairs" class="size-matrix-input grn-size-val" data-size="11" min="0" placeholder="0" value="${state.grnForm.sizes['11'] || ''}" /></td>
+                <td><input type="number" aria-label="Size 7 / S Pairs" class="size-matrix-input grn-size-val" data-size="7" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['7']}"` : ''} placeholder="0" value="${state.grnForm.sizes['7'] || ''}" /></td>
+                <td><input type="number" aria-label="Size 8 / M Pairs" class="size-matrix-input grn-size-val" data-size="8" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['8']}"` : ''} placeholder="0" value="${state.grnForm.sizes['8'] || ''}" /></td>
+                <td><input type="number" aria-label="Size 9 / L Pairs" class="size-matrix-input grn-size-val" data-size="9" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['9']}"` : ''} placeholder="0" value="${state.grnForm.sizes['9'] || ''}" /></td>
+                <td><input type="number" aria-label="Size 10 / XL Pairs" class="size-matrix-input grn-size-val" data-size="10" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['10']}"` : ''} placeholder="0" value="${state.grnForm.sizes['10'] || ''}" /></td>
+                <td><input type="number" aria-label="Size 11 / XXL Pairs" class="size-matrix-input grn-size-val" data-size="11" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['11']}"` : ''} placeholder="0" value="${state.grnForm.sizes['11'] || ''}" /></td>
                 <td style="font-weight: 800; font-size: 14px; color: var(--ink-950);" id="grn-size-total-display">${currentSizeTotal.toLocaleString()}</td>
               </tr>
             </tbody>
           </table>
+          <div id="grn-size-caps" style="font-size: 11.5px; color: var(--ink-600); margin-top: 6px;">
+            ${grnCaps
+              ? formatGrnRemainingCaps(grnCaps, state.grnForm.sizes)
+              : 'No matching pending-order size cap available; received quantities are unrestricted.'}
+          </div>
         </div>
 
         <div class="form-action-row" style="justify-content: flex-end;">
@@ -589,6 +1133,18 @@ function renderScreenGRN(): string {
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px;">
+              <label for="grn-queue-req-select" style="color: var(--ink-600); font-weight: 600;">Active Queue REQ:</label>
+              <select id="grn-queue-req-select" class="form-select" style="min-width: 240px; height: 32px; font-size: 12px;">
+                ${activeQueueList.map((item: any) => {
+                  const reqCode = normalizeBaseReqNumber(item.selectedBatch || item.reqNumber);
+                  const qty = Number(item.plannedQty || calculateSizeTotal(item.sizes) || 0);
+                  const ordTxt = item.parentOrderId ? ` • ${item.parentOrderId}` : '';
+                  const stTxt = item.issueStatus === 'Issued by Inward Register' ? 'ISSUED' : 'PENDING';
+                  return `<option value="${reqCode}" ${reqCode === baseReq ? 'selected' : ''}>${reqCode}${ordTxt} (${qty.toLocaleString()} Prs • ${stTxt})</option>`;
+                }).join('')}
+              </select>
+            </div>
             <div style="font-size: 12px;">
               <span style="color: var(--ink-600);">Article:</span>
               <strong>${wip.article || '---'}</strong>
@@ -602,7 +1158,7 @@ function renderScreenGRN(): string {
               <strong id="grn-req-asking-qty">${askingPairs.toLocaleString()} Pairs</strong>
             </div>
             <div style="font-size: 12px;">
-              <span style="color: var(--ink-600);">Available Inward Stock:</span>
+              <span style="color: var(--ink-600);">Available Stock${wip.parentOrderId ? ` (${wip.parentOrderId})` : ''}:</span>
               <strong id="grn-available-stock">${evalIssue.availablePairs.toLocaleString()} Pairs</strong>
             </div>
             <span class="status-pill ${wip.issueStatus === 'Issued by Inward Register' ? 'status-pill-green' : 'status-pill-amber'}" id="grn-req-issue-status">
@@ -679,9 +1235,9 @@ function renderScreenGRN(): string {
           <span class="stat-divider">|</span>
           <span>Total Received: <strong>${sumRcvd.toLocaleString()} Pairs</strong></span>
           <span class="stat-divider">|</span>
-          <span>Issued to Packing Hall: <strong>${state.issuedPairsTotal.toLocaleString()} Pairs</strong></span>
+          <span>Issued to Packing Hall: <strong>${totalIssuedPairs.toLocaleString()} Pairs</strong></span>
           <span class="stat-divider">|</span>
-          <span>Available Stock: <strong>${evalIssue.availablePairs.toLocaleString()} Pairs</strong></span>
+          <span>Available Stock${wip.parentOrderId ? ` (${wip.parentOrderId})` : ''}: <strong>${evalIssue.availablePairs.toLocaleString()} Pairs</strong></span>
         </div>
         <div class="footer-actions-right">
           <button class="btn-outline" id="btn-export-grn-excel">Excel export</button>
@@ -696,305 +1252,22 @@ function renderScreenGRN(): string {
 // SCREEN: Packing Hall Portal & 5-Stage WIP Flow
 // ==========================================
 function renderScreenPacking(): string {
-  const wip = state.packingWip;
-  const baseReq = normalizeBaseReqNumber(wip.selectedBatch);
-  const mReq = getMaterialReqNumber(baseReq);
-  const aReq = getAlterationReqNumber(baseReq);
-  const activeAlts = state.defectList.filter(d => d.status === 'In Rework' || d.status === 'In Washing' || d.status === 'In Sorting');
-
-  return `
-    <div class="sub-header-bar">
-      <div class="sub-header-title">
-        Packing Hall Floor &mdash; 5-Stage WIP Flow &amp; Requisition Slip Generator
-      </div>
-      <div class="sub-header-right">
-        <span class="system-date-label">Date: 31-10-2026</span>
-      </div>
-    </div>
-
-    <main class="main-viewport">
-      <!-- Active Order Toolbar (Single Requisition with M- and A- Prefixes, No Buyer) -->
-      <section class="form-card">
-        <div class="form-row" style="align-items: flex-end;">
-          <div class="form-group" style="flex: 1.3; min-width: 170px;">
-            <label for="wip-batch-select">Active Requisition / Order #</label>
-            <select id="wip-batch-select" class="form-select" style="font-weight: 700;">
-              ${(() => {
-                const knownReqs = Array.from(new Set([
-                  baseReq,
-                  DEFAULT_REQ_NUMBER,
-                  ...Object.keys(state.ordersWipMap)
-                ]));
-                return knownReqs.map(r => {
-                  const item = state.ordersWipMap[r] || (r === baseReq ? wip : null);
-                  const art = item?.article || (r === baseReq ? wip.article : '');
-                  const stage = item ? determineOrderActiveStage(item) : 'STEP_1';
-                  const stageLabel = stage === 'STEP_1' ? 'Stage 1 (Checking)'
-                    : stage === 'STEP_2' ? 'Stage 2 (Ironing)'
-                    : stage === 'STEP_3' ? 'Stage 3 (Matching)'
-                    : stage === 'STEP_4' ? 'Stage 4 (1st Pkg)'
-                    : stage === 'STEP_5' ? 'Stage 5 (Cartons)'
-                    : 'Completed';
-                  return `<option value="${r}" ${r === baseReq ? 'selected' : ''}>${r}${art ? ` — ${art}` : ''} [${stageLabel}]</option>`;
-                }).join('');
-              })()}
-            </select>
-          </div>
-          <div class="form-group" style="flex: 1.1; min-width: 140px;">
-            <label>Material Req (M-Prefix)</label>
-            <div style="padding: 5px 0;">
-              <span class="status-pill" id="wip-disp-mreq">${mReq}</span>
-            </div>
-          </div>
-          <div class="form-group" style="flex: 1.1; min-width: 140px;">
-            <label>Alteration Bay (A-Prefix)</label>
-            <div style="padding: 5px 0;">
-              <span class="status-pill" id="wip-disp-areq">${aReq}</span>
-            </div>
-          </div>
-          <div class="form-group" style="flex: 1.2; min-width: 140px;">
-            <label>Article</label>
-            <div id="wip-disp-article" style="font-weight: 700; color: var(--ink-950); padding: 7px 0; font-size: 13px;">${wip.article || '---'}</div>
-          </div>
-          <div class="form-group" style="flex: 1; min-width: 110px;">
-            <label>Asking Qty</label>
-            <div id="wip-disp-qty" style="font-weight: 700; color: var(--ink-950); padding: 7px 0; font-size: 13px;">${wip.plannedQty.toLocaleString()} Pairs</div>
-          </div>
-          <div class="form-group" style="flex: 1.1; min-width: 140px;">
-            <label>Inward Issue Status</label>
-            <div style="padding: 5px 0;">
-              <span class="status-pill ${wip.issueStatus === 'Issued by Inward Register' ? 'status-pill-green' : 'status-pill-amber'}" id="wip-disp-issue-status">${wip.issueStatus}</span>
-            </div>
-          </div>
-          <div class="form-group" style="flex: 1;">
-            <button class="btn-primary" style="width: 100%; justify-content: center;" id="btn-wip-new-req">+ Generate &amp; Print Requisition</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- 5-Stage WIP Floor Process Pipeline -->
-      <section>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <h3 style="font-size: 12.5px; font-weight: 700; color: var(--ink-950); text-transform: uppercase; letter-spacing: 0.04em; margin: 0;">
-            5-Stage WIP Floor Process Pipeline
-          </h3>
-          <span style="font-size: 11.5px; color: var(--ink-500);">Unified Req: <strong>${baseReq}</strong> &bull; Material: <strong>${mReq}</strong> &bull; Alteration: <strong>${aReq}</strong></span>
-        </div>
-
-        ${(() => {
-          const activeStage = determineOrderActiveStage(wip);
-          return `
-        <div style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px;">
-          <!-- STAGE 1: Checking / Inspection -->
-          <div class="pipeline-stage-card ${activeStage === 'STEP_1' ? 'stage-active' : ''}">
-            <div>
-              <div class="pipeline-stage-header">
-                <span>Stage 1: Checking</span>
-                ${activeStage === 'STEP_1' ? '<span class="stage-active-badge">Active</span>' : ''}
-              </div>
-              <div class="pipeline-stage-metric"><span>Issued In:</span> <strong id="wip-stg1-in">${wip.stage1In.toLocaleString()}</strong></div>
-              <div class="pipeline-stage-metric"><span>Passed:</span> <strong id="wip-stg1-passed">${wip.stage1Passed.toLocaleString()}</strong></div>
-              <div class="pipeline-stage-metric"><span>Defects (${aReq}):</span> <strong id="wip-stg1-defects">${wip.stage1Defects.toLocaleString()}</strong></div>
-            </div>
-            <button class="${activeStage === 'STEP_1' ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step1">
-              Process Stage 1
-            </button>
-          </div>
-
-          <!-- STAGE 2: Ironing & Brushing -->
-          <div class="pipeline-stage-card ${activeStage === 'STEP_2' ? 'stage-active' : ''}">
-            <div>
-              <div class="pipeline-stage-header">
-                <span>Stage 2: Ironing</span>
-                ${activeStage === 'STEP_2' ? '<span class="stage-active-badge">Active</span>' : ''}
-              </div>
-              <div class="pipeline-stage-metric"><span>In Stage:</span> <strong id="wip-stg2-in">${wip.stage2In.toLocaleString()}</strong></div>
-              <div class="pipeline-stage-metric"><span>Passed:</span> <strong id="wip-stg2-passed">${wip.stage2Passed.toLocaleString()}</strong></div>
-              <div class="pipeline-stage-metric"><span>Defects (${aReq}):</span> <strong id="wip-stg2-defects">${wip.stage2Defects.toLocaleString()}</strong></div>
-            </div>
-            <button class="${activeStage === 'STEP_2' ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step2">
-              Process Stage 2
-            </button>
-          </div>
-
-          <!-- STAGE 3: Pair Matching -->
-          <div class="pipeline-stage-card ${activeStage === 'STEP_3' ? 'stage-active' : ''}">
-            <div>
-              <div class="pipeline-stage-header">
-                <span>Stage 3: Matching</span>
-                ${activeStage === 'STEP_3' ? '<span class="stage-active-badge">Active</span>' : ''}
-              </div>
-              <div class="pipeline-stage-metric"><span>In Stage:</span> <strong id="wip-stg3-in">${wip.stage3In.toLocaleString()}</strong></div>
-              <div class="pipeline-stage-metric"><span>Matched:</span> <strong id="wip-stg3-passed">${wip.stage3Passed.toLocaleString()} Prs</strong></div>
-              <div class="pipeline-stage-metric"><span>Defects (${aReq}):</span> <strong id="wip-stg3-defects">${wip.stage3Defects.toLocaleString()}</strong></div>
-            </div>
-            <button class="${activeStage === 'STEP_3' ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step3">
-              Process Stage 3
-            </button>
-          </div>
-
-          <!-- REQUISITION SLIP GENERATOR (M-PREFIX) -->
-          <div class="pipeline-stage-card" style="background: var(--ink-50); border-style: dashed;">
-            <div>
-              <div class="pipeline-stage-header">
-                <span>Material Req (M)</span>
-              </div>
-              <div class="pipeline-stage-metric"><span>Slip No:</span> <strong id="wip-mreq-no">${mReq}</strong></div>
-              <div class="pipeline-stage-metric"><span>Sets:</span> <strong id="wip-mreq-qty">${wip.mreqQty}</strong></div>
-              <div class="pipeline-stage-metric"><span>Article:</span> <strong>${wip.article || '---'}</strong></div>
-            </div>
-            <button class="btn-primary" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-print-mreq">
-              Generate &amp; Print Slip
-            </button>
-          </div>
-
-          <!-- STAGE 4: 1st Packing -->
-          <div class="pipeline-stage-card ${activeStage === 'STEP_4' ? 'stage-active' : ''}">
-            <div>
-              <div class="pipeline-stage-header">
-                <span>Stage 4: 1st Packing</span>
-                ${activeStage === 'STEP_4' ? '<span class="stage-active-badge">Active</span>' : ''}
-              </div>
-              <div class="pipeline-stage-metric"><span>Polybag In:</span> <strong id="wip-stg4-in">${wip.stage4In.toLocaleString()} prs</strong></div>
-              <div class="pipeline-stage-metric"><span>Packaged:</span> <strong id="wip-stg4-passed">${wip.stage4Passed.toLocaleString()} Prs</strong></div>
-              <div class="pipeline-stage-metric"><span>Pending:</span> <strong id="wip-stg4-pending">${wip.stage4Pending}</strong></div>
-            </div>
-            <button class="${activeStage === 'STEP_4' ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step4">
-              Record 1st Packing
-            </button>
-          </div>
-
-          <!-- STAGE 5: 2nd Packing -->
-          <div class="pipeline-stage-card ${activeStage === 'STEP_5' ? 'stage-active' : ''}">
-            <div>
-              <div class="pipeline-stage-header">
-                <span>Stage 5: Master Cartons</span>
-                ${activeStage === 'STEP_5' ? '<span class="stage-active-badge">Active</span>' : ''}
-              </div>
-              <div class="pipeline-stage-metric"><span>Spec:</span> <strong>30 Prs / Ctn</strong></div>
-              <div class="pipeline-stage-metric"><span>Packed:</span> <strong id="wip-stg5-cartons">${wip.stage5Cartons || '0 Cartons (0 Prs)'}</strong></div>
-              <div class="pipeline-stage-metric"><span>Pending:</span> <strong>${wip.stage5Pending || '0 Cartons'}</strong></div>
-            </div>
-            <button class="${activeStage === 'STEP_5' ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step5">
-              Box &amp; Seal Cartons
-            </button>
-          </div>
-        </div>
-        `;
-        })()}
-      </section>
-
-      <!-- Real-Time WIP Analytics Dashboard (Planned Demand vs. Actual Packed Pairs per Active Requisition) -->
-      ${(() => {
-        const summary = getCurrentRollupSummary();
-        const series = buildRequisitionAnalyticsSeries(summary, baseReq);
-        return renderRequisitionWipAnalyticsChart({
-          series,
-          activeWipSizes: wip.sizes,
-          activeReqNumber: baseReq,
-          activePlannedQty: wip.plannedQty,
-          activeStage4Packed: wip.stage4Passed,
-          activeStage5Packed: wip.outputPairs,
-          mode: 'packing-hall'
-        });
-      })()}
-
-      <!-- Split Enterprise Data Grids -->
-      <section class="two-column-grid">
-        <!-- LEFT: Active Alteration / Rework Loop -->
-        <div class="panel-card">
-          <div class="panel-card-header">
-            <span class="panel-card-title">Active Alteration / Repair Loop (${aReq})</span>
-            <span class="panel-counter-badge">${activeAlts.length} Active</span>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Alteration Req #</th>
-                  <th>Source Stage</th>
-                  <th>Defect Class</th>
-                  <th class="text-right">Qty</th>
-                  <th>Status</th>
-                  <th>Route</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${state.defectList.length === 0 ? `
-                  <tr>
-                    <td colspan="6" class="table-empty-cell">No active alterations in queue.</td>
-                  </tr>
-                ` : state.defectList.slice(0, 5).map(d => `
-                  <tr>
-                    <td><strong>${d.id}</strong></td>
-                    <td>${d.origin}</td>
-                    <td>${d.defectClass}</td>
-                    <td class="text-right font-bold">${d.qty}</td>
-                    <td><span class="status-pill">${d.status}</span></td>
-                    <td style="font-size: 11px; color: var(--ink-600);">Return to Stage 1</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- RIGHT: Master Shipping Carton Manifest -->
-        <div class="panel-card">
-          <div class="panel-card-header">
-            <span class="panel-card-title">Master Shipping Carton Manifest</span>
-            <span class="panel-counter-badge">${state.cartons.length} Cartons</span>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Carton #</th>
-                  <th class="text-right">Net Pairs</th>
-                  <th class="text-right">Gross Wt</th>
-                  <th class="text-center">QC Status</th>
-                  <th class="text-center">Barcode</th>
-                  <th>QC Seal #</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${state.cartons.length === 0 ? `
-                  <tr>
-                    <td colspan="6" class="table-empty-cell">No cartons logged in manifest.</td>
-                  </tr>
-                ` : state.cartons.slice(0, 5).map(c => `
-                  <tr>
-                    <td><strong>${c.cartonNo}</strong></td>
-                    <td class="text-right">${c.pairs}</td>
-                    <td class="text-right">${c.grossWt}</td>
-                    <td class="text-center"><span class="status-pill">${c.status}</span></td>
-                    <td class="text-center" style="font-weight: 600;">${c.barcodeVerified ? 'Verified' : 'Pending'}</td>
-                    <td style="font-family: monospace; font-size: 11.5px;">${c.sealNo}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- Bottom Enterprise Status Bar -->
-      <footer class="portal-footer">
-        <div class="footer-stats-left">
-          <span>Line Efficiency: <strong>${wip.lineEfficiency}</strong></span>
-          <span class="stat-divider">&bull;</span>
-          <span>Output: <strong>${wip.outputPairs} Pairs / ${wip.outputCartons} Cartons</strong></span>
-          <span class="stat-divider">&bull;</span>
-          <span>In Alteration (${aReq}): <strong>${wip.inAlteration} Pairs</strong></span>
-        </div>
-        <div class="footer-actions-right">
-          <button class="btn-outline" id="btn-wip-export-shift">Export Shift Log</button>
-          <button class="btn-outline" id="btn-wip-print-labels">Print Carton Labels</button>
-          <button class="btn-primary" id="btn-wip-final-clearance">Final Dispatch Clearance</button>
-        </div>
-      </footer>
-    </main>
-  `;
+  return renderPackingHallScreen({
+    wip: state.packingWip as any,
+    defaultReqNumber: DEFAULT_REQ_NUMBER,
+    ordersWipMap: state.ordersWipMap,
+    persistedReqNumbers: state.persistedReqNumbers,
+    pendingOrders: state.pendingOrders,
+    defectList: state.defectList,
+    cartons: state.cartons,
+    rollupSummary: getCurrentRollupSummary(),
+    getOrderAvailableDockPairs: (orderId: string) => getOrderStockState(orderId).availablePairs,
+    remainingStagePairs,
+    escapeHtml,
+    isInitialSyncing: state.isInitialSyncing,
+    isManualSync: state.isManualSync,
+    syncError: state.syncError
+  });
 }
 
 // ==========================================
@@ -1003,18 +1276,21 @@ function renderScreenPacking(): string {
 function renderScreenRepair(): string {
   const aReq = getAlterationReqNumber(state.packingWip.selectedBatch);
   const batchOptions = Array.from(new Set([aReq, ...state.dropdownOptions.defectBatchIds]));
+  const savedTailorSelected = state.savedTailors.some(
+    tailor => tailor.toLocaleLowerCase() === state.repairForm.tailor.toLocaleLowerCase()
+  );
 
   return `
     <div class="sub-header-bar">
-      <div class="sub-header-title">
+      <h1 class="sub-header-title">
         Alteration &amp; Repair Bay #2 &mdash; Rework &amp; Mandatory Stage 1 Return (Prefix A: ${aReq})
-      </div>
+      </h1>
       <div class="sub-header-right">
         <span class="system-date-label">Date: 31-10-2026</span>
       </div>
     </div>
 
-    <main class="main-viewport">
+    <main id="main-content" class="main-viewport" tabindex="-1">
       <div class="alert-banner">
         <span>FACTORY RULE: Alteration Bay is called from the same Requisition Number with Prefix A (${aReq}). Every Repaired Pair Is Auto-Routed Back to Stage 1 (Checking &amp; Inspection).</span>
       </div>
@@ -1055,7 +1331,11 @@ function renderScreenRepair(): string {
           </div>
           <div class="form-group" style="flex: 1.6;">
             <label for="defect-tailor">Assigned Tailor</label>
-            <input type="text" id="defect-tailor" class="form-input" placeholder="Enter tailor name" value="${state.repairForm.tailor}" />
+            <select id="defect-tailor-select" class="form-select" aria-label="Select saved tailor">
+              <option value="__custom__" ${savedTailorSelected ? '' : 'selected'}>Enter a new tailor name</option>
+              ${state.savedTailors.map(tailor => `<option value="${escapeHtml(tailor)}" ${state.repairForm.tailor.toLocaleLowerCase() === tailor.toLocaleLowerCase() ? 'selected' : ''}>${escapeHtml(tailor)}</option>`).join('')}
+            </select>
+            <input type="text" id="defect-tailor" class="form-input" placeholder="Custom tailor name" value="${savedTailorSelected ? '' : escapeHtml(state.repairForm.tailor)}" />
           </div>
           <div class="form-group" style="flex: 0.9;">
             <label for="defect-qty">Qty in Batch</label>
@@ -1153,15 +1433,15 @@ function renderScreenQC(): string {
 
   return `
     <div class="sub-header-bar">
-      <div class="sub-header-title">
+      <h1 class="sub-header-title">
         Final Inspection &amp; Master Carton Clearance (Dock #4)
-      </div>
+      </h1>
       <div class="sub-header-right">
         <span class="system-date-label">Date: 31-10-2026</span>
       </div>
     </div>
 
-    <main class="main-viewport">
+    <main id="main-content" class="main-viewport" tabindex="-1">
       <!-- Order Summary Card (No Buyer, No Mockup Fallbacks) -->
       <section class="order-summary-card">
         <div class="order-summary-top">
@@ -1200,10 +1480,12 @@ function renderScreenQC(): string {
           </div>
           <div class="checklist-container">
             ${state.qcChecklist.map(item => `
-              <div class="checklist-item" onclick="window.toggleQcCheck('${item.id}')" style="cursor: pointer;">
-                <div class="checklist-box" style="background-color: ${item.passed ? 'var(--ink-950)' : 'var(--ink-400)'};">
+              <div class="checklist-item">
+                <button type="button" class="checklist-box" aria-label="${escapeHtml(item.title)}"
+                  aria-pressed="${item.passed}" onclick="window.toggleQcCheck('${item.id}')"
+                  style="background-color: ${item.passed ? 'var(--ink-950)' : 'var(--ink-400)'};">
                   ✓
-                </div>
+                </button>
                 <div class="checklist-content">
                   <span class="checklist-title">${item.title}</span>
                   ${item.details ? `<span class="${item.passed ? 'checklist-status-pass' : ''}" style="font-size: 11.5px; color: ${item.passed ? 'var(--ink-950)' : 'var(--ink-500)'};">${item.details} ${item.passed ? '— PASS' : ''}</span>` : ''}
@@ -1299,6 +1581,8 @@ function renderScreenAdmin(): string {
 
   return renderSuperUserScreen({
     activeTab: state.adminActiveTab,
+    adminNavCollapsed: state.adminNavCollapsed,
+    locationSearch: typeof window !== 'undefined' ? window.location.search : '',
     activeReport: state.adminActiveReport,
     trackingSearch: state.adminTrackingSearch,
     trackingStatusFilter: state.adminTrackingStatusFilter,
@@ -1326,15 +1610,15 @@ function renderScreenAdmin(): string {
 // Global modal container template
 function renderModalContainer(): string {
   return `
-    <div id="global-modal" class="modal-overlay">
-      <div class="modal-box">
+    <div id="global-modal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
         <div class="modal-header">
           <div class="modal-title" id="modal-title">System Slip</div>
-          <button class="modal-close-btn" id="modal-close-x">&times;</button>
+          <button type="button" class="modal-close-btn" id="modal-close-x" aria-label="Close dialog">&times;</button>
         </div>
         <div class="modal-body" id="modal-body"></div>
         <div class="modal-footer">
-          <button class="btn-outline" id="modal-btn-close">Close</button>
+          <button type="button" class="btn-outline" id="modal-btn-close">Close</button>
           <button class="btn-primary" id="modal-btn-print" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px;">
             Print Document
           </button>
@@ -1344,10 +1628,116 @@ function renderModalContainer(): string {
   `;
 }
 
+interface RenderFocusSnapshot {
+  selector: string;
+  selectionStart: number | null;
+  selectionEnd: number | null;
+  selectionDirection: 'forward' | 'backward' | 'none' | null;
+}
+
+function captureRenderFocusTarget(root: HTMLElement): RenderFocusSnapshot | null {
+  const modal = document.getElementById('global-modal');
+  if (modal?.classList.contains('open')) return null;
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || active === document.body || !root.contains(active)) {
+    return null;
+  }
+  const selector = buildFocusRestoreSelector({
+    id: active.id || undefined,
+    classList: active.classList,
+    dataset: { ...active.dataset }
+  });
+  if (!selector) return null;
+  let selectionStart: number | null = null;
+  let selectionEnd: number | null = null;
+  let selectionDirection: 'forward' | 'backward' | 'none' | null = null;
+  if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+    try {
+      selectionStart = active.selectionStart;
+      selectionEnd = active.selectionEnd;
+      selectionDirection = active.selectionDirection;
+    } catch {
+      // Input type (e.g., number/checkbox) does not support selection offsets
+    }
+  }
+  return { selector, selectionStart, selectionEnd, selectionDirection };
+}
+
+function restoreRenderFocusTarget(root: HTMLElement, snapshot: RenderFocusSnapshot | null): void {
+  if (!snapshot) return;
+  try {
+    const nextEl = root.querySelector<HTMLElement>(snapshot.selector);
+    if (!nextEl || (nextEl as HTMLButtonElement).disabled || nextEl.getClientRects().length === 0) return;
+    nextEl.focus({ preventScroll: true });
+    if (
+      snapshot.selectionStart !== null &&
+      snapshot.selectionEnd !== null &&
+      (nextEl instanceof HTMLInputElement || nextEl instanceof HTMLTextAreaElement)
+    ) {
+      try {
+        nextEl.setSelectionRange(
+          snapshot.selectionStart,
+          snapshot.selectionEnd,
+          snapshot.selectionDirection || 'none'
+        );
+      } catch {
+        // Ignore selection errors for non-text input types
+      }
+    }
+  } catch {
+    // Ignore invalid selector edge cases
+  }
+}
+
+interface RenderAppOptions {
+  preserveInitialSyncDrafts?: boolean;
+}
+
+interface FormDraftEntry {
+  id: string;
+  value: string;
+}
+
+function captureDirtyFormDrafts(root: HTMLElement): FormDraftEntry[] {
+  const drafts: FormDraftEntry[] = [];
+  for (const el of root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input[id], textarea[id]')) {
+    if (el.type === 'password' || el.type === 'checkbox' || el.type === 'radio' || el.type === 'file') continue;
+    if (el.value !== el.defaultValue) {
+      drafts.push({ id: el.id, value: el.value });
+    }
+  }
+  return drafts;
+}
+
+function restoreDirtyFormDrafts(root: HTMLElement, drafts: FormDraftEntry[]): void {
+  for (const draft of drafts) {
+    const nextEl = document.getElementById(draft.id);
+    if ((nextEl instanceof HTMLInputElement || nextEl instanceof HTMLTextAreaElement) && root.contains(nextEl)) {
+      nextEl.value = draft.value;
+    }
+  }
+}
+
 // Main rendering engine
-function renderApp(): void {
+function renderApp(options: RenderAppOptions = {}): void {
   const root = document.getElementById('root');
   if (!root) return;
+  const focusSnapshot = captureRenderFocusTarget(root);
+  const draftSnapshots = options.preserveInitialSyncDrafts ? captureDirtyFormDrafts(root) : [];
+  root.dataset.syncReady = state.authMode === 'ready' && state.hasCompletedInitialSync && !state.isInitialSyncing ? 'true' : 'false';
+
+  if (state.authMode !== 'ready' || !state.currentUser) {
+    root.innerHTML = renderAuthScreen();
+    attachEventHandlers();
+    restoreRenderFocusTarget(root, focusSnapshot);
+    return;
+  }
+
+  if (state.currentUser.role !== 'SUPER_USER') {
+    state.activeScreen = screenForRole(state.currentUser.role);
+  } else if (!['screen-grn', 'screen-packing', 'screen-repair', 'screen-qc', 'screen-admin'].includes(state.activeScreen)) {
+    state.activeScreen = 'screen-admin';
+  }
 
   let screenHTML = '';
   if (state.activeScreen === 'screen-grn') {
@@ -1365,32 +1755,122 @@ function renderApp(): void {
   root.innerHTML = `
     ${renderModuleSwitcher()}
     ${screenHTML}
-    ${renderSecretPasswordOverlay()}
     ${renderModalContainer()}
   `;
 
   attachEventHandlers();
+  if (draftSnapshots.length > 0) {
+    restoreDirtyFormDrafts(root, draftSnapshots);
+  }
+  restoreRenderFocusTarget(root, focusSnapshot);
+}
+
+async function initializeAuth(): Promise<void> {
+  state.authMode = 'checking';
+  renderApp();
+  try {
+    const response = await fetch('/api/auth/status');
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Unable to check sign-in status.');
+    }
+
+    if (result.data.user) {
+      state.currentUser = result.data.user;
+      state.authMode = 'ready';
+      state.activeScreen = screenForRole(state.currentUser!.role);
+    } else {
+      state.authMode = result.data.initialized ? 'login' : 'setup';
+    }
+    state.authError = '';
+    renderApp();
+    if (state.currentUser) await syncBackendData();
+  } catch (error) {
+    state.authMode = 'error';
+    state.authError = error instanceof Error ? error.message : 'Unable to connect to the MES server.';
+    renderApp();
+  }
+}
+
+async function submitAuthForm(form: HTMLFormElement): Promise<void> {
+  const isSetup = state.authMode === 'setup';
+  const name = (document.getElementById('auth-name') as HTMLInputElement | null)?.value.trim() || '';
+  const username = (document.getElementById('auth-username') as HTMLInputElement | null)?.value.trim() || '';
+  const password = (document.getElementById('auth-password') as HTMLInputElement | null)?.value || '';
+  const passwordConfirm = (document.getElementById('auth-password-confirm') as HTMLInputElement | null)?.value || '';
+
+  if (isSetup && password !== passwordConfirm) {
+    state.authError = 'Passwords do not match.';
+    renderApp();
+    return;
+  }
+
+  const submitButton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const response = await fetch(isSetup ? '/api/auth/bootstrap' : '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, username, password })
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Sign in failed.');
+    }
+    state.currentUser = result.data.user;
+    state.authMode = 'ready';
+    state.authError = '';
+    state.activeScreen = screenForRole(state.currentUser!.role);
+    renderApp();
+    showToast(isSetup ? 'Initial Super User account created.' : `Signed in to ${stationName(state.currentUser!.role)}.`);
+    await syncBackendData();
+  } catch (error) {
+    state.authError = error instanceof Error ? error.message : 'Sign in failed.';
+    renderApp();
+  }
+}
+
+async function lockCurrentSession(): Promise<void> {
+  try {
+    const response = await fetch('/api/auth/logout', { method: 'POST' });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Unable to lock the session.');
+    }
+    state.currentUser = null;
+    state.authMode = 'login';
+    state.authError = '';
+    state.hasCompletedInitialSync = false;
+    state.isInitialSyncing = false;
+    state.isManualSync = false;
+    state.syncError = '';
+    state.activeScreen = 'screen-grn';
+    renderApp();
+    showToast('Session locked.');
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Unable to lock the session.');
+  }
 }
 
 // Attach interactive event handlers
 function attachEventHandlers(): void {
-  // Navigation / Switcher buttons
-  document.querySelectorAll('.module-nav-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const targetScreen = (e.currentTarget as HTMLElement).getAttribute('data-screen');
-      if (targetScreen) {
-        state.activeScreen = targetScreen;
-        if (targetScreen === 'screen-admin') {
-          state.isAdminUnlocked = true;
-        }
-        renderApp();
-      }
+  if (state.authMode !== 'ready' || !state.currentUser) {
+    document.getElementById('auth-form')?.addEventListener('submit', event => {
+      event.preventDefault();
+      void submitAuthForm(event.currentTarget as HTMLFormElement);
     });
-  });
+    document.getElementById('btn-auth-retry')?.addEventListener('click', () => void initializeAuth());
+    return;
+  }
 
   // Global toolbar actions: AQL calculator & Document center
   document.getElementById('btn-open-aql-calculator')?.addEventListener('click', openAqlCalculatorModal);
   document.getElementById('btn-open-doc-center')?.addEventListener('click', () => openDocumentCenterModal('grn'));
+  document.getElementById('btn-session-lock')?.addEventListener('click', () => void lockCurrentSession());
+  document.getElementById('btn-return-admin')?.addEventListener('click', () => {
+    state.activeScreen = 'screen-admin';
+    renderApp();
+  });
 
   document.getElementById('btn-clear-all-data')?.addEventListener('click', () => {
     state.grnList = [];
@@ -1404,40 +1884,7 @@ function attachEventHandlers(): void {
       rcvdPairs: '',
       sizes: createEmptySizes()
     };
-    state.packingWip = {
-      selectedBatch: DEFAULT_REQ_NUMBER,
-      parentOrderId: '',
-      po: '',
-      article: '',
-      plannedQty: 0,
-      issueStatus: 'Pending Inward Issue',
-      sizes: createEmptySizes(),
-      wipBatch: DEFAULT_REQ_NUMBER,
-      stage1In: 0,
-      stage1Passed: 0,
-      stage1Defects: 0,
-      stage2In: 0,
-      stage2Passed: 0,
-      stage2Defects: 0,
-      stage3In: 0,
-      stage3Passed: 0,
-      stage3Defects: 0,
-      mreqNo: getMaterialReqNumber(DEFAULT_REQ_NUMBER),
-      altReqNo: getAlterationReqNumber(DEFAULT_REQ_NUMBER),
-      mreqQty: '0 Sets',
-      mreqStatus: 'Ready',
-      stage4In: 0,
-      stage4Passed: 0,
-      stage4Pending: 0,
-      stage5Cartons: '0 Cartons (0 Prs)',
-      stage5Pending: '0 Cartons',
-      lineEfficiency: '0.0%',
-      outputPairs: 0,
-      outputCartons: 0,
-      inAlteration: 0,
-      scrappedPairs: 0,
-      finalQcApproved: false
-    };
+    state.packingWip = createEmptyPackingWipState();
     state.repairForm = {
       batchId: getAlterationReqNumber(DEFAULT_REQ_NUMBER),
       article: '',
@@ -1474,80 +1921,41 @@ function attachEventHandlers(): void {
   });
 
   const modal = document.getElementById('global-modal');
+  const modalBox = modal?.querySelector<HTMLElement>('.modal-box');
+  modal?.addEventListener('keydown', (event) => {
+    if (!modal.classList.contains('open')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeModal();
+      return;
+    }
+    if (event.key !== 'Tab' || !modalBox) return;
+
+    const focusable = Array.from(modalBox.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(element =>
+      element.getAttribute('aria-hidden') !== 'true' && element.getClientRects().length > 0
+    );
+    if (!focusable.length) {
+      event.preventDefault();
+      modalBox.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !modalBox.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active === last || !modalBox.contains(active))) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
   modal?.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
-  });
-
-  // ==========================================
-  // SECRET 7-CLICK TRIGGER ON "MERIDIAN WORKS"
-  // ==========================================
-  document.querySelectorAll('.header-brand').forEach(brandEl => {
-    brandEl.addEventListener('click', () => {
-      state.secretClickCount += 1;
-      if ((window as any).__secretClickTimer) {
-        clearTimeout((window as any).__secretClickTimer);
-      }
-      if (state.secretClickCount >= 7) {
-        state.secretClickCount = 0;
-        state.showPasswordPrompt = true;
-        state.passwordError = '';
-        renderApp();
-        setTimeout(() => {
-          const pwdInput = document.getElementById('secret-admin-password-input') as HTMLInputElement;
-          pwdInput?.focus();
-        }, 30);
-      } else {
-        (window as any).__secretClickTimer = setTimeout(() => {
-          state.secretClickCount = 0;
-        }, 4000);
-      }
-    });
-  });
-
-  // Secret Password Gate Verification.
-  const ADMIN_PASSPHRASE = (
-    ((import.meta as any).env?.VITE_ADMIN_PASSPHRASE as string | undefined) || ''
-  ).trim().toLowerCase();
-
-  const verifySecretPassword = async () => {
-    const pwdInput = document.getElementById('secret-admin-password-input') as HTMLInputElement;
-    const entered = (pwdInput?.value || '').trim().toLowerCase();
-    const isCorrect = ADMIN_PASSPHRASE
-      ? entered === ADMIN_PASSPHRASE
-      : (entered === 'admin' || entered === 'meridian' || entered === '');
-
-    if (isCorrect) {
-      state.showPasswordPrompt = false;
-      state.passwordError = '';
-      state.isAdminUnlocked = true;
-      state.activeScreen = 'screen-admin';
-      showToast('Super User Access Granted. Welcome to the Executive Control Panel.');
-      await syncBackendData();
-    } else {
-      state.passwordError = 'Invalid Super User passphrase. Access denied.';
-      renderApp();
-      setTimeout(() => {
-        const el = document.getElementById('secret-admin-password-input') as HTMLInputElement;
-        el?.focus();
-      }, 30);
-    }
-  };
-
-  document.getElementById('btn-submit-secret-auth')?.addEventListener('click', verifySecretPassword);
-  document.getElementById('secret-admin-password-input')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      verifySecretPassword();
-    } else if (e.key === 'Escape') {
-      state.showPasswordPrompt = false;
-      state.passwordError = '';
-      renderApp();
-    }
-  });
-  document.getElementById('btn-cancel-secret-auth')?.addEventListener('click', () => {
-    state.showPasswordPrompt = false;
-    state.passwordError = '';
-    renderApp();
+    const cancelTrigger = (e.target as HTMLElement | null)?.closest('[data-modal-cancel]');
+    if (cancelTrigger || e.target === modal) closeModal();
+    else if (!modal.classList.contains('open')) closeModal();
   });
 
   if (state.activeScreen === 'screen-grn') {
@@ -1570,21 +1978,70 @@ function attachGRNHandlers(): void {
   const articleSelect = document.getElementById('grn-article') as HTMLSelectElement;
   const rcvdPairsInput = document.getElementById('grn-rcvd-pairs') as HTMLInputElement;
   const totalDisplay = document.getElementById('grn-size-total-display');
+  const capsDisplay = document.getElementById('grn-size-caps');
 
-  function syncSizesAndReceived() {
+  function syncSizesAndReceived(changedInput?: HTMLInputElement) {
+    const caps = getGrnRemainingCaps(state.grnForm.pendingOrderId);
+    const sizeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('.grn-size-val'));
     const sizes: SizeBreakdown = createEmptySizes();
-    document.querySelectorAll('.grn-size-val').forEach(el => {
-      const inp = el as HTMLInputElement;
+    sizeInputs.forEach(inp => {
       const key = inp.getAttribute('data-size') as keyof SizeBreakdown;
       if (key) {
-        sizes[key] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+        const entered = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+        const cap = caps && STANDARD_GLOVE_SIZES.includes(key as StandardSizeKey)
+          ? caps.sizeRemaining[key as StandardSizeKey]
+          : Number.POSITIVE_INFINITY;
+        sizes[key] = Math.min(entered, cap);
       }
     });
+
+    if (caps && calculateSizeTotal(sizes) > caps.totalRemaining) {
+      if (changedInput) {
+        const changedSize = changedInput.getAttribute('data-size') as StandardSizeKey;
+        const otherTotal = STANDARD_GLOVE_SIZES.reduce(
+          (sum, size) => sum + (size === changedSize ? 0 : Number(sizes[size] || 0)),
+          0
+        );
+        sizes[changedSize] = Math.max(0, Math.min(
+          Number(sizes[changedSize] || 0),
+          caps.totalRemaining - otherTotal
+        ));
+      } else {
+        let excess = calculateSizeTotal(sizes) - caps.totalRemaining;
+        for (const size of [...STANDARD_GLOVE_SIZES].reverse()) {
+          const reduction = Math.min(Number(sizes[size] || 0), excess);
+          sizes[size] -= reduction;
+          excess -= reduction;
+          if (excess <= 0) break;
+        }
+      }
+    }
+
+    sizeInputs.forEach(inp => {
+      const key = inp.getAttribute('data-size') as StandardSizeKey;
+      if (!STANDARD_GLOVE_SIZES.includes(key)) return;
+      const otherTotal = STANDARD_GLOVE_SIZES.reduce(
+        (sum, size) => sum + (size === key ? 0 : Number(sizes[size] || 0)),
+        0
+      );
+      if (caps) {
+        inp.max = String(Math.max(0, Math.min(caps.sizeRemaining[key], caps.totalRemaining - otherTotal)));
+      } else {
+        inp.removeAttribute('max');
+      }
+      inp.value = sizes[key] ? String(sizes[key]) : '';
+    });
+
     state.grnForm.sizes = sizes;
     const sizeSum = calculateSizeTotal(sizes);
 
     if (totalDisplay) {
       totalDisplay.textContent = sizeSum.toLocaleString();
+    }
+    if (capsDisplay) {
+      capsDisplay.textContent = caps
+        ? formatGrnRemainingCaps(caps, sizes)
+        : 'No matching pending-order size cap available; received quantities are unrestricted.';
     }
     if (rcvdPairsInput) {
       rcvdPairsInput.value = sizeSum > 0 ? String(sizeSum) : '';
@@ -1594,12 +2051,16 @@ function attachGRNHandlers(): void {
 
   pendingOrderSelect?.addEventListener('change', () => {
     const val = pendingOrderSelect.value;
+    state.grnForm.pendingOrderId = val;
     if (!val) {
-      state.grnForm.pendingOrderId = '';
+      syncSizesAndReceived();
       return;
     }
     const filled = applyPendingOrderSelection(state.pendingOrders, val);
-    if (!filled) return;
+    if (!filled) {
+      syncSizesAndReceived();
+      return;
+    }
 
     state.grnForm.pendingOrderId = filled.pendingOrderId;
     state.grnForm.maker = filled.maker;
@@ -1607,6 +2068,7 @@ function attachGRNHandlers(): void {
     if (makerSelect) makerSelect.value = filled.maker;
     if (articleSelect) articleSelect.value = filled.article;
 
+    syncSizesAndReceived();
     showToast(`Pending Order ${filled.pendingOrderId} selected: Auto-filled Maker (${filled.maker}) and Article (${filled.article}).`);
   });
 
@@ -1618,8 +2080,9 @@ function attachGRNHandlers(): void {
   });
 
   document.querySelectorAll('.grn-size-val').forEach(inp => {
-    inp.addEventListener('input', syncSizesAndReceived);
+    inp.addEventListener('input', () => syncSizesAndReceived(inp as HTMLInputElement));
   });
+  syncSizesAndReceived();
 
   document.getElementById('btn-clear-grn')?.addEventListener('click', () => {
     state.grnForm = {
@@ -1641,48 +2104,96 @@ function attachGRNHandlers(): void {
     const formArt = articleSelect?.value || state.grnForm.article;
     const sizeTotal = calculateSizeTotal(state.grnForm.sizes);
     const rcvdPairs = Math.max(0, parseInt(rcvdPairsInput?.value || '0', 10) || sizeTotal);
+    const caps = getGrnRemainingCaps(formPendingOrder);
+    if (caps && (
+      rcvdPairs > caps.totalRemaining ||
+      STANDARD_GLOVE_SIZES.some(size => Number(state.grnForm.sizes[size] || 0) > caps.sizeRemaining[size])
+    )) {
+      showToast('Received quantities exceed the selected pending order’s remaining size or total cap.');
+      return;
+    }
 
     if (formPendingOrder || formMaker || formArt || rcvdPairs > 0) {
       const entryPendingOrder = formPendingOrder || 'ORD-INWARD';
+      const selectedOrder = state.pendingOrders.find(order => order.orderId === entryPendingOrder);
       const entryMaker = formMaker || '---';
       const entryArticle = formArt || '---';
       const entrySizes = { ...state.grnForm.sizes };
       const newSr = state.grnList.length + 1;
       const newGrnCode = formatBatchSequence('GRN', newSr);
 
+      let savedReceiving: any = null;
       try {
-        await fetch('/api/store/receivings', {
+        const response = await fetch('/api/store/receivings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            orderId: entryPendingOrder,
             pendingOrderId: entryPendingOrder,
+            customerName: selectedOrder?.buyer || 'Standard',
             makerContractor: entryMaker,
             articleName: entryArticle,
+            orderQty: selectedOrder
+              ? STANDARD_GLOVE_SIZES.reduce((sum, sizeCode) => sum + Number(selectedOrder.sizes?.[sizeCode] || 0), 0)
+              : rcvdPairs,
             rcvdPairs,
-            date: '31-10-2026'
+            rcvDate: '31-10-2026',
+            sizes: STANDARD_GLOVE_SIZES.map(sizeCode => ({
+              sizeCode,
+              orderPairs: Number(selectedOrder?.sizes?.[sizeCode] || 0),
+              rcvdPairs: Number(entrySizes[sizeCode] || 0)
+            }))
           })
         });
+        const result = await response.json();
+        if (!response.ok || !result.success || !result.data) {
+          showToast(result.error || 'Unable to save receiving record to database.');
+          return;
+        }
+        savedReceiving = result.data;
       } catch (err) {
-        console.warn('Offline GRN save fallback', err);
+        console.error('GRN save failed:', err);
+        showToast('Failed to save receiving record to backend.');
+        return;
       }
 
+      const persistedCode = savedReceiving?.rcv_number || newGrnCode;
+      const persistedDate = savedReceiving?.rcv_date || '31-10-2026';
+      const persistedOrderId = savedReceiving?.order_id || entryPendingOrder;
+
       state.grnList.unshift({
-        sr: newSr,
-        grnCode: newGrnCode,
-        date: '31-10-2026',
-        pendingOrderId: entryPendingOrder,
-        maker: entryMaker,
-        article: entryArticle,
-        rcvdPairs,
+        sr: savedReceiving?.id || newSr,
+        grnCode: persistedCode,
+        date: persistedDate,
+        pendingOrderId: persistedOrderId,
+        maker: savedReceiving?.maker_contractor || entryMaker,
+        article: savedReceiving?.article_name || entryArticle,
+        rcvdPairs: Number(savedReceiving?.rcvd_pairs || rcvdPairs),
         sizes: entrySizes,
         status: 'Received'
       });
 
+      if (selectedOrder && selectedOrder.availableDockPairs !== undefined) {
+        const addedPairs = Number(savedReceiving?.rcvd_pairs || rcvdPairs);
+        selectedOrder.receivedPairs = Number(selectedOrder.receivedPairs || 0) + addedPairs;
+        selectedOrder.availableDockPairs = Number(selectedOrder.availableDockPairs || 0) + addedPairs;
+        selectedOrder.unclaimedDockPairs = Math.max(
+          0,
+          selectedOrder.availableDockPairs - Number(selectedOrder.pendingReqPairs || 0)
+        );
+        if (selectedOrder.receivedSizes) {
+          for (const size of STANDARD_GLOVE_SIZES) {
+            selectedOrder.receivedSizes[size] =
+              Number(selectedOrder.receivedSizes[size] || 0) + Number(entrySizes[size] || 0);
+          }
+        }
+      }
+
       if (!state.packingWip.article && formArt) {
         state.packingWip.article = formArt;
       }
-      if (!state.packingWip.parentOrderId && entryPendingOrder) {
-        state.packingWip.parentOrderId = entryPendingOrder;
+      if (!state.packingWip.parentOrderId && persistedOrderId) {
+        state.packingWip.parentOrderId = persistedOrderId;
       }
     }
 
@@ -1711,9 +2222,15 @@ function attachGRNHandlers(): void {
     printDocument(`Goods Receiving Slip — ${grnCode}`, docHtml);
   });
 
+  document.getElementById('grn-queue-req-select')?.addEventListener('change', (e) => {
+    const select = e.target as HTMLSelectElement;
+    if (!select.value) return;
+    switchActiveOrder(select.value);
+    renderApp();
+  });
+
   // Inward Register Person issues the Packing Hall's Requisition Asking (given available received stock)
-  document.getElementById('btn-issue-req-to-packing')?.addEventListener('click', () => {
-    const sumRcvd = state.grnList.reduce((acc, row) => acc + row.rcvdPairs, 0);
+  document.getElementById('btn-issue-req-to-packing')?.addEventListener('click', async () => {
     const wip = state.packingWip;
     const baseReq = normalizeBaseReqNumber(wip.selectedBatch);
     const askingPairs = wip.plannedQty || calculateSizeTotal(wip.sizes);
@@ -1723,33 +2240,85 @@ function attachGRNHandlers(): void {
       return;
     }
 
+    const targetOrderId = wip.parentOrderId || state.grnList[0]?.pendingOrderId || '';
+    const orderStock = getOrderStockState(targetOrderId);
     const evalIssue = evaluateRequisitionIssuance({
       askingPairs,
       askingSizes: wip.sizes,
-      totalReceivedPairs: sumRcvd,
-      alreadyIssuedPairs: state.issuedPairsTotal
+      totalReceivedPairs: orderStock.totalReceived,
+      alreadyIssuedPairs: orderStock.totalIssued
     });
 
     if (!evalIssue.canIssue) {
-      showToast(`Insufficient received stock in Inward Register! Asking: ${evalIssue.askingPairs} Pairs, Available: ${evalIssue.availablePairs} Pairs (Shortfall: ${evalIssue.shortfallPairs} Pairs).`);
+      showToast(`Insufficient received stock in Inward Register${targetOrderId ? ` for ${targetOrderId}` : ''}! Asking: ${evalIssue.askingPairs} Pairs, Available: ${evalIssue.availablePairs} Pairs (Shortfall: ${evalIssue.shortfallPairs} Pairs).`);
       return;
     }
 
-    state.issuedPairsTotal += evalIssue.askingPairs;
-    state.packingWip.issueStatus = 'Issued by Inward Register';
-    state.packingWip.stage1In = evalIssue.askingPairs;
-    state.packingWip.mreqQty = `${evalIssue.askingPairs} Sets`;
-    if (!state.packingWip.parentOrderId && state.grnList[0]?.pendingOrderId) {
-      state.packingWip.parentOrderId = state.grnList[0].pendingOrderId;
-    }
+    const isPersisted = isPersistedRequisition(baseReq);
 
-    saveCurrentOrderWipState();
+    if (targetOrderId || isPersisted) {
+      const endpoint = targetOrderId
+        ? `/api/orders/${encodeURIComponent(targetOrderId)}/issue-req`
+        : `/api/requisitions/${encodeURIComponent(baseReq)}/issue`;
+      const bodyPayload = targetOrderId
+        ? { reqNumber: baseReq, requestedPairs: evalIssue.askingPairs }
+        : {};
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload)
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          showToast(result.error || `Unable to issue Requisition ${baseReq}.`);
+          return;
+        }
+
+        const serverReq = result.data?.requisition || (result.data?.req_number ? result.data : null);
+        if (serverReq) {
+          applyServerRequisition(serverReq, true);
+          state.persistedReqNumbers = Array.from(new Set([...state.persistedReqNumbers, baseReq]));
+        } else {
+          state.packingWip.issueStatus = 'Issued by Inward Register';
+          state.packingWip.stage1In = evalIssue.askingPairs;
+          state.packingWip.mreqQty = `${evalIssue.askingPairs} Sets`;
+          if (!state.packingWip.parentOrderId && targetOrderId) {
+            state.packingWip.parentOrderId = targetOrderId;
+          }
+          saveCurrentOrderWipState();
+        }
+
+        const matchedOrder = state.pendingOrders.find(o => o.orderId === targetOrderId);
+        if (matchedOrder && matchedOrder.availableDockPairs !== undefined) {
+          matchedOrder.issuedPairs = Number(matchedOrder.issuedPairs || 0) + evalIssue.askingPairs;
+          const nextAvailableDock = typeof result.data?.remainingDockPoolPairs === 'number'
+            ? result.data.remainingDockPoolPairs
+            : Math.max(0, Number(matchedOrder.availableDockPairs || 0) - evalIssue.askingPairs);
+          const nextPendingReq = Math.max(0, Number(matchedOrder.pendingReqPairs || 0) - evalIssue.askingPairs);
+          matchedOrder.availableDockPairs = nextAvailableDock;
+          matchedOrder.pendingReqPairs = nextPendingReq;
+          matchedOrder.unclaimedDockPairs = Math.max(0, nextAvailableDock - nextPendingReq);
+        }
+        state.issuedPairsTotal = getTotalIssuedPairs();
+      } catch (error) {
+        console.error('Requisition issuance failed:', error);
+        showToast(`Failed to issue Requisition ${baseReq} to backend.`);
+        return;
+      }
+    } else {
+      state.issuedPairsTotal += evalIssue.askingPairs;
+      state.packingWip.issueStatus = 'Issued by Inward Register';
+      state.packingWip.stage1In = evalIssue.askingPairs;
+      state.packingWip.mreqQty = `${evalIssue.askingPairs} Sets`;
+      saveCurrentOrderWipState();
+    }
 
     const slipHtml = buildPackingRequisitionSlipHtml({
       reqNo: baseReq,
       date: '31-10-2026',
-      article: wip.article || '---',
-      sizes: wip.sizes,
+      article: state.packingWip.article || '---',
+      sizes: state.packingWip.sizes,
       totalPairs: evalIssue.askingPairs,
       issueStatus: 'Issued by Inward Register'
     });
@@ -1824,31 +2393,79 @@ function attachGRNHandlers(): void {
 // Handlers for Screen 3: Alteration / Repair Bay (Uses A-Prefix Requisition Number)
 function attachRepairHandlers(): void {
   const defaultAltId = getAlterationReqNumber(state.packingWip.selectedBatch);
+  const tailorSelect = document.getElementById('defect-tailor-select') as HTMLSelectElement | null;
+  const tailorInput = document.getElementById('defect-tailor') as HTMLInputElement | null;
+
+  const getTailor = (fallback: string): string => {
+    const selected = tailorSelect?.value || '__custom__';
+    const name = selected === '__custom__' ? tailorInput?.value.trim() || '' : selected;
+    state.repairForm.tailor = name;
+    return name || fallback;
+  };
+  const applyAlterationOutcome = (batchId: string, quantity: number, outcome: 'repaired' | 'scrapped'): boolean => {
+    const reqNumber = normalizeBaseReqNumber(batchId);
+    const wip = normalizeBaseReqNumber(state.packingWip.selectedBatch) === reqNumber
+      ? state.packingWip
+      : state.ordersWipMap[reqNumber] as OrderWipState | undefined;
+    if (!wip) {
+      showToast(`No Packing Hall WIP record is available for ${batchId}; the alteration was not closed.`);
+      return false;
+    }
+    const availableAlteration = Math.max(0, Number(wip.inAlteration || 0) - Number(wip.scrappedPairs || 0));
+    if (quantity > availableAlteration) {
+      showToast(`Only ${availableAlteration} pairs are currently in alteration for ${batchId}.`);
+      return false;
+    }
+
+    if (outcome === 'repaired') {
+      wip.inAlteration = Math.max(0, Number(wip.inAlteration || 0) - quantity);
+      wip.stage1In = Number(wip.stage1In || 0) + quantity;
+    } else {
+      wip.scrappedPairs = Number(wip.scrappedPairs || 0) + quantity;
+    }
+    if (wip === state.packingWip) {
+      saveCurrentOrderWipState();
+    } else {
+      state.ordersWipMap[reqNumber] = JSON.parse(JSON.stringify(wip));
+    }
+    return true;
+  };
+
+  tailorSelect?.addEventListener('change', () => {
+    state.repairForm.tailor = tailorSelect.value === '__custom__' ? (tailorInput?.value || '') : tailorSelect.value;
+  });
+  tailorInput?.addEventListener('input', () => {
+    if (tailorSelect?.value === '__custom__') state.repairForm.tailor = tailorInput.value;
+  });
 
   document.getElementById('btn-complete-repair')?.addEventListener('click', async () => {
     const batchId = (document.getElementById('defect-batch-id') as HTMLSelectElement)?.value || defaultAltId;
     const article = (document.getElementById('defect-article') as HTMLSelectElement)?.value || state.packingWip.article || '---';
     const po = (document.getElementById('defect-po') as HTMLSelectElement)?.value || state.packingWip.po || '---';
     const defectType = (document.getElementById('defect-type') as HTMLSelectElement)?.value || 'Stitching Skip / Broken Seam (سلائی ٹوٹ)';
-    const tailor = (document.getElementById('defect-tailor') as HTMLInputElement)?.value || 'Supervisor A';
+    const tailor = getTailor('Supervisor A');
     const qtyNum = parseInt((document.getElementById('defect-qty') as HTMLInputElement)?.value || '0', 10) || 0;
 
-    if (qtyNum > 0) {
-      state.defectList.unshift({
-        id: batchId,
-        date: '31-10-2026',
-        origin: 'Stage 1 Checking',
-        article,
-        po,
-        defectClass: defectType,
-        qty: `${qtyNum} Prs`,
-        tailor,
-        status: 'Completed',
-        route: 'Auto-Return to Stage 1 Checking',
-        actionText: 'Verified'
-      });
-      renderApp();
+    if (qtyNum <= 0) {
+      showToast('Enter a repair quantity greater than zero.');
+      return;
     }
+    if (!applyAlterationOutcome(batchId, qtyNum, 'repaired')) return;
+    saveTailorName(tailor);
+    state.defectList.unshift({
+      id: batchId,
+      date: '31-10-2026',
+      origin: 'Stage 1 Checking',
+      article,
+      po,
+      defectClass: defectType,
+      qty: `${qtyNum} Prs`,
+      tailor,
+      status: 'Completed',
+      route: 'Auto-Return to Stage 1 Checking',
+      actionText: 'Verified'
+    });
+    renderApp();
 
     showToast(`Alteration ${batchId} marked complete and auto-routed to STAGE 1 Checking.`);
   });
@@ -1858,25 +2475,29 @@ function attachRepairHandlers(): void {
     const article = (document.getElementById('defect-article') as HTMLSelectElement)?.value || state.packingWip.article || '---';
     const po = (document.getElementById('defect-po') as HTMLSelectElement)?.value || state.packingWip.po || '---';
     const defectType = (document.getElementById('defect-type') as HTMLSelectElement)?.value || 'Stitching Skip / Broken Seam (سلائی ٹوٹ)';
-    const tailor = (document.getElementById('defect-tailor') as HTMLInputElement)?.value || 'Scrap Authority';
+    const tailor = getTailor('Scrap Authority');
     const qtyNum = parseInt((document.getElementById('defect-qty') as HTMLInputElement)?.value || '0', 10) || 0;
 
-    if (qtyNum > 0) {
-      state.defectList.unshift({
-        id: batchId,
-        date: '31-10-2026',
-        origin: 'Stage 1 Checking',
-        article,
-        po,
-        defectClass: defectType,
-        qty: `${qtyNum} Prs`,
-        tailor,
-        status: 'Scrapped',
-        route: 'Scrap Ledger',
-        actionText: 'Scrapped'
-      });
-      renderApp();
+    if (qtyNum <= 0) {
+      showToast('Enter a scrap quantity greater than zero.');
+      return;
     }
+    if (!applyAlterationOutcome(batchId, qtyNum, 'scrapped')) return;
+    saveTailorName(tailor);
+    state.defectList.unshift({
+      id: batchId,
+      date: '31-10-2026',
+      origin: 'Stage 1 Checking',
+      article,
+      po,
+      defectClass: defectType,
+      qty: `${qtyNum} Prs`,
+      tailor,
+      status: 'Scrapped',
+      route: 'Scrap Ledger',
+      actionText: 'Scrapped'
+    });
+    renderApp();
 
     showToast(`Alteration ${batchId} logged as Scrap/Unrepairable.`);
   });
@@ -1886,7 +2507,7 @@ function attachRepairHandlers(): void {
     const selArt = (document.getElementById('defect-article') as HTMLSelectElement)?.value || state.packingWip.article || '---';
     const selPo = (document.getElementById('defect-po') as HTMLSelectElement)?.value || state.packingWip.po || '---';
     const selDefect = (document.getElementById('defect-type') as HTMLSelectElement)?.value || 'Stitching Skip / Broken Seam (سلائی ٹوٹ)';
-    const selTailor = (document.getElementById('defect-tailor') as HTMLInputElement)?.value || '---';
+    const selTailor = escapeHtml(getTailor('---'));
     const selQty = (document.getElementById('defect-qty') as HTMLInputElement)?.value || '0';
 
     const docHtml = `
@@ -2049,10 +2670,188 @@ function attachQCHandlers(): void {
   });
 }
 
+function isPersistedRequisition(reqNo: string): boolean {
+  return state.persistedReqNumbers.includes(normalizeBaseReqNumber(reqNo));
+}
+
+function mapServerCartons(serverCartons: any[]): CartonRecord[] {
+  if (!Array.isArray(serverCartons)) return [];
+  return serverCartons.map((carton: any) => ({
+    cartonNo: carton.carton_barcode || `CTN-${String(carton.carton_number || 1).padStart(2, '0')}`,
+    pairs: Number(carton.pairs_count || 0),
+    netWt: '4.8 kg',
+    grossWt: '5.3 kg',
+    dims: '29 x 23 x 28',
+    barcodeVerified: true,
+    sealNo: carton.carton_barcode || `SEAL-${String(carton.carton_number || 1).padStart(2, '0')}`,
+    status: carton.aql_status === 'PASSED'
+      ? 'Approved (AQL 1.5)'
+      : carton.aql_status === 'REJECTED'
+        ? 'Quarantined (AQL 1.5)'
+        : (carton.status || 'PACKED')
+  }));
+}
+
+function applyServerRequisition(
+  requisition: any,
+  forceActive = false
+): typeof state.packingWip & OrderWipState {
+  const mapped = mapServerRequisitionToWip(requisition);
+  const reqNumber = normalizeBaseReqNumber(mapped.reqNumber);
+  state.ordersWipMap[reqNumber] = mapped;
+  if (
+    forceActive ||
+    normalizeBaseReqNumber(state.packingWip.selectedBatch) === reqNumber ||
+    state.packingWip.selectedBatch === DEFAULT_REQ_NUMBER
+  ) {
+    state.packingWip = JSON.parse(JSON.stringify(mapped));
+    state.cartons = Array.isArray((mapped as any).cartons)
+      ? JSON.parse(JSON.stringify((mapped as any).cartons))
+      : [];
+    state.qcChecklist.forEach(c => (c.passed = Boolean(state.packingWip.finalQcApproved)));
+  }
+  return mapped;
+}
+
+async function postWipStageUpdate(
+  reqNo: string,
+  stagePath: string,
+  payload: Record<string, unknown>,
+  failureMessage: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/wip/${encodeURIComponent(reqNo)}/${stagePath}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success || !result.data) {
+      showToast(result.error || failureMessage);
+      return false;
+    }
+    applyServerRequisition(result.data, true);
+    return true;
+  } catch (error) {
+    console.error(`WIP stage ${stagePath} save failed:`, error);
+    showToast(failureMessage);
+    return false;
+  }
+}
+
 // Helper to persist current WIP state into ordersWipMap
 function saveCurrentOrderWipState(): void {
   const req = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+  (state.packingWip as any).cartons = JSON.parse(JSON.stringify(state.cartons));
   state.ordersWipMap[req] = JSON.parse(JSON.stringify(state.packingWip));
+}
+
+function mapServerRequisitionToWip(requisition: any): typeof state.packingWip & OrderWipState {
+  const reqNumber = normalizeBaseReqNumber(requisition.req_number || requisition.reqNumber);
+  const order = state.pendingOrders.find(item => item.orderId === requisition.order_id);
+  const wip = requisition.wip || {};
+  const sizes = { ...createEmptySizes(), ...(requisition.sizes || {}) };
+  const plannedQty = Number(requisition.requested_pairs || 0);
+  const stage1In = Number(wip.step1_checking_in || 0);
+  const stage1Passed = Number(wip.step1_checking_good || 0);
+  const stage1Defects = Number(wip.step1_checking_defects || 0);
+  const stage2In = Number(wip.step2_ironing_in || 0);
+  const stage2Passed = Number(wip.step2_ironing_good || 0);
+  const stage2Defects = Number(wip.step2_ironing_defects || 0);
+  const stage3In = Number(wip.step3_matching_in || 0);
+  const stage3Passed = Number(wip.step3_matching_good || 0);
+  const stage3Defects = Number(wip.step3_matching_defects || 0);
+  const stage4In = stage3Passed;
+  const stage4Passed = Number(wip.step4_packing_good || 0);
+  const stage5Cartons = Number(wip.step5_cartons_packed || 0);
+  const stage5Pairs = Number(wip.step5_pairs_packed || 0);
+  const issued = ['ISSUED', 'IN_PROGRESS', 'COMPLETED', 'DISPATCHED'].includes(requisition.status);
+  const alterations = Array.isArray(requisition.alterations) ? requisition.alterations : [];
+  const inAlteration = alterations.reduce(
+    (sum: number, alt: any) => (alt.status === 'SENT_FOR_ALTERATION' && !alt.is_scrapped ? sum + Number(alt.pairs_count || 0) : sum),
+    0
+  );
+  const scrappedPairs = alterations.reduce(
+    (sum: number, alt: any) => (alt.is_scrapped ? sum + Number(alt.pairs_count || 0) : sum),
+    0
+  );
+  const mappedCartons = mapServerCartons(requisition.cartons);
+
+  return {
+    reqNumber,
+    selectedBatch: reqNumber,
+    wipBatch: reqNumber,
+    parentOrderId: requisition.order_id || '',
+    grnRef: '',
+    article: requisition.product_name || order?.article || '',
+    po: order?.po || '',
+    maker: order?.maker || '',
+    buyer: order?.buyer || '',
+    plannedQty,
+    issueStatus: issued ? 'Issued by Inward Register' : 'Pending Inward Issue',
+    sizes,
+    stage1In,
+    stage1Passed,
+    stage1Defects,
+    stage2In,
+    stage2Passed,
+    stage2Defects,
+    stage3In,
+    stage3Passed,
+    stage3Defects,
+    mreqNo: getMaterialReqNumber(reqNumber),
+    matReqNumber: requisition.materialReq?.mat_req_number || '',
+    altReqNo: getAlterationReqNumber(reqNumber),
+    mreqQty: `${stage3Passed || plannedQty} Sets`,
+    mreqStatus: requisition.materialReq?.status || (Number(wip.step4_materials_issued || 0) === 1 ? 'ISSUED' : 'Ready'),
+    stage4In,
+    stage4Passed,
+    stage4Pending: Math.max(0, stage4In - stage4Passed),
+    stage5Cartons: `${stage5Cartons} Cartons (${stage5Pairs} Prs)`,
+    stage5Pending: `${Math.max(0, Math.ceil(stage4Passed / 30) - stage5Cartons)} Cartons`,
+    lineEfficiency: computeWipRolledYieldPct({
+      stage1Passed,
+      stage1Defects,
+      stage2Passed,
+      stage2Defects,
+      stage3Passed,
+      stage3Defects
+    }),
+    outputPairs: stage5Pairs,
+    outputCartons: stage5Cartons,
+    inAlteration,
+    scrappedPairs,
+    finalQcApproved: wip.final_qc_status === 'APPROVED_DISPATCH',
+    cartons: mappedCartons
+  } as any;
+}
+
+function buildCurrentPackingRequisitionSlip(): string {
+  const wip = state.packingWip;
+  const reqNumber = normalizeBaseReqNumber(wip.selectedBatch);
+  return buildPackingRequisitionSlipHtml({
+    reqNo: reqNumber,
+    date: '31-10-2026',
+    article: wip.article || '---',
+    sizes: wip.sizes,
+    totalPairs: wip.plannedQty,
+    issueStatus: wip.issueStatus
+  });
+}
+
+function buildCurrentMaterialRequisitionSlip(): string {
+  const wip = state.packingWip;
+  const reqNumber = normalizeBaseReqNumber(wip.selectedBatch);
+  const pairs = wip.stage3Passed || wip.plannedQty || calculateSizeTotal(wip.sizes);
+  return buildMaterialRequisitionSlipHtml({
+    mreqNo: getMaterialReqNumber(reqNumber),
+    reqNo: reqNumber,
+    orderId: wip.parentOrderId || '---',
+    article: wip.article || '---',
+    pairs,
+    status: wip.mreqStatus || 'Ready for issue',
+    date: '31-10-2026'
+  });
 }
 
 // Helper to switch active order and restore its exact stage progress
@@ -2062,12 +2861,17 @@ function switchActiveOrder(targetReq: string): void {
 
   if (state.ordersWipMap[norm]) {
     state.packingWip = JSON.parse(JSON.stringify(state.ordersWipMap[norm]));
+    state.cartons = Array.isArray((state.ordersWipMap[norm] as any).cartons)
+      ? JSON.parse(JSON.stringify((state.ordersWipMap[norm] as any).cartons))
+      : [];
   } else {
     state.packingWip.selectedBatch = norm;
     state.packingWip.wipBatch = norm;
     state.packingWip.mreqNo = getMaterialReqNumber(norm);
     state.packingWip.altReqNo = getAlterationReqNumber(norm);
+    state.cartons = [];
   }
+  state.qcChecklist.forEach(c => (c.passed = Boolean(state.packingWip.finalQcApproved)));
   state.repairForm.batchId = getAlterationReqNumber(norm);
 }
 
@@ -2080,9 +2884,34 @@ function attachPackingHandlers(): void {
     renderApp();
   };
 
+  document.querySelectorAll<HTMLElement>('[data-packing-action="select-wip-batch"]').forEach(el => {
+    el.addEventListener('click', () => {
+      const reqNumber = el.dataset.reqNumber;
+      if (reqNumber) (window as any).selectWipBatchFromChart(reqNumber);
+    });
+  });
+
+  document.getElementById('btn-wip-sync-retry')?.addEventListener('click', () => {
+    void syncBackendData({ manual: true });
+  });
+
+  document.getElementById('btn-wip-open-qc-banner')?.addEventListener('click', () => {
+    state.activeScreen = 'screen-qc';
+    renderApp();
+    showToast('Navigated to Final Inspection & Master Carton Clearance.');
+  });
+
   // Single Requisition select change
   document.getElementById('wip-batch-select')?.addEventListener('change', (e) => {
-    const val = normalizeBaseReqNumber((e.target as HTMLSelectElement).value);
+    const select = e.target as HTMLSelectElement;
+    if (select.value.startsWith('ORDER:')) {
+      const orderId = select.value.slice('ORDER:'.length);
+      select.value = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+      openNewRequisitionModal(orderId);
+      return;
+    }
+
+    const val = normalizeBaseReqNumber(select.value);
     switchActiveOrder(val);
     showToast(`Switched active order to ${val} (Article: ${state.packingWip.article || '---'}, Stage: ${determineOrderActiveStage(state.packingWip)})`);
     renderApp();
@@ -2090,22 +2919,36 @@ function attachPackingHandlers(): void {
 
   // Stage 1 Modal
   document.getElementById('btn-wip-step1')?.addEventListener('click', () => {
+    const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
     const altReq = getAlterationReqNumber(state.packingWip.selectedBatch);
+    const available = remainingStagePairs(
+      state.packingWip.stage1In,
+      state.packingWip.stage1Passed,
+      state.packingWip.stage1Defects
+    );
+    if (available <= 0) {
+      if (state.packingWip.issueStatus !== 'Issued by Inward Register' && state.packingWip.stage1In <= 0) {
+        showToast(`Stage 1 locked: ${baseReq} is still Pending Inward Issue. Issue pairs in Inward Goods Receiving first.`);
+      } else {
+        showToast(`No pairs remaining to process in Stage 1 for ${baseReq}.`);
+      }
+      return;
+    }
     openModal('Process Stage 1: Checking & Inspection', `
       <div style="font-size: 13px;">
         <p style="margin-bottom: 12px; color: var(--ink-600);">
-          Separate first-pass good units from workmanship defects. Defect pairs are automatically isolated and routed to Alteration Bay #2 under <strong>${altReq}</strong>.
+          Process all ${available.toLocaleString()} available pairs. Passed and defect quantities must total the available amount; defects are routed to Alteration Bay #2 under <strong>${altReq}</strong>.
         </p>
         <div class="form-group" style="margin-bottom: 12px;">
-          <label>Good / Passed Pairs (Advance to Stage 2):</label>
-          <input type="number" id="step1-good-input" class="form-input" value="${state.packingWip.stage1Passed}" />
+          <label for="step1-good-input">Good / Passed Pairs (Advance to Stage 2):</label>
+          <input type="number" id="step1-good-input" class="form-input" value="${available}" />
         </div>
         <div class="form-group" style="margin-bottom: 12px;">
-          <label>Defect Pairs (Route to Alteration Bay ${altReq}):</label>
-          <input type="number" id="step1-defect-input" class="form-input" value="${state.packingWip.stage1Defects}" />
+          <label for="step1-defect-input">Defect Pairs (Route to Alteration Bay ${altReq}):</label>
+          <input type="number" id="step1-defect-input" class="form-input" value="0" />
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
-          <label>Defect Classification:</label>
+          <label for="step1-defect-reason">Defect Classification:</label>
           <select id="step1-defect-reason" class="form-select">
             <option value="Stitching Skip / Broken Seam">Stitching Skip / Broken Seam</option>
             <option value="Oil / Grease Stain">Oil / Grease Stain</option>
@@ -2117,96 +2960,151 @@ function attachPackingHandlers(): void {
           </select>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button class="btn-outline" onclick="document.getElementById('global-modal').classList.remove('open')">Cancel</button>
-          <button class="btn-primary" id="btn-submit-step1-action">Confirm &amp; Advance Pairs &rarr;</button>
+          <button type="button" class="btn-outline" data-modal-cancel>Cancel</button>
+          <button type="button" class="btn-primary" id="btn-submit-step1-action">Confirm &amp; Advance Pairs &rarr;</button>
         </div>
       </div>
-    `, false);
+    `, false, { hideGlobalFooter: true });
+    bindComplementaryStageInputs('step1-good-input', 'step1-defect-input', available);
 
-    document.getElementById('btn-submit-step1-action')?.addEventListener('click', () => {
-      const good = parseInt((document.getElementById('step1-good-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      const defects = parseInt((document.getElementById('step1-defect-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      const reason = (document.getElementById('step1-defect-reason') as HTMLSelectElement)?.value || 'Stitching Skip';
+    let step1InFlight = false;
+    document.getElementById('btn-submit-step1-action')?.addEventListener('click', async (event) => {
+      if (step1InFlight) return;
+      const split = readComplementaryStageInputs('step1-good-input', 'step1-defect-input', available);
+      if (!split) return;
+      const submitBtn = event.currentTarget as HTMLButtonElement | null;
+      step1InFlight = true;
+      if (submitBtn) submitBtn.disabled = true;
 
-      state.packingWip.stage1Passed = good;
-      state.packingWip.stage1Defects = defects;
-      state.packingWip.stage2In = good;
-      state.packingWip.inAlteration = defects;
+      try {
+        const { good, defects } = split;
+        const reason = (document.getElementById('step1-defect-reason') as HTMLSelectElement)?.value || 'Stitching Skip';
+        const activeReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
 
-      if (defects > 0) {
-        if (!state.dropdownOptions.defectBatchIds.includes(altReq)) {
-          state.dropdownOptions.defectBatchIds.unshift(altReq);
+        if (isPersistedRequisition(activeReq)) {
+          const savedOk = await postWipStageUpdate(
+            activeReq,
+            'step1-checking',
+            { goodPairs: good, defectPairs: defects, defectReason: reason },
+            'Unable to save Stage 1 checking progress.'
+          );
+          if (!savedOk) return;
+          recordStageDefects('Stage 1 (Checking)', defects, reason);
+        } else {
+          state.packingWip.stage1Passed += good;
+          state.packingWip.stage1Defects += defects;
+          state.packingWip.stage2In += good;
+          state.packingWip.inAlteration += defects;
+          state.packingWip.lineEfficiency = computeWipRolledYieldPct(state.packingWip);
+          recordStageDefects('Stage 1 (Checking)', defects, reason);
+          saveCurrentOrderWipState();
         }
-        state.defectList.unshift({
-          id: altReq,
-          date: '31-10-2026',
-          origin: 'Stage 1 (Checking)',
-          article: state.packingWip.article || '---',
-          po: state.packingWip.po || '---',
-          defectClass: reason,
-          qty: `${defects} Prs`,
-          tailor: 'Supervisor A',
-          status: 'In Rework',
-          route: 'Auto-Return to Stage 1 Checking',
-          actionText: 'Update'
-        });
+        closeModal();
+        showToast(`${good} pairs advanced to Stage 2. Active stage highlight moved to Stage 2.`);
+        renderApp();
+      } finally {
+        step1InFlight = false;
+        if (submitBtn?.isConnected) submitBtn.disabled = false;
       }
-      saveCurrentOrderWipState();
-      closeModal();
-      showToast(`${good} pairs advanced to Stage 2. Active stage highlight moved to Stage 2.`);
-      renderApp();
     });
   });
 
   // Stage 2 Modal
   document.getElementById('btn-wip-step2')?.addEventListener('click', () => {
+    const available = remainingStagePairs(
+      state.packingWip.stage2In,
+      state.packingWip.stage2Passed,
+      state.packingWip.stage2Defects
+    );
+    if (available <= 0) {
+      showToast('No pairs available in Stage 2 yet. Advance pairs from Stage 1 Checking first.');
+      return;
+    }
     openModal('Process Stage 2: Ironing & Brushing', `
       <div style="font-size: 13px;">
         <p style="margin-bottom: 12px; color: var(--ink-600);">
-          Steam press, crease removal, thread trimming, and thermal flattening verification.
+          Process all ${available.toLocaleString()} available pairs. Passed and defect quantities must total the available amount.
         </p>
         <div class="form-group" style="margin-bottom: 12px;">
-          <label>Ironed &amp; Finished Pairs (Advance to Stage 3):</label>
-          <input type="number" id="step2-good-input" class="form-input" value="${state.packingWip.stage2Passed}" />
+          <label for="step2-good-input">Ironed &amp; Finished Pairs (Advance to Stage 3):</label>
+          <input type="number" id="step2-good-input" class="form-input" value="${available}" />
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
-          <label>Crease / Soil Rejects:</label>
-          <input type="number" id="step2-defect-input" class="form-input" value="${state.packingWip.stage2Defects}" />
+          <label for="step2-defect-input">Crease / Soil Rejects:</label>
+          <input type="number" id="step2-defect-input" class="form-input" value="0" />
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button class="btn-outline" onclick="document.getElementById('global-modal').classList.remove('open')">Cancel</button>
-          <button class="btn-primary" id="btn-submit-step2-action">Advance to Pair Matching &rarr;</button>
+          <button type="button" class="btn-outline" data-modal-cancel>Cancel</button>
+          <button type="button" class="btn-primary" id="btn-submit-step2-action">Advance to Pair Matching &rarr;</button>
         </div>
       </div>
-    `, false);
+    `, false, { hideGlobalFooter: true });
+    bindComplementaryStageInputs('step2-good-input', 'step2-defect-input', available);
 
-    document.getElementById('btn-submit-step2-action')?.addEventListener('click', () => {
-      const good = parseInt((document.getElementById('step2-good-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      const defects = parseInt((document.getElementById('step2-defect-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      state.packingWip.stage2Passed = good;
-      state.packingWip.stage2Defects = defects;
-      state.packingWip.stage3In = good;
-      saveCurrentOrderWipState();
-      closeModal();
-      showToast(`${good} pairs ironed and advanced to Stage 3.`);
-      renderApp();
+    let step2InFlight = false;
+    document.getElementById('btn-submit-step2-action')?.addEventListener('click', async (event) => {
+      if (step2InFlight) return;
+      const split = readComplementaryStageInputs('step2-good-input', 'step2-defect-input', available);
+      if (!split) return;
+      const submitBtn = event.currentTarget as HTMLButtonElement | null;
+      step2InFlight = true;
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const { good, defects } = split;
+        const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+
+        if (isPersistedRequisition(baseReq)) {
+          const savedOk = await postWipStageUpdate(
+            baseReq,
+            'step2-ironing',
+            { goodPairs: good, defectPairs: defects, defectReason: 'Crease / Soil Rejects' },
+            'Unable to save Stage 2 ironing progress.'
+          );
+          if (!savedOk) return;
+          recordStageDefects('Stage 2 (Ironing)', defects, 'Crease / Soil Rejects');
+        } else {
+          state.packingWip.stage2Passed += good;
+          state.packingWip.stage2Defects += defects;
+          state.packingWip.stage3In += good;
+          state.packingWip.inAlteration += defects;
+          state.packingWip.lineEfficiency = computeWipRolledYieldPct(state.packingWip);
+          recordStageDefects('Stage 2 (Ironing)', defects, 'Crease / Soil Rejects');
+          saveCurrentOrderWipState();
+        }
+        closeModal();
+        showToast(`${good} pairs advanced to Stage 3; ${defects} defects routed to Alteration.`);
+        renderApp();
+      } finally {
+        step2InFlight = false;
+        if (submitBtn?.isConnected) submitBtn.disabled = false;
+      }
     });
   });
 
   // Stage 3 Modal
   document.getElementById('btn-wip-step3')?.addEventListener('click', () => {
+    const available = remainingStagePairs(
+      state.packingWip.stage3In,
+      state.packingWip.stage3Passed,
+      state.packingWip.stage3Defects
+    );
+    if (available <= 0) {
+      showToast('No pairs available in Stage 3 yet. Advance pairs from Stage 2 Ironing first.');
+      return;
+    }
     openModal('Process Stage 3: Pair Matching & BOM Calculation', `
       <div style="font-size: 13px;">
         <p style="margin-bottom: 12px; color: var(--ink-600);">
-          Verify Left/Right grain alignment, leather shade consistency, and size fidelity. Auto-computes Bill of Materials (BOM) under <strong>${getMaterialReqNumber(state.packingWip.selectedBatch)}</strong>.
+          Match all ${available.toLocaleString()} available pairs. Passed and defect quantities must total the available amount. Auto-computes the BOM under <strong>${getMaterialReqNumber(state.packingWip.selectedBatch)}</strong>.
         </p>
         <div class="form-group" style="margin-bottom: 12px;">
-          <label>Matched Good Pairs:</label>
-          <input type="number" id="step3-good-input" class="form-input" value="${state.packingWip.stage3Passed}" />
+          <label for="step3-good-input">Matched Good Pairs:</label>
+          <input type="number" id="step3-good-input" class="form-input" value="${available}" />
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
-          <label>Mismatch / Unpaired Gloves:</label>
-          <input type="number" id="step3-defect-input" class="form-input" value="${state.packingWip.stage3Defects}" />
+          <label for="step3-defect-input">Mismatch / Unpaired Gloves:</label>
+          <input type="number" id="step3-defect-input" class="form-input" value="0" />
         </div>
         <div style="background: var(--ink-100); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px; margin-bottom: 14px;">
           <div style="font-weight: 700; color: var(--ink-950); margin-bottom: 4px;">Dynamic Packaging BOM (${getMaterialReqNumber(state.packingWip.selectedBatch)}):</div>
@@ -2215,87 +3113,197 @@ function attachPackingHandlers(): void {
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button class="btn-outline" onclick="document.getElementById('global-modal').classList.remove('open')">Cancel</button>
-          <button class="btn-primary" id="btn-submit-step3-action">Confirm &amp; Route to 1st Packing &rarr;</button>
+          <button type="button" class="btn-outline" data-modal-cancel>Cancel</button>
+          <button type="button" class="btn-primary" id="btn-submit-step3-action">Confirm &amp; Route to 1st Packing &rarr;</button>
         </div>
       </div>
-    `, false);
+    `, false, { hideGlobalFooter: true });
+    bindComplementaryStageInputs('step3-good-input', 'step3-defect-input', available);
 
-    document.getElementById('btn-submit-step3-action')?.addEventListener('click', () => {
-      const good = parseInt((document.getElementById('step3-good-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      const defects = parseInt((document.getElementById('step3-defect-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      state.packingWip.stage3Passed = good;
-      state.packingWip.stage3Defects = defects;
-      state.packingWip.stage4In = good;
-      state.packingWip.mreqNo = getMaterialReqNumber(state.packingWip.selectedBatch);
-      state.packingWip.altReqNo = getAlterationReqNumber(state.packingWip.selectedBatch);
-      state.packingWip.mreqQty = `${good} Sets`;
-      saveCurrentOrderWipState();
-      closeModal();
-      showToast(`${good} pairs matched. Material Requisition ${state.packingWip.mreqNo} updated.`);
-      renderApp();
+    let step3InFlight = false;
+    document.getElementById('btn-submit-step3-action')?.addEventListener('click', async (event) => {
+      if (step3InFlight) return;
+      const split = readComplementaryStageInputs('step3-good-input', 'step3-defect-input', available);
+      if (!split) return;
+      const submitBtn = event.currentTarget as HTMLButtonElement | null;
+      step3InFlight = true;
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const { good, defects } = split;
+        const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+
+        if (isPersistedRequisition(baseReq)) {
+          const savedOk = await postWipStageUpdate(
+            baseReq,
+            'step3-matching',
+            { goodPairs: good, defectPairs: defects, defectReason: 'Mismatch / Unpaired Gloves' },
+            'Unable to save Stage 3 matching progress.'
+          );
+          if (!savedOk) return;
+          recordStageDefects('Stage 3 (Matching)', defects, 'Mismatch / Unpaired Gloves');
+        } else {
+          state.packingWip.stage3Passed += good;
+          state.packingWip.stage3Defects += defects;
+          state.packingWip.stage4In += good;
+          state.packingWip.inAlteration += defects;
+          state.packingWip.lineEfficiency = computeWipRolledYieldPct(state.packingWip);
+          recordStageDefects('Stage 3 (Matching)', defects, 'Mismatch / Unpaired Gloves');
+          state.packingWip.mreqNo = getMaterialReqNumber(state.packingWip.selectedBatch);
+          state.packingWip.altReqNo = getAlterationReqNumber(state.packingWip.selectedBatch);
+          state.packingWip.mreqQty = `${good} Sets`;
+          saveCurrentOrderWipState();
+        }
+        closeModal();
+        showToast(`${good} pairs matched. Material Requisition ${state.packingWip.mreqNo} updated.`);
+        renderApp();
+      } finally {
+        step3InFlight = false;
+        if (submitBtn?.isConnected) submitBtn.disabled = false;
+      }
     });
   });
 
-  // Generate & Print Material Requisition Slip directly (Uses M-Prefix and Approved By footer, No Buyer, includes Sizes & Article)
-  document.getElementById('btn-wip-print-mreq')?.addEventListener('click', () => {
-    const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
-    const mreqId = getMaterialReqNumber(baseReq);
-    const altId = getAlterationReqNumber(baseReq);
-    const sizeSum = calculateSizeTotal(state.packingWip.sizes);
-    const qty = state.packingWip.stage3Passed || state.packingWip.plannedQty || sizeSum || 0;
+  let mreqInFlight = false;
+  document.getElementById('btn-wip-generate-mreq-slip')?.addEventListener('click', async (event) => {
+    if (mreqInFlight) return;
+    const btn = event.currentTarget as HTMLButtonElement | null;
+    mreqInFlight = true;
+    if (btn) btn.disabled = true;
 
-    state.packingWip.mreqNo = mreqId;
-    state.packingWip.altReqNo = altId;
-    state.packingWip.mreqQty = `${qty} Sets`;
-    state.packingWip.mreqStatus = 'Printed';
+    try {
+      const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+      const mreqId = getMaterialReqNumber(baseReq);
 
-    const docHtml = buildPackingRequisitionSlipHtml({
-      reqNo: baseReq,
-      date: '31-10-2026',
-      article: state.packingWip.article || '---',
-      sizes: state.packingWip.sizes,
-      totalPairs: qty,
-      issueStatus: state.packingWip.issueStatus
-    });
+      if (isPersistedRequisition(baseReq)) {
+        try {
+          const createResp = await fetch(`/api/wip/${encodeURIComponent(baseReq)}/material-requisition`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          const createData = await createResp.json();
+          if (!createResp.ok || !createData.success || !createData.data) {
+            showToast(createData.error || 'Unable to generate Material Requisition.');
+            return;
+          }
 
-    saveCurrentOrderWipState();
-    renderApp();
-    openModal(`Packing Hall Requisition Slip — ${mreqId}`, docHtml, true);
-    printDocument(`Packing Hall Requisition Slip — ${mreqId}`, docHtml);
+          let matReq = createData.data;
+          if (matReq.mat_req_number && matReq.status === 'PENDING') {
+            const issueResp = await fetch(`/api/material-requisitions/${encodeURIComponent(matReq.mat_req_number)}/issue`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            });
+            const issueData = await issueResp.json();
+            if (!issueResp.ok || !issueData.success || !issueData.data) {
+              state.packingWip.mreqStatus = matReq.status;
+              (state.packingWip as any).matReqNumber = matReq.mat_req_number;
+              saveCurrentOrderWipState();
+              renderApp();
+              showToast(issueData.error || `Material Requisition ${matReq.mat_req_number} created, but issue failed.`);
+              return;
+            }
+            matReq = issueData.data;
+          }
+
+          state.packingWip.mreqStatus = matReq.status || 'ISSUED';
+          (state.packingWip as any).matReqNumber = matReq.mat_req_number || '';
+          saveCurrentOrderWipState();
+          renderApp();
+        } catch (error) {
+          console.error('Material Requisition persistence failed:', error);
+          showToast('Failed to save or issue Material Requisition.');
+          return;
+        }
+      }
+
+      openModal(`Material Requisition Slip — ${mreqId}`, buildCurrentMaterialRequisitionSlip(), true);
+    } finally {
+      mreqInFlight = false;
+      if (btn?.isConnected) btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btn-wip-print-mreq-slip')?.addEventListener('click', () => {
+    const mreqId = getMaterialReqNumber(state.packingWip.selectedBatch);
+    printDocument(`Material Requisition Slip — ${mreqId}`, buildCurrentMaterialRequisitionSlip());
   });
 
   // Stage 4 Modal
   document.getElementById('btn-wip-step4')?.addEventListener('click', () => {
+    const available = Math.max(0, state.packingWip.stage4In - state.packingWip.stage4Passed);
+    if (available <= 0) {
+      if (isPackingAwaitingFinalQc(state.packingWip)) {
+        showToast('Stage 4 1st Packing is 100% complete — awaiting Final QC clearance (AQL 1.5) before Stage 5 cartons.');
+      } else {
+        showToast('No pairs available in Stage 4 yet. Match pairs in Stage 3 first.');
+      }
+      return;
+    }
     openModal('Process Stage 4: 1st Packing (Unit Polybag)', `
       <div style="font-size: 13px;">
         <p style="margin-bottom: 12px; color: var(--ink-600);">
-          Insert silica gel sachet, attach rider hangtag, seal airtight polybag, and affix scannable barcode label.
+          Insert silica gel sachet, attach rider hangtag, seal airtight polybag, and affix scannable barcode label. Available to pack: <strong>${available.toLocaleString()} pairs</strong> (Cumulative packed so far: ${state.packingWip.stage4Passed.toLocaleString()} pairs).
         </p>
         <div class="form-group" style="margin-bottom: 12px;">
-          <label>Total Polybagged &amp; Labeled Pairs:</label>
-          <input type="number" id="step4-packed-input" class="form-input" value="${state.packingWip.stage4Passed}" />
+          <label for="step4-packed-input">Pairs to Polybag &amp; Seal (Incremental):</label>
+          <input type="number" id="step4-packed-input" class="form-input" min="0" max="${available}" value="${available}" />
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
-          <label>Remaining in Progress:</label>
-          <input type="number" id="step4-pending-input" class="form-input" value="${state.packingWip.stage4Pending}" />
+          <label for="step4-pending-input">Remaining in Progress:</label>
+          <input type="number" id="step4-pending-input" class="form-input" value="0" readonly />
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button class="btn-outline" onclick="document.getElementById('global-modal').classList.remove('open')">Cancel</button>
-          <button class="btn-primary" id="btn-submit-step4-action">Complete 1st Packing &rarr;</button>
+          <button type="button" class="btn-outline" data-modal-cancel>Cancel</button>
+          <button type="button" class="btn-primary" id="btn-submit-step4-action">Complete 1st Packing &rarr;</button>
         </div>
       </div>
-    `, false);
+    `, false, { hideGlobalFooter: true });
 
-    document.getElementById('btn-submit-step4-action')?.addEventListener('click', () => {
+    const step4Input = document.getElementById('step4-packed-input') as HTMLInputElement | null;
+    const step4PendingInput = document.getElementById('step4-pending-input') as HTMLInputElement | null;
+    step4Input?.addEventListener('input', () => {
+      const val = parseInt(step4Input.value || '0', 10) || 0;
+      if (step4PendingInput) {
+        step4PendingInput.value = String(Math.max(0, available - val));
+      }
+    });
+
+    let step4InFlight = false;
+    document.getElementById('btn-submit-step4-action')?.addEventListener('click', async (event) => {
+      if (step4InFlight) return;
       const packed = parseInt((document.getElementById('step4-packed-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      const pending = parseInt((document.getElementById('step4-pending-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      state.packingWip.stage4Passed = packed;
-      state.packingWip.stage4Pending = pending;
-      saveCurrentOrderWipState();
-      closeModal();
-      showToast(`${packed} unit polybags sealed with barcode verification.`);
-      renderApp();
+      if (packed <= 0 || packed > available) {
+        showToast(`Enter between 1 and ${available.toLocaleString()} pairs available for Stage 4 packing.`);
+        return;
+      }
+      const submitBtn = event.currentTarget as HTMLButtonElement | null;
+      step4InFlight = true;
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+        if (isPersistedRequisition(baseReq)) {
+          const savedOk = await postWipStageUpdate(
+            baseReq,
+            'step4-packing',
+            { packedPairs: packed },
+            'Unable to save Stage 4 packing progress.'
+          );
+          if (!savedOk) return;
+        } else {
+          state.packingWip.stage4Passed += packed;
+          state.packingWip.stage4Pending = Math.max(0, state.packingWip.stage4In - state.packingWip.stage4Passed);
+          saveCurrentOrderWipState();
+        }
+        closeModal();
+        showToast(`${packed} unit polybags sealed with barcode verification.`);
+        renderApp();
+      } finally {
+        step4InFlight = false;
+        if (submitBtn?.isConnected) submitBtn.disabled = false;
+      }
     });
   });
 
@@ -2313,57 +3321,110 @@ function attachPackingHandlers(): void {
           Box 30 pairs per heavy 5-ply export master carton. Automatically generates tamper-evident QC seal serial numbers and computes tare weights.
         </p>
         <div class="form-group" style="margin-bottom: 12px;">
-          <label>Cartons to Seal (30 prs/carton):</label>
+          <label for="step5-cartons-input">Cartons to Seal (30 prs/carton):</label>
           <input type="number" id="step5-cartons-input" class="form-input" value="${state.packingWip.outputCartons || Math.max(1, Math.ceil(gateCheck.readyPairs / 30))}" />
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
-          <label>Carton Seal Batch Prefix:</label>
+          <label for="step5-prefix-input">Carton Seal Batch Prefix:</label>
           <input type="text" id="step5-prefix-input" class="form-input" value="FSKD-44" />
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button class="btn-outline" onclick="document.getElementById('global-modal').classList.remove('open')">Cancel</button>
-          <button class="btn-primary" id="btn-submit-step5-action">Seal &amp; Add to Shipping Manifest &rarr;</button>
+          <button type="button" class="btn-outline" data-modal-cancel>Cancel</button>
+          <button type="button" class="btn-primary" id="btn-submit-step5-action">Seal &amp; Add to Shipping Manifest &rarr;</button>
         </div>
       </div>
-    `, false);
+    `, false, { hideGlobalFooter: true });
 
-    document.getElementById('btn-submit-step5-action')?.addEventListener('click', () => {
+    let step5InFlight = false;
+    document.getElementById('btn-submit-step5-action')?.addEventListener('click', async (event) => {
+      if (step5InFlight) return;
       const numCartons = parseInt((document.getElementById('step5-cartons-input') as HTMLInputElement)?.value || '0', 10) || 0;
-      const sealedPairs = Math.min(state.packingWip.stage4Passed || numCartons * 30, numCartons * 30);
-      state.packingWip.outputCartons = numCartons;
-      state.packingWip.outputPairs = sealedPairs;
-      state.packingWip.stage5Cartons = `${numCartons} Cartons (${sealedPairs} Prs)`;
-      (state.packingWip as any).packedSizes = scaleSizeBreakdown(state.packingWip.sizes, sealedPairs);
+      if (numCartons <= 0) {
+        showToast('Enter at least 1 carton to seal.');
+        return;
+      }
+      const submitBtn = event.currentTarget as HTMLButtonElement | null;
+      step5InFlight = true;
+      if (submitBtn) submitBtn.disabled = true;
 
-      state.cartons = Array.from({ length: numCartons }, (_, i) => ({
-        cartonNo: `CTN-${String(i + 1).padStart(2, '0')}`,
-        pairs: 30,
-        netWt: '4.8 kg',
-        grossWt: '5.3 kg',
-        dims: '29 x 23 x 28',
-        barcodeVerified: true,
-        sealNo: `FSKD-44${String(i + 1).padStart(2, '0')}`,
-        status: 'Approved (AQL 1.5)'
-      }));
+      try {
+        const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+        const defaultCartons = Math.max(1, Math.ceil(gateCheck.readyPairs / 30));
+        const pairsPerCarton = numCartons === defaultCartons
+          ? 30
+          : Math.max(1, Math.ceil(state.packingWip.stage4Passed / numCartons));
 
-      logAuditEvent(
-        'STAGE_5_CARTON_SEAL',
-        state.packingWip.selectedBatch,
-        `Stage 4 Ready: ${state.packingWip.stage4Passed} Prs`,
-        `Sealed ${numCartons} Cartons (${sealedPairs} Prs)`,
-        state.packingWip.parentOrderId
-      );
+        if (isPersistedRequisition(baseReq)) {
+          const savedOk = await postWipStageUpdate(
+            baseReq,
+            'step5-cartons-gated',
+            { pairsPerCarton },
+            'Unable to save Stage 5 carton packing.'
+          );
+          if (!savedOk) return;
+          (state.packingWip as any).packedSizes = scaleSizeBreakdown(state.packingWip.sizes, state.packingWip.outputPairs);
+          saveCurrentOrderWipState();
+          logAuditEvent(
+            'STAGE_5_CARTON_SEAL',
+            baseReq,
+            `Stage 4 Ready: ${state.packingWip.stage4Passed} Prs`,
+            `Sealed ${state.packingWip.outputCartons} Cartons (${state.packingWip.outputPairs} Prs)`,
+            state.packingWip.parentOrderId
+          );
+          closeModal();
+          showToast(`${state.packingWip.outputCartons} Master Cartons (${state.packingWip.outputPairs} Prs) sealed and logged into Shipping Manifest!`);
+          renderApp();
+          return;
+        }
 
-      saveCurrentOrderWipState();
-      closeModal();
-      showToast(`${numCartons} Master Cartons (${sealedPairs} Prs) sealed and logged into Shipping Manifest!`);
-      renderApp();
+        const sealedPairs = Math.min(state.packingWip.stage4Passed || numCartons * 30, numCartons * 30);
+        state.packingWip.outputCartons = numCartons;
+        state.packingWip.outputPairs = sealedPairs;
+        state.packingWip.stage5Cartons = `${numCartons} Cartons (${sealedPairs} Prs)`;
+        (state.packingWip as any).packedSizes = scaleSizeBreakdown(state.packingWip.sizes, sealedPairs);
+
+        state.cartons = Array.from({ length: numCartons }, (_, i) => ({
+          cartonNo: `CTN-${String(i + 1).padStart(2, '0')}`,
+          pairs: 30,
+          netWt: '4.8 kg',
+          grossWt: '5.3 kg',
+          dims: '29 x 23 x 28',
+          barcodeVerified: true,
+          sealNo: `FSKD-44${String(i + 1).padStart(2, '0')}`,
+          status: 'Approved (AQL 1.5)'
+        }));
+
+        logAuditEvent(
+          'STAGE_5_CARTON_SEAL',
+          state.packingWip.selectedBatch,
+          `Stage 4 Ready: ${state.packingWip.stage4Passed} Prs`,
+          `Sealed ${numCartons} Cartons (${sealedPairs} Prs)`,
+          state.packingWip.parentOrderId
+        );
+
+        saveCurrentOrderWipState();
+        closeModal();
+        showToast(`${numCartons} Master Cartons (${sealedPairs} Prs) sealed and logged into Shipping Manifest!`);
+        renderApp();
+      } finally {
+        step5InFlight = false;
+        if (submitBtn?.isConnected) submitBtn.disabled = false;
+      }
     });
   });
 
   // Packing Hall Generates Requisition Asking (Inward Register Person Issues Given Available Stock)
   document.getElementById('btn-wip-new-req')?.addEventListener('click', () => {
     openNewRequisitionModal();
+  });
+
+  document.getElementById('btn-wip-print-req')?.addEventListener('click', () => {
+    const reqNumber = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+    if (!state.persistedReqNumbers.includes(reqNumber)) {
+      showToast('Save this requisition before printing it.');
+      return;
+    }
+    printDocument(`Packing Hall Requisition Slip — ${reqNumber}`, buildCurrentPackingRequisitionSlip());
   });
 
   // Shift log export
@@ -2389,6 +3450,14 @@ function attachPackingHandlers(): void {
   });
 
   document.getElementById('btn-wip-print-labels')?.addEventListener('click', () => {
+    const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+    const reqCartons = Array.isArray((state.ordersWipMap[baseReq] as any)?.cartons)
+      ? (state.ordersWipMap[baseReq] as any).cartons
+      : [];
+    if (reqCartons.length === 0) {
+      showToast(`No master cartons sealed for ${baseReq} yet. Complete Final QC and seal cartons in Stage 5 before printing labels.`);
+      return;
+    }
     openDocumentCenterModal('carton');
     const preview = document.getElementById('doc-preview-container');
     if (preview) printDocument('Meridian-Doc-carton', preview.innerHTML);
@@ -2403,47 +3472,59 @@ function attachPackingHandlers(): void {
 
 // Open Packing Hall Requisition Generator Modal (Links REQ-000X -> M-REQ-000X & A-REQ-000X back to Parent Order)
 function openNewRequisitionModal(preselectOrderId?: string): void {
-  const existingReqsCount = Object.keys(state.ordersWipMap).filter(k => (state.ordersWipMap[k]?.plannedQty || 0) > 0).length;
-  const suggestedReq = preselectOrderId
-    ? formatBatchSequence('REQ', existingReqsCount + 1)
-    : normalizeBaseReqNumber(state.packingWip.selectedBatch || formatBatchSequence('REQ', Math.max(1, existingReqsCount + 1)));
+  function getOrderReqEntryCaps(orderId: string) {
+    const matched = state.pendingOrders.find(o => o.orderId === orderId);
+    const stock = getOrderStockState(orderId);
+    const maxTotalAllowed = Math.max(0, Math.min(stock.remainingOrderTotal, stock.unclaimedPairs));
+    const hasSizeGrnBreakdown = calculateSizeTotal(stock.receivedSizes) > 0;
+    const perSizeMax = createEmptySizes();
+    for (const size of STANDARD_GLOVE_SIZES) {
+      const remOrder = Number(stock.remainingOrderSizes[size] || 0);
+      perSizeMax[size] = hasSizeGrnBreakdown
+        ? Math.min(remOrder, Math.max(0, Number(stock.receivedSizes[size] || 0)))
+        : remOrder;
+    }
+    const defaultSizes = createEmptySizes();
+    let remainingBudget = Math.min(calculateSizeTotal(perSizeMax), maxTotalAllowed);
+    for (const size of STANDARD_GLOVE_SIZES) {
+      if (remainingBudget <= 0) break;
+      const take = Math.min(perSizeMax[size], remainingBudget);
+      defaultSizes[size] = take;
+      remainingBudget -= take;
+    }
+    return { matched, stock, maxTotalAllowed, perSizeMax, defaultSizes };
+  }
 
   const defaultOrderId = preselectOrderId || state.packingWip.parentOrderId || state.pendingOrders[0]?.orderId || '';
-  const matchedOrder = state.pendingOrders.find(o => o.orderId === defaultOrderId);
-  const defaultArticle = matchedOrder?.article || state.packingWip.article || '';
-  const currentSizes = preselectOrderId ? createEmptySizes() : state.packingWip.sizes;
-  const currentTotal = calculateSizeTotal(currentSizes) || (preselectOrderId ? 0 : state.packingWip.plannedQty) || 0;
+  const initialCaps = getOrderReqEntryCaps(defaultOrderId);
+  const defaultArticle = initialCaps.matched?.article || state.packingWip.article || '';
+  const currentSizes = initialCaps.defaultSizes;
+  const currentTotal = calculateSizeTotal(currentSizes);
 
-  openModal('Generate & Print Packing Hall Requisition (REQ -> M & A)', `
+  openModal('Create Packing Hall Requisition', `
     <div style="font-size: 13px;">
       <p style="margin-bottom: 12px; color: var(--ink-600);">
-        Packing Hall generates a sequential Requisition (<strong>REQ-0001, REQ-0002...</strong>) linked to its Parent Master Order. Material Requisition (<strong>M-</strong>) and Alteration Bay (<strong>A-</strong>) are derived automatically from the same Requisition Number.
+        Choose the parent order and requested sizes. Requests are capped by remaining unrequested order balance and unclaimed Inward Register stock.
       </p>
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+      <div class="modal-meta-grid-3">
         <div class="form-group">
-          <label>Parent Master Order #</label>
+          <label for="new-req-parent-order">Parent Master Order #</label>
           <select id="new-req-parent-order" class="form-select">
             <option value="">-- Select Parent Order --</option>
-            ${state.pendingOrders.map(o => `<option value="${o.orderId}" ${defaultOrderId === o.orderId ? 'selected' : ''}>${o.orderId} (${o.article} • ${o.totalQty} Prs)</option>`).join('')}
+            ${state.pendingOrders.filter(o => !o.shortClosed).map(o => `<option value="${o.orderId}" ${defaultOrderId === o.orderId ? 'selected' : ''}>${o.orderId} (${o.article} • ${Number(o.totalQty || 0).toLocaleString()} Prs)</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
-          <label>Requisition # (0001, 0002...)</label>
-          <input type="text" id="new-req-number" class="form-input" value="${suggestedReq}" />
+          <label for="new-req-number-preview">Requisition #</label>
+          <input type="text" id="new-req-number-preview" class="form-input" value="Assigned when saved" readonly aria-readonly="true" />
         </div>
         <div class="form-group">
-          <label>Article</label>
-          <select id="new-req-article" class="form-select">
-            <option value="">-- Select Article --</option>
-            ${state.dropdownOptions.articles.map(a => `<option value="${a}" ${defaultArticle === a ? 'selected' : ''}>${a}</option>`).join('')}
-          </select>
+          <label for="new-req-article">Article</label>
+          <input type="text" id="new-req-article" class="form-input" value="${defaultArticle}" readonly aria-readonly="true" />
         </div>
       </div>
 
-      <div style="display: flex; gap: 12px; margin-bottom: 12px; font-size: 12px; background: var(--ink-50); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 4px;">
-        <span>Material Req #: <strong id="new-req-m-preview">${getMaterialReqNumber(suggestedReq)}</strong></span>
-        <span>|</span>
-        <span>Alteration Bay Ref: <strong id="new-req-a-preview">${getAlterationReqNumber(suggestedReq)}</strong></span>
+      <div id="new-req-cap-summary" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; font-size: 12px; background: var(--ink-50); border: 1px solid var(--border-strong); padding: 8px 12px; border-radius: 4px;">
       </div>
 
       <div style="background: var(--ink-50); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px; margin-bottom: 14px;">
@@ -2453,148 +3534,199 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
         <table class="size-matrix-table">
           <thead>
             <tr>
-              <th>7 / S</th>
-              <th>8 / M</th>
-              <th>9 / L</th>
-              <th>10 / XL</th>
-              <th>11 / XXL</th>
-              <th style="background: var(--ink-200); color: var(--ink-950);">Total Asking</th>
+              <th scope="col">7 / S</th>
+              <th scope="col">8 / M</th>
+              <th scope="col">9 / L</th>
+              <th scope="col">10 / XL</th>
+              <th scope="col">11 / XXL</th>
+              <th scope="col" style="background: var(--ink-200); color: var(--ink-950);">Total Asking</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="7" min="0" value="${currentSizes['7'] || ''}" placeholder="0" /></td>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="8" min="0" value="${currentSizes['8'] || ''}" placeholder="0" /></td>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="9" min="0" value="${currentSizes['9'] || ''}" placeholder="0" /></td>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="10" min="0" value="${currentSizes['10'] || ''}" placeholder="0" /></td>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="11" min="0" value="${currentSizes['11'] || ''}" placeholder="0" /></td>
+              <td><input type="number" class="size-matrix-input req-size-val" data-size="7" aria-label="Asking pairs for Size 7 S" min="0" max="${initialCaps.perSizeMax['7']}" value="${currentSizes['7'] || ''}" placeholder="0" /></td>
+              <td><input type="number" class="size-matrix-input req-size-val" data-size="8" aria-label="Asking pairs for Size 8 M" min="0" max="${initialCaps.perSizeMax['8']}" value="${currentSizes['8'] || ''}" placeholder="0" /></td>
+              <td><input type="number" class="size-matrix-input req-size-val" data-size="9" aria-label="Asking pairs for Size 9 L" min="0" max="${initialCaps.perSizeMax['9']}" value="${currentSizes['9'] || ''}" placeholder="0" /></td>
+              <td><input type="number" class="size-matrix-input req-size-val" data-size="10" aria-label="Asking pairs for Size 10 XL" min="0" max="${initialCaps.perSizeMax['10']}" value="${currentSizes['10'] || ''}" placeholder="0" /></td>
+              <td><input type="number" class="size-matrix-input req-size-val" data-size="11" aria-label="Asking pairs for Size 11 XXL" min="0" max="${initialCaps.perSizeMax['11']}" value="${currentSizes['11'] || ''}" placeholder="0" /></td>
               <td style="font-weight: 800; font-size: 14px; color: var(--ink-950);" id="new-req-size-total">${currentTotal}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="form-group" style="margin-bottom: 14px;">
-        <label>Total Asking / Requested Pairs</label>
-        <input type="number" id="new-req-pairs" class="form-input" value="${currentTotal}" min="0" />
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label for="new-req-pairs">Total Asking / Requested Pairs</label>
+        <input type="number" id="new-req-pairs" class="form-input" value="${currentTotal}" readonly aria-readonly="true" />
       </div>
+      <div id="new-req-cap-warning" role="alert" aria-live="polite" style="display: none; margin-bottom: 12px; padding: 8px 10px; background: var(--ink-100); border: 1px solid var(--border-strong); border-radius: 4px; font-size: 12px; color: var(--ink-950); font-weight: 600;"></div>
 
       <div style="display: flex; justify-content: flex-end; gap: 8px;">
-        <button class="btn-outline" onclick="document.getElementById('global-modal').classList.remove('open')">Cancel</button>
-        <button class="btn-primary" id="btn-confirm-lot-draw">Generate &amp; Print Requisition &rarr;</button>
+        <button type="button" class="btn-outline" data-modal-cancel>Cancel</button>
+        <button type="button" class="btn-primary" id="btn-confirm-lot-draw">Save Requisition</button>
       </div>
     </div>
-  `, false);
+  `, false, { hideGlobalFooter: true });
 
   const parentOrderSelect = document.getElementById('new-req-parent-order') as HTMLSelectElement;
-  const reqNumberInput = document.getElementById('new-req-number') as HTMLInputElement;
-  const articleSelect = document.getElementById('new-req-article') as HTMLSelectElement;
-  const mPreview = document.getElementById('new-req-m-preview');
-  const aPreview = document.getElementById('new-req-a-preview');
+  const articleInput = document.getElementById('new-req-article') as HTMLInputElement;
   const sizeTotalCell = document.getElementById('new-req-size-total');
   const totalPairsInput = document.getElementById('new-req-pairs') as HTMLInputElement;
+  const capSummaryEl = document.getElementById('new-req-cap-summary');
+  const capWarningEl = document.getElementById('new-req-cap-warning');
+  const saveReqButton = document.getElementById('btn-confirm-lot-draw') as HTMLButtonElement | null;
+
+  let activeCaps = initialCaps;
+
+  function renderCapSummaryAndValidation(enteredTotal: number): void {
+    const { stock, maxTotalAllowed } = activeCaps;
+    if (capSummaryEl) {
+      capSummaryEl.innerHTML = `
+        <span>Order Remaining: <strong>${stock.remainingOrderTotal.toLocaleString()} Prs</strong></span>
+        <span>Inward Received: <strong>${stock.totalReceived.toLocaleString()} Prs</strong> (Issued: ${stock.totalIssued.toLocaleString()} &bull; Pending REQs: ${stock.pendingReqPairs.toLocaleString()})</span>
+        <span>Max Requestable Now: <strong>${maxTotalAllowed.toLocaleString()} Prs</strong></span>
+      `;
+    }
+    const exceeds = enteredTotal > maxTotalAllowed;
+    if (capWarningEl) {
+      if (maxTotalAllowed <= 0) {
+        capWarningEl.style.display = 'block';
+        capWarningEl.textContent = '0 unclaimed Inward Register pairs available for this order. Receive GRN stock in Inward Goods Receiving before creating a requisition.';
+      } else if (exceeds) {
+        capWarningEl.style.display = 'block';
+        capWarningEl.textContent = `Asking ${enteredTotal.toLocaleString()} pairs exceeds Max Requestable Now (${maxTotalAllowed.toLocaleString()} pairs available in Inward Register).`;
+      } else {
+        capWarningEl.style.display = 'none';
+        capWarningEl.textContent = '';
+      }
+    }
+    if (saveReqButton) {
+      saveReqButton.disabled = maxTotalAllowed <= 0 || exceeds || enteredTotal <= 0;
+    }
+  }
 
   parentOrderSelect?.addEventListener('change', () => {
-    const selOrd = state.pendingOrders.find(o => o.orderId === parentOrderSelect.value);
-    if (selOrd && articleSelect) {
-      articleSelect.value = selOrd.article;
-    }
-  });
-
-  reqNumberInput?.addEventListener('input', () => {
-    const norm = normalizeBaseReqNumber(reqNumberInput.value);
-    if (mPreview) mPreview.textContent = getMaterialReqNumber(norm);
-    if (aPreview) aPreview.textContent = getAlterationReqNumber(norm);
+    activeCaps = getOrderReqEntryCaps(parentOrderSelect.value);
+    if (articleInput) articleInput.value = activeCaps.matched?.article || '';
+    document.querySelectorAll('.req-size-val').forEach(el => {
+      const input = el as HTMLInputElement;
+      const size = input.getAttribute('data-size') as keyof SizeBreakdown;
+      if (!size) return;
+      input.max = String(activeCaps.perSizeMax[size] || 0);
+      input.value = String(activeCaps.defaultSizes[size] || 0);
+    });
+    recalcReqModalSizes();
   });
 
   function recalcReqModalSizes() {
-    const s = createEmptySizes();
-    document.querySelectorAll('.req-size-val').forEach(el => {
-      const inp = el as HTMLInputElement;
-      const k = inp.getAttribute('data-size') as keyof SizeBreakdown;
-      if (k) s[k] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
-    });
-    const tot = calculateSizeTotal(s);
-    if (sizeTotalCell) sizeTotalCell.textContent = tot.toLocaleString();
-    if (totalPairsInput && tot > 0) totalPairsInput.value = String(tot);
-  }
-
-  document.querySelectorAll('.req-size-val').forEach(inp => {
-    inp.addEventListener('input', recalcReqModalSizes);
-  });
-
-  document.getElementById('btn-confirm-lot-draw')?.addEventListener('click', () => {
-    saveCurrentOrderWipState();
-    const rawReq = reqNumberInput?.value || DEFAULT_REQ_NUMBER;
-    const reqId = normalizeBaseReqNumber(rawReq);
-    const parentOrderId = parentOrderSelect?.value || state.pendingOrders[0]?.orderId || '';
-    const parentOrder = state.pendingOrders.find(o => o.orderId === parentOrderId);
-    const article = articleSelect?.value || parentOrder?.article || '---';
-
     const sizes = createEmptySizes();
     document.querySelectorAll('.req-size-val').forEach(el => {
-      const inp = el as HTMLInputElement;
-      const k = inp.getAttribute('data-size') as keyof SizeBreakdown;
-      if (k) sizes[k] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+      const input = el as HTMLInputElement;
+      const size = input.getAttribute('data-size') as keyof SizeBreakdown;
+      if (size) {
+        const sizeCap = Number(activeCaps.perSizeMax[size] || 0);
+        const raw = Math.max(0, parseInt(input.value || '0', 10) || 0);
+        const clamped = Math.min(raw, sizeCap);
+        if (raw > sizeCap) {
+          input.value = String(clamped);
+        }
+        sizes[size] = clamped;
+      }
     });
-    const sizeSum = calculateSizeTotal(sizes);
-    const pairs = Math.max(0, parseInt(totalPairsInput?.value || '0', 10) || sizeSum);
+    const total = calculateSizeTotal(sizes);
+    if (sizeTotalCell) sizeTotalCell.textContent = total.toLocaleString();
+    if (totalPairsInput) totalPairsInput.value = String(total);
+    renderCapSummaryAndValidation(total);
+  }
 
-    state.packingWip = {
-      selectedBatch: reqId,
-      parentOrderId,
-      article: article === '---' ? '' : article,
-      po: parentOrder?.po || '',
-      plannedQty: pairs,
-      issueStatus: 'Pending Inward Issue',
-      sizes,
-      wipBatch: reqId,
-      stage1In: 0,
-      stage1Passed: 0,
-      stage1Defects: 0,
-      stage2In: 0,
-      stage2Passed: 0,
-      stage2Defects: 0,
-      stage3In: 0,
-      stage3Passed: 0,
-      stage3Defects: 0,
-      stage4In: 0,
-      stage4Passed: 0,
-      stage4Pending: 0,
-      stage5Cartons: '0 Cartons (0 Prs)',
-      stage5Pending: `${Math.ceil(pairs / 30)} Cartons`,
-      mreqNo: getMaterialReqNumber(reqId),
-      altReqNo: getAlterationReqNumber(reqId),
-      mreqQty: `${pairs} Sets`,
-      mreqStatus: 'Printed',
-      inAlteration: 0,
-      scrappedPairs: 0,
-      finalQcApproved: false,
-      lineEfficiency: '0%',
-      outputPairs: 0,
-      outputCartons: 0
-    };
-    state.repairForm.batchId = state.packingWip.altReqNo;
+  function readRequestSizes(): SizeBreakdown {
+    const sizes = createEmptySizes();
+    document.querySelectorAll('.req-size-val').forEach(el => {
+      const input = el as HTMLInputElement;
+      const size = input.getAttribute('data-size') as keyof SizeBreakdown;
+      if (size) sizes[size] = Math.max(0, parseInt(input.value || '0', 10) || 0);
+    });
+    return sizes;
+  }
 
-    if (!state.dropdownOptions.defectBatchIds.includes(state.packingWip.altReqNo)) {
-      state.dropdownOptions.defectBatchIds.unshift(state.packingWip.altReqNo);
+  document.querySelectorAll('.req-size-val').forEach(input => {
+    input.addEventListener('input', recalcReqModalSizes);
+  });
+
+  renderCapSummaryAndValidation(currentTotal);
+
+  let createReqInFlight = false;
+  document.getElementById('btn-confirm-lot-draw')?.addEventListener('click', async (event) => {
+    if (createReqInFlight) return;
+    const saveButton = event.currentTarget as HTMLButtonElement;
+    const parentOrderId = parentOrderSelect?.value || '';
+    const parentOrder = state.pendingOrders.find(order => order.orderId === parentOrderId);
+    if (!parentOrder) {
+      showToast('Select a pending parent order first.');
+      return;
     }
 
-    saveCurrentOrderWipState();
+    const sizes = readRequestSizes();
+    const pairs = calculateSizeTotal(sizes);
+    if (pairs <= 0) {
+      showToast('Enter a quantity for at least one size.');
+      return;
+    }
+    if (pairs > activeCaps.maxTotalAllowed) {
+      showToast(`Requested ${pairs.toLocaleString()} pairs exceeds available Inward stock (${activeCaps.maxTotalAllowed.toLocaleString()} pairs).`);
+      return;
+    }
 
-    const slipHtml = buildPackingRequisitionSlipHtml({
-      reqNo: reqId,
-      date: '31-10-2026',
-      article,
-      sizes,
-      totalPairs: pairs,
-      issueStatus: 'Pending Inward Issue'
-    });
+    createReqInFlight = true;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving...';
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(parentOrderId)}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success || !result.data?.reqNumber) {
+        showToast(result.error || 'Requisition was not saved. Please try again.');
+        return;
+      }
 
-    renderApp();
-    openModal(`Packing Hall Requisition Slip — ${reqId}`, slipHtml, true);
-    printDocument(`Packing Hall Requisition Slip — ${reqId}`, slipHtml);
-    showToast(`Requisition ${reqId} (${getMaterialReqNumber(reqId)} / ${getAlterationReqNumber(reqId)}) generated for Order ${parentOrderId || '---'} (${pairs} Pairs).`);
+      const saved = result.data;
+      const reqNumber = normalizeBaseReqNumber(saved.reqNumber);
+      const wip = applyServerRequisition(saved, true);
+      state.persistedReqNumbers = Array.from(new Set([...state.persistedReqNumbers, reqNumber]));
+      if (parentOrder.availableDockPairs !== undefined) {
+        parentOrder.requestedPairs = Number(parentOrder.requestedPairs || 0) + pairs;
+        parentOrder.pendingReqPairs = Number(parentOrder.pendingReqPairs || 0) + pairs;
+        parentOrder.unclaimedDockPairs = Math.max(0, Number(parentOrder.availableDockPairs || 0) - parentOrder.pendingReqPairs);
+        if (parentOrder.remainingOrderSizes) {
+          for (const size of STANDARD_GLOVE_SIZES) {
+            parentOrder.remainingOrderSizes[size] = Math.max(
+              0,
+              Number(parentOrder.remainingOrderSizes[size] || 0) - Number(sizes[size] || 0)
+            );
+          }
+        }
+      }
+      state.repairForm.batchId = wip.altReqNo;
+      if (!state.dropdownOptions.defectBatchIds.includes(wip.altReqNo)) {
+        state.dropdownOptions.defectBatchIds.unshift(wip.altReqNo);
+      }
+
+      closeModal();
+      renderApp();
+      showToast(`Requisition ${reqNumber} saved for Order ${parentOrderId} (${pairs.toLocaleString()} pairs). Use Print Requisition when ready.`);
+    } catch (error) {
+      console.error('Requisition save failed:', error);
+      showToast('Requisition could not be saved. No requisition was created.');
+    } finally {
+      createReqInFlight = false;
+      if (saveButton.isConnected) {
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Requisition';
+      }
+    }
   });
 }
 
@@ -2773,19 +3905,19 @@ function openAqlCalculatorModal(): void {
         Automated ISO 2859-1 Normal Single Sampling Plan (AQL 1.5) decision matrix for glove export lots and carton quarantine enforcement.
       </p>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+      <div class="modal-meta-grid-3" style="margin-bottom: 14px;">
         <div class="form-group">
-          <label>Lot Size (Total Pairs)</label>
+          <label for="aql-lot-size">Lot Size (Total Pairs)</label>
           <input type="number" id="aql-lot-size" class="form-input" value="${state.packingWip.plannedQty || 840}" min="1" />
         </div>
         <div class="form-group">
-          <label>AQL Standard</label>
+          <label for="aql-target">AQL Standard</label>
           <select id="aql-target" class="form-select" disabled>
             <option value="1.5">AQL 1.5 (Level II Normal)</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Found Defects (Sample)</label>
+          <label for="aql-found-defects">Found Defects (Sample)</label>
           <input type="number" id="aql-found-defects" class="form-input" value="0" min="0" />
         </div>
       </div>
@@ -2797,12 +3929,12 @@ function openAqlCalculatorModal(): void {
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 11px; color: var(--ink-500);">Standard: ISO 2859-1 / ANSI/ASQ Z1.4</span>
         <div style="display: flex; gap: 8px;">
-          <button class="btn-outline" onclick="document.getElementById('global-modal').classList.remove('open')">Close</button>
+          <button type="button" class="btn-outline" data-modal-cancel>Close</button>
           <button class="btn-primary" id="btn-apply-aql-audit">Apply Audit Result to Active Lot &rarr;</button>
         </div>
       </div>
     </div>
-  `, false);
+  `, false, { hideGlobalFooter: true });
 
   function updateAqlCalculation() {
     const lotSize = parseInt((document.getElementById('aql-lot-size') as HTMLInputElement)?.value || '840', 10);
@@ -2862,8 +3994,11 @@ function openAqlCalculatorModal(): void {
 
   document.getElementById('btn-apply-aql-audit')?.addEventListener('click', async () => {
     const defects = parseInt((document.getElementById('aql-found-defects') as HTMLInputElement)?.value || '0', 10);
+    const baseReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+    let passedAql = defects <= 3;
+
     try {
-      const resp = await fetch(`/api/qc/${state.packingWip.selectedBatch}/aql-audit`, {
+      const resp = await fetch(`/api/qc/${encodeURIComponent(baseReq)}/aql-audit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2873,20 +4008,23 @@ function openAqlCalculatorModal(): void {
         })
       });
       const data = await resp.json();
-      if (data.success) {
-        showToast(`AQL Audit logged to SQLite! Status: ${data.data.verdict}`);
+      if (!resp.ok || !data.success || !data.data) {
+        showToast(data.error || `AQL audit failed for ${baseReq}.`);
+        return;
       }
-    } catch (e) {
-      console.warn('AQL audit offline fallback', e);
+      passedAql = Boolean(data.data.isApproved);
+    } catch (error) {
+      console.error('AQL audit failed:', error);
+      showToast(`Failed to submit AQL audit for ${baseReq}.`);
+      return;
     }
 
-    const passedAql = defects <= 3;
     state.qcChecklist.forEach(c => (c.passed = passedAql));
     state.packingWip.finalQcApproved = passedAql;
     saveCurrentOrderWipState();
     logAuditEvent(
       passedAql ? 'FINAL_QC_APPROVE' : 'FINAL_QC_REJECT',
-      state.packingWip.selectedBatch,
+      baseReq,
       `Stage 4 Ready: ${state.packingWip.stage4Passed} Prs`,
       passedAql ? `AQL 1.5 Passed (${defects} defects)` : `AQL 1.5 Quarantined (${defects} defects)`,
       state.packingWip.parentOrderId
@@ -2911,6 +4049,19 @@ function attachAdminHandlers(): void {
         renderApp();
       }
     });
+
+  });
+
+  document.getElementById('btn-admin-nav-toggle')?.addEventListener('click', () => {
+    state.adminNavCollapsed = !state.adminNavCollapsed;
+    renderApp();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-admin-reset-password]').forEach(button => {
+    button.addEventListener('click', () => {
+      const userId = button.dataset.adminResetPassword;
+      if (userId) void window.adminResetSystemUserPassword(userId, button);
+    });
   });
 
   document.querySelectorAll('[data-admin-tab-jump]').forEach(btn => {
@@ -2923,16 +4074,140 @@ function attachAdminHandlers(): void {
     });
   });
 
+  for (const fieldId of [
+    'admin-pending-order-maker',
+    'admin-pending-order-article',
+    'admin-cust-name',
+    'admin-prod-name',
+    'admin-prod-stickers',
+    'admin-prod-carton',
+    'admin-user-name',
+    'admin-user-username',
+    'admin-user-password'
+  ]) {
+    const field = document.getElementById(fieldId);
+    const eventType = field instanceof HTMLSelectElement ? 'change' : 'input';
+    field?.addEventListener(eventType, () => clearFieldValidationError(field));
+  }
+  document.querySelectorAll<HTMLInputElement>('[data-admin-user-password]').forEach(input => {
+    input.addEventListener('input', () => clearFieldValidationError(input));
+  });
+
+  document.querySelectorAll<HTMLElement>('[data-su-action]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if ((e.target as Element | null)?.closest('[data-su-action]') !== el) return;
+      const action = el.dataset.suAction;
+      switch (action) {
+        case 'inspect-order': {
+          const orderId = el.dataset.orderId;
+          if (orderId) window.adminInspectOrderInTracking(orderId, el.dataset.refCode || undefined);
+          break;
+        }
+        case 'open-slip': {
+          const slipType = el.dataset.slipType as 'GRN' | 'REQ' | 'M-REQ' | 'A-REQ' | undefined;
+          const refCode = el.dataset.refCode;
+          if (slipType && refCode) void window.adminOpenDocumentSlip(slipType, refCode, el.dataset.orderId || undefined);
+          break;
+        }
+        case 'open-req-screen': {
+          const reqNumber = el.dataset.reqNumber;
+          const targetScreen = el.dataset.targetScreen as 'screen-qc' | 'screen-repair' | 'screen-packing' | 'screen-grn' | undefined;
+          if (reqNumber && targetScreen) window.adminOpenReqInScreen(reqNumber, targetScreen);
+          break;
+        }
+        case 'load-demo': {
+          const demoPhase = el.dataset.demoPhase as 'IN_PROGRESS' | 'COMPLETED' | 'DELIBERATE_VARIANCE' | undefined;
+          if (demoPhase) void window.adminLoadDemo600Scenario(demoPhase);
+          break;
+        }
+        case 'remove-demo':
+          void window.adminRemoveDemo600Scenario();
+          break;
+        case 'expand-all':
+          window.adminSetAllOrdersExpanded(el.dataset.expanded === 'true');
+          break;
+        case 'tracking-page': {
+          const page = Number(el.dataset.page);
+          if (Number.isFinite(page)) window.adminSetTrackingPage(page);
+          break;
+        }
+        case 'toggle-order-expand': {
+          const orderId = el.dataset.orderId;
+          if (orderId) window.adminToggleOrderExpand(orderId);
+          break;
+        }
+        case 'quick-receive-grn': {
+          const orderId = el.dataset.orderId;
+          if (orderId) window.adminQuickReceiveGrnForOrder(orderId);
+          break;
+        }
+        case 'quick-create-req': {
+          const orderId = el.dataset.orderId;
+          if (orderId) window.adminQuickCreateReqForOrder(orderId);
+          break;
+        }
+        case 'short-close-order': {
+          const orderId = el.dataset.orderId;
+          if (orderId) void window.adminCloseOrderShort(orderId, el);
+          break;
+        }
+        case 'void-grn': {
+          const sr = Number(el.dataset.grnSr);
+          const grnCode = el.dataset.grnCode;
+          if (Number.isFinite(sr) && grnCode) void window.adminVoidGrnBatch(sr, grnCode, el);
+          break;
+        }
+        case 'void-req': {
+          const reqNumber = el.dataset.reqNumber;
+          if (reqNumber) void window.adminVoidReqBatch(reqNumber, el);
+          break;
+        }
+        case 'remove-pending-order': {
+          const orderId = el.dataset.orderId;
+          if (orderId) void window.adminRemovePendingOrder(orderId, el);
+          break;
+        }
+        case 'remove-dropdown-item': {
+          const listKey = el.dataset.listKey as 'makers' | 'poList' | undefined;
+          const itemVal = el.dataset.itemVal;
+          if (listKey && itemVal !== undefined) void window.adminRemoveDropdownItem(listKey, itemVal, el);
+          break;
+        }
+        case 'add-system-user':
+          void window.adminAddSystemUser(el);
+          break;
+      }
+    });
+  });
+
+  const adminUserRoleSelect = document.getElementById('admin-user-role') as HTMLSelectElement | null;
+  const adminUserStationSelect = document.getElementById('admin-user-station') as HTMLSelectElement | null;
+  adminUserStationSelect?.addEventListener('change', () => {
+    adminUserStationSelect.dataset.manualOverride = 'true';
+  });
+  adminUserRoleSelect?.addEventListener('change', () => {
+    if (adminUserStationSelect && adminUserStationSelect.dataset.manualOverride !== 'true') {
+      adminUserStationSelect.value = getDefaultStationForRole(adminUserRoleSelect.value);
+    }
+  });
+
+  document.querySelectorAll<HTMLElement>('[data-su-change]').forEach(el => {
+    el.addEventListener('change', () => {
+      const changeKey = el.dataset.suChange;
+      const val = (el as HTMLSelectElement).value;
+      if (changeKey === 'tracking-buyer-filter') {
+        window.adminSetTrackingBuyerFilter(val);
+      } else if (changeKey === 'tracking-maker-filter') {
+        window.adminSetTrackingMakerFilter(val);
+      }
+    });
+  });
+
   // Live Tracking Search & Status Filter
   const trackingSearchInput = document.getElementById('admin-tracking-search') as HTMLInputElement;
   trackingSearchInput?.addEventListener('input', () => {
     state.adminTrackingSearch = trackingSearchInput.value;
     renderApp();
-    const refocused = document.getElementById('admin-tracking-search') as HTMLInputElement;
-    if (refocused) {
-      refocused.focus();
-      refocused.setSelectionRange(refocused.value.length, refocused.value.length);
-    }
   });
 
   document.querySelectorAll('.admin-tracking-filter-btn').forEach(btn => {
@@ -2940,6 +4215,18 @@ function attachAdminHandlers(): void {
       const filter = (e.currentTarget as HTMLElement).getAttribute('data-tracking-filter') as any;
       if (filter) {
         state.adminTrackingStatusFilter = filter;
+        renderApp();
+      }
+    });
+  });
+
+  document.querySelectorAll('.su-stage-bar-btn[data-tracking-filter]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const filter = (e.currentTarget as HTMLElement).getAttribute('data-tracking-filter') as any;
+      if (filter) {
+        state.adminTrackingStatusFilter = filter;
+        state.adminTrackingPage = 1;
+        state.adminActiveTab = 'tracking';
         renderApp();
       }
     });
@@ -3004,16 +4291,11 @@ function attachAdminHandlers(): void {
     showToast(`Exported ${built.csvFilename} (${built.csvRows.length} rows).`);
   });
 
-  document.getElementById('btn-admin-refresh')?.addEventListener('click', async () => {
-    await syncBackendData();
-    showToast('Synchronized SQLite tables with Admin Control Center.');
-  });
-
-  document.getElementById('btn-admin-lock')?.addEventListener('click', () => {
-    state.isAdminUnlocked = false;
-    state.activeScreen = 'screen-grn';
-    showToast('Super Admin Session Locked and Hidden.');
-    renderApp();
+  document.getElementById('btn-admin-refresh')?.addEventListener('click', (e) => {
+    void runAdminAction('admin:sync-db', e.currentTarget as HTMLElement, async () => {
+      await syncBackendData();
+      showToast('Synchronized SQLite tables with Admin Control Center.');
+    });
   });
 
   // Recalculate planned order size total in Super User form
@@ -3031,16 +4313,39 @@ function attachAdminHandlers(): void {
     inp.addEventListener('input', recalcAdminOrderSizes);
   });
 
-  document.getElementById('btn-admin-add-pending-order')?.addEventListener('click', async () => {
-    const orderId = (document.getElementById('admin-pending-order-id') as HTMLInputElement)?.value?.trim();
+  document.getElementById('btn-admin-reset-pending-order')?.addEventListener('click', () => {
+    for (const id of [
+      'admin-pending-order-buyer',
+      'admin-pending-order-maker',
+      'admin-pending-order-po',
+      'admin-pending-order-article',
+      'admin-pending-order-color'
+    ]) {
+      const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+      if (el) {
+        el.value = '';
+        clearFieldValidationError(el);
+      }
+    }
+    document.querySelectorAll('.admin-order-size-val').forEach(el => {
+      (el as HTMLInputElement).value = '';
+    });
+    const cell = document.getElementById('admin-order-size-total');
+    if (cell) cell.textContent = '0';
+  });
+
+  document.getElementById('btn-admin-add-pending-order')?.addEventListener('click', (e) => {
+    const makerEl = document.getElementById('admin-pending-order-maker') as HTMLSelectElement | null;
+    const articleEl = document.getElementById('admin-pending-order-article') as HTMLSelectElement | null;
     const buyer = (document.getElementById('admin-pending-order-buyer') as HTMLSelectElement)?.value?.trim();
-    const maker = (document.getElementById('admin-pending-order-maker') as HTMLSelectElement)?.value?.trim();
+    const maker = makerEl?.value?.trim() || '';
     const po = (document.getElementById('admin-pending-order-po') as HTMLInputElement)?.value?.trim();
-    const article = (document.getElementById('admin-pending-order-article') as HTMLSelectElement)?.value?.trim();
+    const article = articleEl?.value?.trim() || '';
     const color = (document.getElementById('admin-pending-order-color') as HTMLInputElement)?.value?.trim();
 
-    if (!orderId || !maker || !article) {
-      showToast('Please enter Order Reference #, Contractor/Maker, and Article.');
+    const errors = validatePendingOrderInputs({ maker, article });
+    if (applyFieldValidationErrors([[makerEl, errors.maker], [articleEl, errors.article]])) {
+      showToast('Select the required Contractor / Maker and Article.');
       return;
     }
 
@@ -3052,15 +4357,7 @@ function attachAdminHandlers(): void {
     });
     const totalPairs = calculateSizeTotal(sizes);
 
-    if (po && !state.dropdownOptions.poList.includes(po)) {
-      state.dropdownOptions.poList.unshift(po);
-    }
-    if (maker && !state.dropdownOptions.makers.includes(maker)) {
-      state.dropdownOptions.makers.unshift(maker);
-    }
-
-    const newOrder: PendingOrder = {
-      orderId,
+    const newOrder = {
       buyer: buyer || 'Standard Client',
       maker,
       po: po || '---',
@@ -3071,90 +4368,116 @@ function attachAdminHandlers(): void {
       notes: `Created by Super User: Buyer=${buyer}, PO=${po}, Color=${color}`
     };
 
-    state.adminExpandedOrders[orderId] = true;
+    void runAdminAction('admin:create-pending-order', e.currentTarget as HTMLElement, async () => {
+      try {
+        const res = await fetch('/api/admin/pending-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newOrder)
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success || typeof json.data?.orderId !== 'string' || !Array.isArray(json.data.orders)) {
+          showToast(json.error || 'Order was not saved. Please try again.');
+          return;
+        }
 
-    try {
-      const res = await fetch('/api/admin/pending-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newOrder)
-      });
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        state.pendingOrders = json.data;
-        showToast(`Saved Master Order ${orderId} to SQLite Database (${buyer || 'Standard'} | ${maker} | ${article} | ${totalPairs} Pairs).`);
+        const { orderId, orders } = json.data;
+        state.pendingOrders = orders;
+        state.adminExpandedOrders[orderId] = true;
+        if (po && !state.dropdownOptions.poList.includes(po)) {
+          state.dropdownOptions.poList.unshift(po);
+        }
+        if (maker && !state.dropdownOptions.makers.includes(maker)) {
+          state.dropdownOptions.makers.unshift(maker);
+        }
+        showToast(`Saved Master Order ${orderId} (${buyer || 'Standard'} | ${maker} | ${article} | ${totalPairs} Pairs).`);
         renderApp();
-        return;
+      } catch (error) {
+        console.error('Order creation failed:', error);
+        showToast('Order could not be saved. No order was created.');
       }
-    } catch (e) {
-      console.warn('Offline pending order save fallback:', e);
-    }
-
-    const existingIndex = state.pendingOrders.findIndex(o => o.orderId === orderId);
-    if (existingIndex >= 0) {
-      state.pendingOrders[existingIndex] = newOrder;
-      showToast(`Updated Master Order ${orderId} (${buyer} | ${maker} | ${article} | ${totalPairs} Pairs).`);
-    } else {
-      state.pendingOrders.unshift(newOrder);
-      showToast(`Created & Issued Master Order ${orderId} to Inward Goods (${buyer} | ${maker} | ${article} | ${totalPairs} Pairs).`);
-    }
-
-    renderApp();
+    });
   });
 
-  document.getElementById('btn-admin-save-customer')?.addEventListener('click', async () => {
-    const name = (document.getElementById('admin-cust-name') as HTMLInputElement)?.value?.trim();
+  document.getElementById('btn-admin-save-customer')?.addEventListener('click', (e) => {
+    const nameEl = document.getElementById('admin-cust-name') as HTMLInputElement | null;
+    const name = nameEl?.value?.trim() || '';
     const country = (document.getElementById('admin-cust-country') as HTMLInputElement)?.value?.trim();
     const inspectionPreference = (document.getElementById('admin-cust-pref') as HTMLSelectElement)?.value;
-    if (!name) {
-      showToast('Please enter a name.');
+
+    const errors = validateCustomerMasterInputs({ name });
+    if (applyFieldValidationErrors([[nameEl, errors.name]])) {
+      showToast('Enter a customer / buyer name.');
       return;
     }
-    try {
-      const res = await fetch('/api/admin/master/customer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, country, inspectionPreference })
-      });
-      const json = await res.json();
-      if (json.success) {
+
+    void runAdminAction('admin:save-customer', e.currentTarget as HTMLElement, async () => {
+      try {
+        const res = await fetch('/api/admin/master/customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, country, inspectionPreference })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          applyFieldValidationErrors([[nameEl, json.error || 'Buyer could not be saved.']]);
+          showToast(json.error || 'Buyer could not be saved.');
+          return;
+        }
         if (!state.dropdownOptions.customers.includes(name)) {
           state.dropdownOptions.customers.push(name);
         }
         showToast(`Saved "${name}" to SQLite Master.`);
         await syncBackendData();
+      } catch (err) {
+        console.warn(err);
+        showToast('Buyer could not be saved.');
       }
-    } catch (e) {
-      console.warn(e);
-    }
+    });
   });
 
-  document.getElementById('btn-admin-save-product')?.addEventListener('click', async () => {
-    const name = (document.getElementById('admin-prod-name') as HTMLInputElement)?.value?.trim();
+  document.getElementById('btn-admin-save-product')?.addEventListener('click', (e) => {
+    const nameEl = document.getElementById('admin-prod-name') as HTMLInputElement | null;
+    const stickersEl = document.getElementById('admin-prod-stickers') as HTMLInputElement | null;
+    const cartonEl = document.getElementById('admin-prod-carton') as HTMLInputElement | null;
+    const name = nameEl?.value?.trim() || '';
     const customerId = (document.getElementById('admin-prod-cust') as HTMLSelectElement)?.value;
-    const stickersPerPair = Number((document.getElementById('admin-prod-stickers') as HTMLInputElement)?.value || 2);
-    const pairsPerCarton = Number((document.getElementById('admin-prod-carton') as HTMLInputElement)?.value || 50);
-    if (!name) {
-      showToast('Please enter Article Name.');
+    const stickersPerPair = Number(stickersEl?.value || 2);
+    const pairsPerCarton = Number(cartonEl?.value || 50);
+
+    const errors = validateProductMasterInputs({ name, stickersPerPair, pairsPerCarton });
+    if (applyFieldValidationErrors([
+      [nameEl, errors.name],
+      [stickersEl, errors.stickersPerPair],
+      [cartonEl, errors.pairsPerCarton]
+    ])) {
+      showToast('Review highlighted Article & BOM Master fields.');
       return;
     }
-    try {
-      const res = await fetch('/api/admin/master/product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, customerId: customerId || 'CUST-01', stickersPerPair, pairsPerCarton })
-      });
-      const json = await res.json();
-      if (json.success) {
+
+    void runAdminAction('admin:save-product', e.currentTarget as HTMLElement, async () => {
+      try {
+        const res = await fetch('/api/admin/master/product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, customerId: customerId || 'CUST-01', stickersPerPair, pairsPerCarton })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          applyFieldValidationErrors([[nameEl, json.error || 'Article could not be saved.']]);
+          showToast(json.error || 'Article could not be saved.');
+          return;
+        }
         if (!state.dropdownOptions.articles.includes(name)) {
           state.dropdownOptions.articles.push(name);
         }
         showToast(`Article "${name}" saved to SQLite Products Master & Dropdowns.`);
         await syncBackendData();
+      } catch (err) {
+        console.warn(err);
+        showToast('Article could not be saved.');
       }
-    } catch (e) {
-      console.warn(e);
-    }
+    });
   });
 
   document.getElementById('btn-admin-add-maker')?.addEventListener('click', () => {
@@ -3177,31 +4500,41 @@ function attachAdminHandlers(): void {
     }
   });
 
-  document.getElementById('btn-admin-trigger-backup')?.addEventListener('click', async () => {
-    try {
-      const res = await fetch('/api/admin/db/backup', { method: 'POST' });
-      const json = await res.json();
-      if (json.success && json.data) {
-        state.lastBackupPath = json.data.backupPath;
-        showToast(`Online VACUUM Backup created successfully!`);
-        renderApp();
+  document.getElementById('btn-admin-trigger-backup')?.addEventListener('click', (e) => {
+    void runAdminAction('admin:backup-db', e.currentTarget as HTMLElement, async () => {
+      try {
+        const res = await fetch('/api/admin/db/backup', { method: 'POST' });
+        const json = await res.json();
+        if (res.ok && json.success && json.data) {
+          state.lastBackupPath = json.data.backupPath;
+          showToast(`Online VACUUM Backup created successfully!`);
+          renderApp();
+        } else {
+          showToast(json.error || 'Backup could not be completed.');
+        }
+      } catch (err) {
+        console.warn(err);
+        showToast('Backup could not be completed.');
       }
-    } catch (e) {
-      console.warn(e);
-    }
+    });
   });
 
-  document.getElementById('btn-admin-reseed-db')?.addEventListener('click', async () => {
-    try {
-      const res = await fetch('/api/admin/db/reset-seed', { method: 'POST' });
-      const json = await res.json();
-      if (json.success) {
-        showToast('SQLite Database verified.');
-        await syncBackendData();
+  document.getElementById('btn-admin-reseed-db')?.addEventListener('click', (e) => {
+    void runAdminAction('admin:reseed-db', e.currentTarget as HTMLElement, async () => {
+      try {
+        const res = await fetch('/api/admin/db/reset-seed', { method: 'POST' });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          showToast('SQLite Database verified.');
+          await syncBackendData();
+        } else {
+          showToast(json.error || 'Database verification failed.');
+        }
+      } catch (err) {
+        console.warn(err);
+        showToast('Database verification failed.');
       }
-    } catch (e) {
-      console.warn(e);
-    }
+    });
   });
 
   document.getElementById('btn-admin-export-json')?.addEventListener('click', () => {
@@ -3226,8 +4559,8 @@ declare global {
     handleDefectAction: (id: string, actionText: string) => void;
     toggleQcCheck: (id: string) => void;
     adminDeleteRecord: (table: string, id: string) => void;
-    adminRemoveDropdownItem: (listKey: 'makers' | 'poList', val: string) => void;
-    adminRemovePendingOrder: (orderId: string) => void;
+    adminRemoveDropdownItem: (listKey: 'makers' | 'poList', val: string, triggerEl?: HTMLElement | null) => void;
+    adminRemovePendingOrder: (orderId: string, triggerEl?: HTMLElement | null) => void;
     adminForceRepair: (altId: number, isScrap: boolean) => void;
     adminToggleOrderExpand: (orderId: string) => void;
     adminSetAllOrdersExpanded: (expanded: boolean) => void;
@@ -3239,10 +4572,11 @@ declare global {
     adminLoadDemo600Scenario: (phase?: 'IN_PROGRESS' | 'COMPLETED' | 'DELIBERATE_VARIANCE') => void;
     adminLoadDemo600PairScenario: (phase?: 'IN_PROGRESS' | 'COMPLETED' | 'DELIBERATE_VARIANCE') => void;
     adminRemoveDemo600Scenario: () => void;
-    adminVoidGrnBatch: (sr: number, grnCode: string) => void;
-    adminVoidReqBatch: (reqNumber: string) => void;
-    adminCloseOrderShort: (orderId: string) => void;
-    adminAddSystemUser: () => void;
+    adminVoidGrnBatch: (sr: number, grnCode: string, triggerEl?: HTMLElement | null) => void;
+    adminVoidReqBatch: (reqNumber: string, triggerEl?: HTMLElement | null) => void;
+    adminCloseOrderShort: (orderId: string, triggerEl?: HTMLElement | null) => void;
+    adminAddSystemUser: (triggerEl?: HTMLElement | null) => void;
+    adminResetSystemUserPassword: (userId: string, triggerEl?: HTMLElement | null) => void;
     adminQuickReceiveGrnForOrder: (orderId: string) => void;
     adminQuickCreateReqForOrder: (orderId: string) => void;
     adminOpenReqInScreen: (reqNumber: string, targetScreen: string) => void;
@@ -3439,22 +4773,19 @@ window.adminRemoveDemo600Scenario = function() {
   delete state.ordersWipMap['REQ-0901'];
   delete state.ordersWipMap['REQ-0902'];
   delete state.ordersWipMap['REQ-0903'];
-  if (state.packingWip.parentOrderId === 'ORD-2026-600') {
-    state.packingWip.selectedBatch = DEFAULT_REQ_NUMBER;
-    state.packingWip.parentOrderId = '';
-    state.packingWip.plannedQty = 0;
-    state.packingWip.stage1In = 0;
-    state.packingWip.stage1Passed = 0;
-    state.packingWip.stage2In = 0;
-    state.packingWip.stage2Passed = 0;
-    state.packingWip.stage3In = 0;
-    state.packingWip.stage3Passed = 0;
-    state.packingWip.stage4In = 0;
-    state.packingWip.stage4Passed = 0;
-    state.packingWip.outputPairs = 0;
-    state.packingWip.outputCartons = 0;
-    state.packingWip.inAlteration = 0;
-    state.packingWip.scrappedPairs = 0;
+  for (const [k, v] of Object.entries(state.ordersWipMap)) {
+    if ((v as any)?.isDemoScenario || v?.parentOrderId === 'ORD-2026-600') {
+      delete state.ordersWipMap[k];
+    }
+  }
+  delete state.adminExpandedOrders['ORD-2026-600'];
+  const activeWip = state.packingWip as any;
+  if (
+    activeWip.parentOrderId === 'ORD-2026-600' ||
+    activeWip.isDemoScenario ||
+    ['REQ-0901', 'REQ-0902', 'REQ-0903'].includes(activeWip.selectedBatch)
+  ) {
+    state.packingWip = createEmptyPackingWipState();
   }
   state.defectList = state.defectList.filter(
     d => !(d as any).isDemoScenario && d.id !== 'A-REQ-0902'
@@ -3463,73 +4794,191 @@ window.adminRemoveDemo600Scenario = function() {
   renderApp();
 };
 
-window.adminVoidGrnBatch = function(sr: number, grnCode: string) {
+window.adminVoidGrnBatch = function(sr: number, grnCode: string, triggerEl?: HTMLElement | null) {
   const item = state.grnList.find(g => g.sr === sr || g.grnCode === grnCode);
   if (!item) return;
-  item.isVoided = true;
-  item.status = 'VOIDED';
-  logAuditEvent(
-    'GRN_VOID',
-    grnCode,
-    `Received ${item.rcvdPairs} Prs`,
-    'VOIDED (0 Prs)',
-    item.pendingOrderId
+  void confirmAndRunAdminAction(
+    `admin:void-grn:${grnCode}`,
+    triggerEl,
+    {
+      title: 'Confirm Void GRN Batch',
+      message: `Void GRN batch ${grnCode} (${item.rcvdPairs} Prs)?`,
+      detail: `Removes ${grnCode} from available Dock stock for Order ${item.pendingOrderId} and records the void in the audit trail.`,
+      confirmLabel: 'Void GRN Batch',
+      cancelLabel: 'Keep Batch',
+      tone: 'danger'
+    },
+    async () => {
+      item.isVoided = true;
+      item.status = 'VOIDED';
+      logAuditEvent(
+        'GRN_VOID',
+        grnCode,
+        `Received ${item.rcvdPairs} Prs`,
+        'VOIDED (0 Prs)',
+        item.pendingOrderId
+      );
+      showToast(`Voided GRN Batch ${grnCode} (${item.rcvdPairs} Prs) and recorded in Audit Trail.`);
+      renderApp();
+    }
   );
-  showToast(`Voided GRN Batch ${grnCode} (${item.rcvdPairs} Prs) and recorded in Audit Trail.`);
-  renderApp();
 };
 
-window.adminVoidReqBatch = function(reqNumber: string) {
+window.adminVoidReqBatch = function(reqNumber: string, triggerEl?: HTMLElement | null) {
   const norm = normalizeBaseReqNumber(reqNumber);
-  if (state.ordersWipMap[norm]) {
-    state.ordersWipMap[norm].isVoided = true;
-  }
-  if (normalizeBaseReqNumber(state.packingWip.selectedBatch) === norm) {
-    (state.packingWip as any).isVoided = true;
-  }
-  logAuditEvent('REQ_VOID', norm, 'Active Requisition', 'VOIDED before Stage 1');
-  showToast(`Voided Requisition ${norm} and recorded in Audit Trail.`);
-  renderApp();
+  void confirmAndRunAdminAction(
+    `admin:void-req:${norm}`,
+    triggerEl,
+    {
+      title: 'Confirm Void Requisition',
+      message: `Void Requisition ${norm}?`,
+      detail: 'Marks this Requisition VOIDED before Stage 1 inspection and records the change in the audit trail.',
+      confirmLabel: 'Void Requisition',
+      cancelLabel: 'Keep Requisition',
+      tone: 'danger'
+    },
+    async () => {
+      if (state.ordersWipMap[norm]) {
+        state.ordersWipMap[norm].isVoided = true;
+      }
+      if (normalizeBaseReqNumber(state.packingWip.selectedBatch) === norm) {
+        (state.packingWip as any).isVoided = true;
+      }
+      logAuditEvent('REQ_VOID', norm, 'Active Requisition', 'VOIDED before Stage 1');
+      showToast(`Voided Requisition ${norm} and recorded in Audit Trail.`);
+      renderApp();
+    }
+  );
 };
 
-window.adminCloseOrderShort = function(orderId: string) {
+window.adminCloseOrderShort = function(orderId: string, triggerEl?: HTMLElement | null) {
   const ord = state.pendingOrders.find(o => o.orderId === orderId);
   if (!ord) return;
   const beforeQty = ord.totalQty || 0;
-  ord.shortClosed = true;
-  ord.shortCloseReason = 'Approved Short-Shipment Closure by Super User';
-  logAuditEvent(
-    'ORDER_SHORT_CLOSE',
-    orderId,
-    `Planned ${beforeQty} Prs`,
-    'Short-Closed at Received GRN Quantity',
-    orderId
+  void confirmAndRunAdminAction(
+    `admin:short-close:${orderId}`,
+    triggerEl,
+    {
+      title: 'Confirm Short-Close Order',
+      message: `Short-close Master Order ${orderId}?`,
+      detail: `Closes open contractor balance on ${orderId} at received GRN quantity (Planned: ${beforeQty} Prs) and records closure in the audit trail.`,
+      confirmLabel: 'Short-Close Order',
+      cancelLabel: 'Keep Open',
+      tone: 'danger'
+    },
+    async () => {
+      ord.shortClosed = true;
+      ord.shortCloseReason = 'Approved Short-Shipment Closure by Super User';
+      logAuditEvent(
+        'ORDER_SHORT_CLOSE',
+        orderId,
+        `Planned ${beforeQty} Prs`,
+        'Short-Closed at Received GRN Quantity',
+        orderId
+      );
+      showToast(`Order ${orderId} short-closed at received quantity.`);
+      renderApp();
+    }
   );
-  showToast(`Order ${orderId} short-closed at received quantity.`);
-  renderApp();
 };
 
-window.adminAddSystemUser = function() {
-  const name = (document.getElementById('admin-user-name') as HTMLInputElement)?.value?.trim();
+window.adminAddSystemUser = async function(triggerEl?: HTMLElement | null) {
+  const nameEl = document.getElementById('admin-user-name') as HTMLInputElement | null;
+  const usernameEl = document.getElementById('admin-user-username') as HTMLInputElement | null;
+  const passwordEl = document.getElementById('admin-user-password') as HTMLInputElement | null;
+  const name = nameEl?.value?.trim() || '';
+  const username = usernameEl?.value?.trim() || '';
+  const password = passwordEl?.value || '';
   const role = ((document.getElementById('admin-user-role') as HTMLSelectElement)?.value ||
     'PACKING_SUPERVISOR') as SystemUserRecord['role'];
   const station =
     (document.getElementById('admin-user-station') as HTMLInputElement)?.value?.trim() ||
-    'Packing Hall #1';
-  if (!name) {
-    showToast('Please enter Operator Name.');
+    getDefaultStationForRole(role);
+  const errors = validateSystemUserInputs({ name, username, password });
+  if (applyFieldValidationErrors([
+    [nameEl, errors.name],
+    [usernameEl, errors.username],
+    [passwordEl, errors.password]
+  ])) {
+    showToast('Review highlighted operator account fields.');
     return;
   }
-  const userId = `USR-0${state.systemUsers.length + 1}`;
-  state.systemUsers.push({
-    userId,
-    name,
-    role,
-    station,
-    active: true
+  await runAdminAction('admin:add-system-user', triggerEl, async () => {
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, username, password, role, station })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Unable to create the account.');
+      }
+
+      const usersResponse = await fetch('/api/admin/users');
+      const usersResult = await usersResponse.json();
+      if (!usersResponse.ok || !usersResult.success || !Array.isArray(usersResult.data)) {
+        throw new Error(usersResult.error || 'Account was created, but the account list could not be refreshed.');
+      }
+      state.systemUsers = usersResult.data;
+      showToast(`Created ${role} account for ${name}.`);
+      renderApp();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unable to create the account.';
+      applyFieldValidationErrors([[usernameEl, msg]]);
+      showToast(msg);
+    }
   });
-  showToast(`Added System User ${name} (${role}) to RBAC Registry.`);
-  renderApp();
+};
+
+window.adminResetSystemUserPassword = async function(userId: string, triggerEl?: HTMLElement | null) {
+  const passwordInput = Array.from(
+    document.querySelectorAll<HTMLInputElement>('[data-admin-user-password]')
+  ).find(input => input.dataset.adminUserPassword === userId) || null;
+  const password = passwordInput?.value || '';
+  const pwError = validatePasswordResetInput(password);
+  if (applyFieldValidationErrors([[passwordInput, pwError || undefined]])) {
+    showToast(pwError || 'Password must be at least 8 characters.');
+    return;
+  }
+  const targetUser = state.systemUsers.find(u => u.userId === userId);
+  const accountLabel = targetUser ? `${targetUser.name} (@${targetUser.username})` : userId;
+  await confirmAndRunAdminAction(
+    `admin:reset-password:${userId}`,
+    triggerEl,
+    {
+      title: 'Confirm Password Reset',
+      message: `Update sign-in password for ${accountLabel}?`,
+      detail: 'Changing a password signs this account out immediately on all devices.',
+      confirmLabel: 'Update Password',
+      cancelLabel: 'Cancel',
+      tone: 'danger'
+    },
+    async () => {
+      try {
+        const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/password`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Unable to update the account password.');
+        }
+        if (state.currentUser?.userId === userId) {
+          await lockCurrentSession();
+          showToast('Password updated. Sign in again with the new password.');
+          return;
+        }
+        showToast('Password updated. The account has been signed out on all devices.');
+        renderApp();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unable to update the account password.';
+        applyFieldValidationErrors([[passwordInput, msg]]);
+        showToast(msg);
+      }
+    }
+  );
 };
 
 window.adminQuickReceiveGrnForOrder = function(orderId: string) {
@@ -3563,24 +5012,37 @@ window.adminOpenReqInScreen = function(reqNumber: string, targetScreen: string) 
   showToast(`Opened Requisition ${normalizeBaseReqNumber(reqNumber)} in ${targetScreen.replace('screen-', '').toUpperCase()}.`);
 };
 
-window.adminRemovePendingOrder = async function(orderId: string) {
-  try {
-    const res = await fetch(`/api/admin/pending-orders/${encodeURIComponent(orderId)}`, {
-      method: 'DELETE'
-    });
-    const json = await res.json();
-    if (json.success && Array.isArray(json.data)) {
-      state.pendingOrders = json.data;
-      showToast(`Removed Order ${orderId} from SQLite Database.`);
-      renderApp();
-      return;
+window.adminRemovePendingOrder = async function(orderId: string, triggerEl?: HTMLElement | null) {
+  await confirmAndRunAdminAction(
+    `admin:remove-order:${orderId}`,
+    triggerEl,
+    {
+      title: 'Confirm Delete Master Order',
+      message: `Delete Master Order ${orderId}?`,
+      detail: 'Removes this Master Order permanently from the SQLite database.',
+      confirmLabel: 'Delete Order',
+      cancelLabel: 'Keep Order',
+      tone: 'danger'
+    },
+    async () => {
+      try {
+        const res = await fetch(`/api/admin/pending-orders/${encodeURIComponent(orderId)}`, {
+          method: 'DELETE'
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success || !Array.isArray(json.data)) {
+          showToast(json.error || `Order ${orderId} could not be deleted.`);
+          return;
+        }
+        state.pendingOrders = json.data;
+        showToast(`Removed Order ${orderId} from SQLite Database.`);
+        renderApp();
+      } catch (error) {
+        console.error('Order deletion failed:', error);
+        showToast(`Order ${orderId} could not be deleted. No local data was removed.`);
+      }
     }
-  } catch (e) {
-    console.warn('Offline pending order delete fallback:', e);
-  }
-  state.pendingOrders = state.pendingOrders.filter(o => o.orderId !== orderId);
-  showToast(`Removed Pending Order ${orderId}.`);
-  renderApp();
+  );
 };
 
 window.adminDeleteRecord = async function(table: string, id: string) {
@@ -3600,10 +5062,29 @@ window.adminDeleteRecord = async function(table: string, id: string) {
   }
 };
 
-window.adminRemoveDropdownItem = function(listKey: 'makers' | 'poList', val: string) {
-  state.dropdownOptions[listKey] = state.dropdownOptions[listKey].filter(item => item !== val);
-  showToast(`Removed "${val}" from dropdown options.`);
-  renderApp();
+window.adminRemoveDropdownItem = async function(
+  listKey: 'makers' | 'poList',
+  val: string,
+  triggerEl?: HTMLElement | null
+) {
+  const listLabel = listKey === 'makers' ? 'Contractors / Makers' : 'Purchase Order #';
+  await confirmAndRunAdminAction(
+    `admin:remove-dropdown:${listKey}:${val}`,
+    triggerEl,
+    {
+      title: 'Confirm Remove Registry Item',
+      message: `Remove "${val}" from ${listLabel}?`,
+      detail: 'Future forms will no longer suggest this entry in global dropdowns.',
+      confirmLabel: 'Remove Entry',
+      cancelLabel: 'Keep Entry',
+      tone: 'danger'
+    },
+    async () => {
+      state.dropdownOptions[listKey] = state.dropdownOptions[listKey].filter(item => item !== val);
+      showToast(`Removed "${val}" from dropdown options.`);
+      renderApp();
+    }
+  );
 };
 
 window.adminForceRepair = async function(altId: number, isScrap: boolean) {
@@ -3714,93 +5195,191 @@ function exportTableToCSV(filename: string, rows: object[]): void {
 }
 
 // Dynamic backend SQLite synchronization
-async function syncBackendData(): Promise<void> {
-  try {
-    const res = await fetch('/api/store/dropdowns');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && json.data) {
-        if (json.data.makers?.length) state.dropdownOptions.makers = json.data.makers;
-        if (json.data.customers?.length) state.dropdownOptions.customers = json.data.customers;
-        if (json.data.articles?.length) state.dropdownOptions.articles = json.data.articles;
-        if (json.data.poList?.length) state.dropdownOptions.poList = json.data.poList;
-      }
-    }
-  } catch (e) {
-    console.debug('Dropdown sync offline:', e);
+async function syncBackendData(options: { manual?: boolean } = {}): Promise<void> {
+  const isInitial = !state.hasCompletedInitialSync;
+  const isManual = Boolean(options.manual);
+  const role = state.currentUser?.role || '';
+  const syncFailures: string[] = [];
+
+  if (isInitial) state.isInitialSyncing = true;
+  if (isManual) state.isManualSync = true;
+  if (isInitial || isManual) {
+    state.syncError = '';
+    renderApp({ preserveInitialSyncDrafts: isInitial });
   }
 
   try {
-    const res = await fetch('/api/store/receivings');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        state.grnList = json.data.map((r: any, idx: number) => ({
-          sr: r.id || (idx + 1),
-          grnCode: formatBatchSequence('GRN', r.id || (idx + 1)),
-          date: r.rcv_date || '31-10-2026',
-          pendingOrderId: r.po_number || 'ORD-INWARD',
-          maker: r.maker_contractor,
-          article: r.article_name,
-          rcvdPairs: r.rcvd_pairs,
-          sizes: createEmptySizes(),
-          status: 'Received'
-        }));
-      }
-    }
-  } catch (e) {
-    console.debug('Receivings sync offline:', e);
-  }
-
-  try {
-    const res = await fetch('/api/alterations');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        state.dropdownOptions.defectBatchIds = json.data.map((alt: any) =>
-          getAlterationReqNumber(alt.req_number || state.packingWip.selectedBatch)
-        );
-        state.defectList = json.data.map((alt: any) => ({
-          id: getAlterationReqNumber(alt.req_number || state.packingWip.selectedBatch),
-          date: alt.sent_at ? alt.sent_at.split(' ')[0] : '31-10-2026',
-          origin: (alt.source_stage || 'Step 1').replace(/_/g, ' '),
-          article: alt.product_name || '---',
-          po: alt.req_number || '---',
-          defectClass: alt.defect_reason || 'Workmanship Defect',
-          qty: `${alt.pairs_count} Prs`,
-          tailor: alt.tailor_name || 'Supervisor A',
-          status: alt.status === 'RETURNED_TO_CHECKING' ? 'Completed' : (alt.is_scrapped ? 'Scrapped' : 'In Rework'),
-          route: 'Auto-Return to Stage 1 Checking',
-          actionText: alt.status === 'RETURNED_TO_CHECKING' ? 'Verified' : 'Update'
-        }));
-      }
-    }
-  } catch (e) {
-    console.debug('Alterations sync offline:', e);
-  }
-
-  try {
-    const res = await fetch('/api/admin/overview');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && json.data) {
-        state.adminOverview = json.data;
-        if (Array.isArray(json.data.pendingOrders)) {
-          state.pendingOrders = json.data.pendingOrders;
+    if (role === 'SUPER_USER' || role === 'INWARD_CLERK') {
+      try {
+        const res = await fetch('/api/store/dropdowns');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            if (json.data.makers?.length) state.dropdownOptions.makers = json.data.makers;
+            if (json.data.customers?.length) state.dropdownOptions.customers = json.data.customers;
+            if (json.data.articles?.length) state.dropdownOptions.articles = json.data.articles;
+            if (json.data.poList?.length) state.dropdownOptions.poList = json.data.poList;
+          }
+        } else if (res.status !== 403) {
+          syncFailures.push('dropdowns');
         }
+      } catch (e) {
+        console.debug('Dropdown sync offline:', e);
+        syncFailures.push('dropdowns');
+      }
+
+      try {
+        const res = await fetch('/api/store/receivings');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            state.grnList = json.data.map((r: any, idx: number) => {
+              const sizes = createEmptySizes();
+              for (const sizeRow of Array.isArray(r.sizes) ? r.sizes : []) {
+                const sizeCode = String(sizeRow.size_code) as StandardSizeKey;
+                if (STANDARD_GLOVE_SIZES.includes(sizeCode)) {
+                  sizes[sizeCode] = Number(sizeRow.rcvd_pairs) || 0;
+                }
+              }
+              const isVoided = Boolean(r.is_voided);
+              return {
+                sr: r.id || (idx + 1),
+                grnCode: r.rcv_number || formatBatchSequence('GRN', r.id || (idx + 1)),
+                date: r.rcv_date || '31-10-2026',
+                pendingOrderId: r.order_id || r.po_number || 'ORD-INWARD',
+                maker: r.maker_contractor,
+                article: r.article_name,
+                rcvdPairs: Number(r.rcvd_pairs) || 0,
+                sizes,
+                status: isVoided ? 'VOIDED' : 'Received',
+                isVoided,
+                voidReason: r.void_reason || undefined
+              };
+            });
+          }
+        } else if (res.status !== 403) {
+          syncFailures.push('receivings');
+        }
+      } catch (e) {
+        console.debug('Receivings sync offline:', e);
+        syncFailures.push('receivings');
       }
     }
-  } catch (e) {
-    console.debug('Admin overview sync offline:', e);
-  }
 
-  renderApp();
+    if (role === 'SUPER_USER' || role === 'ALTERATION_LEAD') {
+      try {
+        const res = await fetch('/api/alterations');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            state.dropdownOptions.defectBatchIds = json.data.map((alt: any) =>
+              getAlterationReqNumber(alt.req_number || state.packingWip.selectedBatch)
+            );
+            state.defectList = json.data.map((alt: any) => ({
+              id: getAlterationReqNumber(alt.req_number || state.packingWip.selectedBatch),
+              date: alt.sent_at ? alt.sent_at.split(' ')[0] : '31-10-2026',
+              origin: (alt.source_stage || 'Step 1').replace(/_/g, ' '),
+              article: alt.product_name || '---',
+              po: alt.req_number || '---',
+              defectClass: alt.defect_reason || 'Workmanship Defect',
+              qty: `${alt.pairs_count} Prs`,
+              tailor: alt.tailor_name || 'Supervisor A',
+              status: alt.status === 'RETURNED_TO_CHECKING' ? 'Completed' : (alt.is_scrapped ? 'Scrapped' : 'In Rework'),
+              route: 'Auto-Return to Stage 1 Checking',
+              actionText: alt.status === 'RETURNED_TO_CHECKING' ? 'Verified' : 'Update'
+            }));
+          }
+        } else if (res.status !== 403) {
+          syncFailures.push('alterations');
+        }
+      } catch (e) {
+        console.debug('Alterations sync offline:', e);
+        syncFailures.push('alterations');
+      }
+    }
+
+    try {
+      if (role === 'SUPER_USER') {
+        const usersResponse = await fetch('/api/admin/users');
+        const usersResult = await usersResponse.json();
+        if (!usersResponse.ok || !usersResult.success || !Array.isArray(usersResult.data)) {
+          throw new Error(usersResult.error || 'Unable to load system users.');
+        }
+        state.systemUsers = usersResult.data;
+        const res = await fetch('/api/admin/overview');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            state.adminOverview = json.data;
+            if (Array.isArray(json.data.pendingOrders)) {
+              state.pendingOrders = json.data.pendingOrders;
+            }
+          }
+        } else {
+          syncFailures.push('admin overview');
+        }
+      } else if (role === 'INWARD_CLERK' || role === 'PACKING_SUPERVISOR') {
+        const pendingResponse = await fetch('/api/admin/pending-orders');
+        const pendingResult = await pendingResponse.json();
+        if (!pendingResponse.ok || !pendingResult.success || !Array.isArray(pendingResult.data)) {
+          throw new Error(pendingResult.error || 'Unable to load pending orders.');
+        }
+        state.pendingOrders = pendingResult.data;
+      }
+    } catch (e) {
+      console.warn('MES account data sync failed:', e);
+      syncFailures.push('orders');
+    }
+
+    if (['SUPER_USER', 'INWARD_CLERK', 'PACKING_SUPERVISOR'].includes(role)) {
+      try {
+        const response = await fetch('/api/requisitions');
+        const result = await response.json();
+        if (!response.ok || !result.success || !Array.isArray(result.data)) {
+          throw new Error(result.error || 'Unable to load requisitions.');
+        }
+
+        const linkedRequisitions = result.data.filter((requisition: any) =>
+          requisition.order_id && Number(requisition.is_voided || 0) === 0
+        );
+        state.persistedReqNumbers = linkedRequisitions.map((requisition: any) =>
+          normalizeBaseReqNumber(requisition.req_number)
+        );
+        for (const requisition of linkedRequisitions) {
+          const reqNumber = normalizeBaseReqNumber(requisition.req_number);
+          state.ordersWipMap[reqNumber] = mapServerRequisitionToWip(requisition);
+        }
+        state.issuedPairsTotal = getTotalIssuedPairs();
+
+        const selectedReq = normalizeBaseReqNumber(state.packingWip.selectedBatch);
+        const startupReqNumber = getStartupRequisitionNumber(
+          selectedReq,
+          state.packingWip,
+          state.persistedReqNumbers
+        );
+        if (startupReqNumber && state.ordersWipMap[startupReqNumber]) {
+          state.packingWip = JSON.parse(JSON.stringify(state.ordersWipMap[startupReqNumber]));
+          state.cartons = Array.isArray((state.ordersWipMap[startupReqNumber] as any).cartons)
+            ? JSON.parse(JSON.stringify((state.ordersWipMap[startupReqNumber] as any).cartons))
+            : [];
+          state.qcChecklist.forEach(c => (c.passed = Boolean(state.packingWip.finalQcApproved)));
+        }
+      } catch (error) {
+        console.warn('Requisition sync failed:', error);
+        syncFailures.push('requisitions');
+      }
+    }
+
+    state.syncError = syncFailures.length > 0
+      ? `Unable to synchronize server data (${syncFailures.join(', ')}). Check your connection and retry.`
+      : '';
+  } finally {
+    state.hasCompletedInitialSync = true;
+    state.isInitialSyncing = false;
+    state.isManualSync = false;
+    renderApp({ preserveInitialSyncDrafts: isInitial });
+  }
 }
 
 // Initial Boot
-document.addEventListener('DOMContentLoaded', () => {
-  renderApp();
-  syncBackendData();
-});
-renderApp();
-syncBackendData();
+void initializeAuth();

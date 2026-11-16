@@ -2,16 +2,19 @@ import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import { backfillOrderSequence } from './services/orderService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dataDir = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+const defaultDataDir = path.join(__dirname, '..', 'data');
+const dbPath = process.env.MES_DB_PATH
+  ? path.resolve(process.env.MES_DB_PATH)
+  : path.join(defaultDataDir, 'gloves_packing.db');
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
 }
-
-const dbPath = path.join(dataDir, 'gloves_packing.db');
 export const db = new DatabaseSync(dbPath);
 
 export function initDatabase() {
@@ -79,6 +82,10 @@ export function initDatabase() {
       issued_pairs INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL CHECK(status IN ('PENDING', 'ISSUED', 'IN_PROGRESS', 'COMPLETED', 'DISPATCHED')),
       notes TEXT,
+      order_id TEXT NOT NULL DEFAULT '',
+      sizes_json TEXT NOT NULL DEFAULT '{}',
+      is_voided INTEGER NOT NULL DEFAULT 0,
+      void_reason TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       issued_at DATETIME
     );
@@ -269,6 +276,11 @@ export function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS order_seq (
+      year INTEGER PRIMARY KEY,
+      last_n INTEGER NOT NULL CHECK(last_n >= 0)
+    );
+
     -- 18. GRN -> REQ Allocation Join Table (2.5 & 10.1: Many-to-Many with quantities & per-size JSON)
     CREATE TABLE IF NOT EXISTS grn_req_allocations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -293,6 +305,25 @@ export function initDatabase() {
       before_summary TEXT NOT NULL,
       after_summary TEXT NOT NULL,
       reason TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS mes_users (
+      user_id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('SUPER_USER', 'INWARD_CLERK', 'PACKING_SUPERVISOR', 'QC_INSPECTOR', 'ALTERATION_LEAD')),
+      station TEXT NOT NULL DEFAULT '',
+      password_salt TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0, 1)),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS mes_sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES mes_users(user_id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -389,6 +420,9 @@ function migrateDatabase() {
     if (!reqCols.includes('void_reason')) {
       db.exec(`ALTER TABLE glove_requisitions ADD COLUMN void_reason TEXT DEFAULT ''`);
     }
+    if (!reqCols.includes('sizes_json')) {
+      db.exec(`ALTER TABLE glove_requisitions ADD COLUMN sizes_json TEXT NOT NULL DEFAULT '{}'`);
+    }
   }
 
   // pending_orders
@@ -447,6 +481,8 @@ function migrateDatabase() {
       db.exec(`ALTER TABLE cartons ADD COLUMN aql_status TEXT DEFAULT 'PENDING'`);
     }
   }
+
+  backfillOrderSequence(db);
 }
 
 function seedInitialData() {
@@ -592,7 +628,7 @@ function seedSizeBreakdowns() {
 }
 
 export function backupDatabase(targetPath) {
-  const dest = targetPath || path.join(dataDir, `backup_gloves_packing_${Date.now()}.sqlite`);
+  const dest = targetPath || path.join(dbDir, `backup_gloves_packing_${Date.now()}.sqlite`);
   const sql = `VACUUM INTO '${dest.replace(/\\/g, '/')}'`;
   db.exec(sql);
   return dest;

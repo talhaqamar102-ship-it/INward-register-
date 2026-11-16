@@ -1,5 +1,37 @@
 import { db, backupDatabase, initDatabase } from '../db.js';
 import { AQLService } from './aqlService.js';
+import { createPendingOrder, deletePendingOrder } from './orderService.js';
+
+const REQUISITION_SIZES = ['7', '8', '9', '10', '11'];
+
+function parseRequisitionSizes(value) {
+  const parsed = JSON.parse(value || '{}');
+  return Object.fromEntries(REQUISITION_SIZES.map(size => [size, Number(parsed[size] || 0)]));
+}
+
+function runAtomicWipStep(fn) {
+  const nested = Boolean(db.isTransaction);
+  if (nested) {
+    db.exec('SAVEPOINT wip_step_sp');
+    try {
+      const result = fn();
+      db.exec('RELEASE SAVEPOINT wip_step_sp');
+      return result;
+    } catch (error) {
+      try { db.exec('ROLLBACK TO SAVEPOINT wip_step_sp; RELEASE SAVEPOINT wip_step_sp'); } catch {}
+      throw error;
+    }
+  }
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    try { db.exec('ROLLBACK'); } catch {}
+    throw error;
+  }
+}
 
 export class PackingService {
   // --- INVENTORY LOOKUPS ---
@@ -57,6 +89,120 @@ export class PackingService {
     return this.getRequisition(reqNumber);
   }
 
+  static createOrderRequisition(orderId, requestedSizes, actor = 'Packing Hall', role = 'PACKING_SUPERVISOR') {
+    this.enforceRolePermission(role, 'REQ_CREATE');
+    const normalizedOrderId = String(orderId || '').trim();
+    if (!normalizedOrderId) throw new Error('Parent order is required.');
+
+    const sizes = {};
+    for (const size of REQUISITION_SIZES) {
+      const value = Number(requestedSizes?.[size] ?? 0);
+      if (!Number.isSafeInteger(value) || value < 0) {
+        throw new Error(`Size ${size} quantity must be a whole number greater than or equal to zero.`);
+      }
+      sizes[size] = value;
+    }
+    if (Object.keys(requestedSizes || {}).some(size => !REQUISITION_SIZES.includes(size))) {
+      throw new Error('Only sizes 7 through 11 are supported for this requisition.');
+    }
+    const requestedPairs = REQUISITION_SIZES.reduce((total, size) => total + sizes[size], 0);
+    if (requestedPairs <= 0) throw new Error('Enter a quantity for at least one size.');
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const order = db.prepare(`SELECT * FROM pending_orders WHERE order_id = ?`).get(normalizedOrderId);
+      if (!order) {
+        const error = new Error(`Parent order ${normalizedOrderId} was not found.`);
+        error.statusCode = 404;
+        throw error;
+      }
+      if (Number(order.short_closed || 0) === 1) {
+        const error = new Error(`Parent order ${normalizedOrderId} is closed and cannot receive a new requisition.`);
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const buyer = db.prepare(`
+        SELECT id FROM customers WHERE name = ? COLLATE NOCASE LIMIT 1
+      `).get(order.buyer_name);
+      const product = buyer && db.prepare(`
+        SELECT id FROM products
+        WHERE customer_id = ? AND name = ? COLLATE NOCASE
+        LIMIT 1
+      `).get(buyer.id, order.article_name);
+      if (!buyer || !product) {
+        throw new Error('The parent order must match a customer and article in the master lists.');
+      }
+
+      const stockSummary = this.getOrderStockSummary(order);
+      for (const size of REQUISITION_SIZES) {
+        const remaining = stockSummary.remainingOrderSizes[size];
+        if (sizes[size] > remaining) {
+          throw new Error(
+            `Size ${size} request (${sizes[size]}) exceeds remaining unrequested order balance (${remaining} remaining of ${stockSummary.plannedSizes[size]} planned).`
+          );
+        }
+      }
+      if (stockSummary.receivedPairs > 0 && requestedPairs > stockSummary.unclaimedDockPairs) {
+        throw new Error(
+          `Requested ${requestedPairs} pairs exceeds available unclaimed Inward Register stock (${stockSummary.unclaimedDockPairs} pairs available across ${stockSummary.receivedPairs} received for ${normalizedOrderId}).`
+        );
+      }
+
+      const year = new Date().getFullYear();
+      const prefix = `REQ-${year}-`;
+      const existingNumbers = db.prepare(`
+        SELECT req_number FROM glove_requisitions WHERE req_number LIKE ?
+      `).all(`${prefix}%`);
+      const sequencePattern = new RegExp(`^REQ-${year}-(\\d+)$`);
+      const nextSequence = existingNumbers.reduce((next, row) => {
+        const match = sequencePattern.exec(row.req_number || '');
+        return match ? Math.max(next, Number(match[1]) + 1) : next;
+      }, 1);
+      const reqNumber = `${prefix}${String(nextSequence).padStart(4, '0')}`;
+
+      db.prepare(`
+        INSERT INTO glove_requisitions (
+          req_number, customer_id, product_id, requested_pairs, status, notes,
+          order_id, sizes_json, is_voided
+        )
+        VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, 0)
+      `).run(
+        reqNumber,
+        buyer.id,
+        product.id,
+        requestedPairs,
+        `Created in Packing Hall for ${normalizedOrderId}`,
+        normalizedOrderId,
+        JSON.stringify(sizes)
+      );
+      db.prepare(`
+        INSERT INTO packing_wip (req_number, current_step)
+        VALUES (?, 'STEP_1')
+      `).run(reqNumber);
+
+      this.recordAuditLog({
+        actor,
+        role,
+        action: 'REQ_CREATE',
+        entityId: reqNumber,
+        orderId: normalizedOrderId,
+        beforeSummary: 'Requisition did not exist',
+        afterSummary: `Created ${requestedPairs} pairs for ${normalizedOrderId}`
+      });
+
+      db.exec('COMMIT');
+      return { reqNumber, ...this.getRequisition(reqNumber), sizes };
+    } catch (error) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        // Preserve the original transaction error.
+      }
+      throw error;
+    }
+  }
+
   static getRequisitions() {
     return db.prepare(`
       SELECT r.*, c.name AS customer_name, c.inspection_preference, p.name AS product_name
@@ -64,7 +210,14 @@ export class PackingService {
       JOIN customers c ON r.customer_id = c.id
       JOIN products p ON r.product_id = p.id
       ORDER BY r.created_at DESC
-    `).all();
+    `).all().map(row => ({
+      ...row,
+      sizes: parseRequisitionSizes(row.sizes_json),
+      wip: db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(row.req_number) || null,
+      materialReq: db.prepare(`SELECT * FROM material_requisitions WHERE req_number = ?`).get(row.req_number) || null,
+      cartons: db.prepare(`SELECT * FROM cartons WHERE req_number = ? ORDER BY carton_number`).all(row.req_number),
+      alterations: db.prepare(`SELECT * FROM alterations WHERE req_number = ? ORDER BY id DESC`).all(row.req_number)
+    }));
   }
 
   static getRequisition(reqNumber) {
@@ -78,6 +231,7 @@ export class PackingService {
     `).get(reqNumber);
 
     if (!req) return null;
+    req.sizes = parseRequisitionSizes(req.sizes_json);
 
     const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
     const materialReq = db.prepare(`SELECT * FROM material_requisitions WHERE req_number = ?`).get(reqNumber);
@@ -150,100 +304,115 @@ export class PackingService {
 
   // --- STEP 1: CHECKING / INSPECTION ---
   static executeStep1Checking(reqNumber, goodPairs, defectPairs = 0, defectReason = '') {
-    const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
-    if (!wip) throw new Error(`WIP record for ${reqNumber} not found`);
-
-    const availableToCheck = wip.step1_checking_in - wip.step1_checking_good - wip.step1_checking_defects;
-    const totalProcessed = goodPairs + defectPairs;
-
-    if (totalProcessed > availableToCheck) {
-      throw new Error(`Cannot process ${totalProcessed} pairs. Only ${availableToCheck} pairs pending check at Step 1.`);
+    if (!Number.isInteger(goodPairs) || !Number.isInteger(defectPairs) || goodPairs < 0 || defectPairs < 0 || (goodPairs + defectPairs) <= 0) {
+      throw new Error('Good and defect pairs must be non-negative integers totaling more than 0.');
     }
+    return runAtomicWipStep(() => {
+      const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
+      if (!wip) throw new Error(`WIP record for ${reqNumber} not found`);
 
-    db.prepare(`
-      UPDATE packing_wip
-      SET step1_checking_good = step1_checking_good + ?,
-          step1_checking_defects = step1_checking_defects + ?,
-          step2_ironing_in = step2_ironing_in + ?,
-          current_step = CASE WHEN (step1_checking_in - (step1_checking_good + ?) - (step1_checking_defects + ?)) = 0 THEN 'STEP_2' ELSE current_step END,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE req_number = ?
-    `).run(goodPairs, defectPairs, goodPairs, goodPairs, defectPairs, reqNumber);
+      const availableToCheck = wip.step1_checking_in - wip.step1_checking_good - wip.step1_checking_defects;
+      const totalProcessed = goodPairs + defectPairs;
 
-    // If defects found, log to Alteration
-    if (defectPairs > 0) {
+      if (totalProcessed > availableToCheck) {
+        throw new Error(`Cannot process ${totalProcessed} pairs. Only ${availableToCheck} pairs pending check at Step 1.`);
+      }
+
       db.prepare(`
-        INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, status)
-        VALUES (?, 'STEP_1_CHECKING', ?, ?, 'SENT_FOR_ALTERATION')
-      `).run(reqNumber, defectPairs, defectReason || 'Failed Checking Inspection');
-    }
+        UPDATE packing_wip
+        SET step1_checking_good = step1_checking_good + ?,
+            step1_checking_defects = step1_checking_defects + ?,
+            step2_ironing_in = step2_ironing_in + ?,
+            current_step = CASE WHEN (step1_checking_in - (step1_checking_good + ?) - (step1_checking_defects + ?)) = 0 THEN 'STEP_2' ELSE current_step END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE req_number = ?
+      `).run(goodPairs, defectPairs, goodPairs, goodPairs, defectPairs, reqNumber);
 
-    return this.getRequisition(reqNumber);
+      // If defects found, log to Alteration
+      if (defectPairs > 0) {
+        db.prepare(`
+          INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, status)
+          VALUES (?, 'STEP_1_CHECKING', ?, ?, 'SENT_FOR_ALTERATION')
+        `).run(reqNumber, defectPairs, defectReason || 'Failed Checking Inspection');
+      }
+
+      return this.getRequisition(reqNumber);
+    });
   }
 
   // --- STEP 2: IRONING & BRUSHING ---
   static executeStep2Ironing(reqNumber, goodPairs, defectPairs = 0, defectReason = '') {
-    const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
-    if (!wip) throw new Error(`WIP record for ${reqNumber} not found`);
-
-    const availableToIron = wip.step2_ironing_in - wip.step2_ironing_good - wip.step2_ironing_defects;
-    const totalProcessed = goodPairs + defectPairs;
-
-    if (totalProcessed > availableToIron) {
-      throw new Error(`Cannot process ${totalProcessed} pairs. Only ${availableToIron} pairs pending at Step 2.`);
+    if (!Number.isInteger(goodPairs) || !Number.isInteger(defectPairs) || goodPairs < 0 || defectPairs < 0 || (goodPairs + defectPairs) <= 0) {
+      throw new Error('Good and defect pairs must be non-negative integers totaling more than 0.');
     }
+    return runAtomicWipStep(() => {
+      const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
+      if (!wip) throw new Error(`WIP record for ${reqNumber} not found`);
 
-    db.prepare(`
-      UPDATE packing_wip
-      SET step2_ironing_good = step2_ironing_good + ?,
-          step2_ironing_defects = step2_ironing_defects + ?,
-          step3_matching_in = step3_matching_in + ?,
-          current_step = CASE WHEN (step2_ironing_in - (step2_ironing_good + ?) - (step2_ironing_defects + ?)) = 0 THEN 'STEP_3' ELSE current_step END,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE req_number = ?
-    `).run(goodPairs, defectPairs, goodPairs, goodPairs, defectPairs, reqNumber);
+      const availableToIron = wip.step2_ironing_in - wip.step2_ironing_good - wip.step2_ironing_defects;
+      const totalProcessed = goodPairs + defectPairs;
 
-    // If defects found, log to Alteration (loops back to Step 1 upon return)
-    if (defectPairs > 0) {
+      if (totalProcessed > availableToIron) {
+        throw new Error(`Cannot process ${totalProcessed} pairs. Only ${availableToIron} pairs pending at Step 2.`);
+      }
+
       db.prepare(`
-        INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, status)
-        VALUES (?, 'STEP_2_IRONING', ?, ?, 'SENT_FOR_ALTERATION')
-      `).run(reqNumber, defectPairs, defectReason || 'Ironing/Brushing Workmanship Defect');
-    }
+        UPDATE packing_wip
+        SET step2_ironing_good = step2_ironing_good + ?,
+            step2_ironing_defects = step2_ironing_defects + ?,
+            step3_matching_in = step3_matching_in + ?,
+            current_step = CASE WHEN (step2_ironing_in - (step2_ironing_good + ?) - (step2_ironing_defects + ?)) = 0 THEN 'STEP_3' ELSE current_step END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE req_number = ?
+      `).run(goodPairs, defectPairs, goodPairs, goodPairs, defectPairs, reqNumber);
 
-    return this.getRequisition(reqNumber);
+      // If defects found, log to Alteration (loops back to Step 1 upon return)
+      if (defectPairs > 0) {
+        db.prepare(`
+          INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, status)
+          VALUES (?, 'STEP_2_IRONING', ?, ?, 'SENT_FOR_ALTERATION')
+        `).run(reqNumber, defectPairs, defectReason || 'Ironing/Brushing Workmanship Defect');
+      }
+
+      return this.getRequisition(reqNumber);
+    });
   }
 
   // --- STEP 3: PAIR MATCHING ---
   static executeStep3Matching(reqNumber, goodPairs, defectPairs = 0, defectReason = '') {
-    const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
-    if (!wip) throw new Error(`WIP record for ${reqNumber} not found`);
-
-    const availableToMatch = wip.step3_matching_in - wip.step3_matching_good - wip.step3_matching_defects;
-    const totalProcessed = goodPairs + defectPairs;
-
-    if (totalProcessed > availableToMatch) {
-      throw new Error(`Cannot process ${totalProcessed} pairs. Only ${availableToMatch} pairs pending at Step 3.`);
+    if (!Number.isInteger(goodPairs) || !Number.isInteger(defectPairs) || goodPairs < 0 || defectPairs < 0 || (goodPairs + defectPairs) <= 0) {
+      throw new Error('Good and defect pairs must be non-negative integers totaling more than 0.');
     }
+    return runAtomicWipStep(() => {
+      const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
+      if (!wip) throw new Error(`WIP record for ${reqNumber} not found`);
 
-    db.prepare(`
-      UPDATE packing_wip
-      SET step3_matching_good = step3_matching_good + ?,
-          step3_matching_defects = step3_matching_defects + ?,
-          current_step = CASE WHEN (step3_matching_in - (step3_matching_good + ?) - (step3_matching_defects + ?)) = 0 THEN 'WAITING_MATERIALS' ELSE current_step END,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE req_number = ?
-    `).run(goodPairs, defectPairs, goodPairs, defectPairs, reqNumber);
+      const availableToMatch = wip.step3_matching_in - wip.step3_matching_good - wip.step3_matching_defects;
+      const totalProcessed = goodPairs + defectPairs;
 
-    // If defects found, log to Alteration (loops back to Step 1 upon return)
-    if (defectPairs > 0) {
+      if (totalProcessed > availableToMatch) {
+        throw new Error(`Cannot process ${totalProcessed} pairs. Only ${availableToMatch} pairs pending at Step 3.`);
+      }
+
       db.prepare(`
-        INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, status)
-        VALUES (?, 'STEP_3_MATCHING', ?, ?, 'SENT_FOR_ALTERATION')
-      `).run(reqNumber, defectPairs, defectReason || 'Mismatch in pair sizing or shade difference');
-    }
+        UPDATE packing_wip
+        SET step3_matching_good = step3_matching_good + ?,
+            step3_matching_defects = step3_matching_defects + ?,
+            current_step = CASE WHEN (step3_matching_in - (step3_matching_good + ?) - (step3_matching_defects + ?)) = 0 THEN 'WAITING_MATERIALS' ELSE current_step END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE req_number = ?
+      `).run(goodPairs, defectPairs, goodPairs, defectPairs, reqNumber);
 
-    return this.getRequisition(reqNumber);
+      // If defects found, log to Alteration (loops back to Step 1 upon return)
+      if (defectPairs > 0) {
+        db.prepare(`
+          INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, status)
+          VALUES (?, 'STEP_3_MATCHING', ?, ?, 'SENT_FOR_ALTERATION')
+        `).run(reqNumber, defectPairs, defectReason || 'Mismatch in pair sizing or shade difference');
+      }
+
+      return this.getRequisition(reqNumber);
+    });
   }
 
   // --- CREATE MATERIAL REQUISITION FOR 1ST PACKING ACCESSORIES ---
@@ -338,24 +507,29 @@ export class PackingService {
 
   // --- STEP 4: 1ST PACKING (INDIVIDUAL PAIR PACKING) ---
   static executeStep4FirstPacking(reqNumber, packedPairs) {
-    const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
-    if (!wip) throw new Error(`WIP for ${reqNumber} not found`);
-    if (!wip.step4_materials_issued) throw new Error(`Materials have not been issued by the Packing Materials Store yet.`);
-
-    const maxCanPack = wip.step3_matching_good - wip.step4_packing_good;
-    if (packedPairs > maxCanPack) {
-      throw new Error(`Cannot pack ${packedPairs} pairs. Only ${maxCanPack} good pairs pending at Step 4.`);
+    if (!Number.isInteger(packedPairs) || packedPairs <= 0) {
+      throw new Error('Packed pairs must be a positive integer greater than 0.');
     }
+    return runAtomicWipStep(() => {
+      const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
+      if (!wip) throw new Error(`WIP for ${reqNumber} not found`);
+      if (!wip.step4_materials_issued) throw new Error(`Materials have not been issued by the Packing Materials Store yet.`);
 
-    db.prepare(`
-      UPDATE packing_wip
-      SET step4_packing_good = step4_packing_good + ?,
-          current_step = CASE WHEN (step3_matching_good - (step4_packing_good + ?)) = 0 THEN 'STEP_5' ELSE current_step END,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE req_number = ?
-    `).run(packedPairs, packedPairs, reqNumber);
+      const maxCanPack = wip.step3_matching_good - wip.step4_packing_good;
+      if (packedPairs > maxCanPack) {
+        throw new Error(`Cannot pack ${packedPairs} pairs. Only ${maxCanPack} good pairs pending at Step 4.`);
+      }
 
-    return this.getRequisition(reqNumber);
+      db.prepare(`
+        UPDATE packing_wip
+        SET step4_packing_good = step4_packing_good + ?,
+            current_step = CASE WHEN (step3_matching_good - (step4_packing_good + ?)) = 0 THEN 'STEP_5' ELSE current_step END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE req_number = ?
+      `).run(packedPairs, packedPairs, reqNumber);
+
+      return this.getRequisition(reqNumber);
+    });
   }
 
   // --- STEP 5: 2ND PACKING (PAIRS INTO CARTONS) ---
@@ -571,9 +745,23 @@ export class PackingService {
     const balanceNum = Math.max(0, orderNum - rcvdNum);
 
     const year = new Date().getFullYear();
-    const countRow = db.prepare(`SELECT COUNT(*) as cnt FROM store_receivings`).get();
-    const seq = String(Number(countRow.cnt) + 1).padStart(4, '0');
-    const rcvNumber = data.rcvNumber || data.rcv_no || `RCV-${year}-${seq}`;
+    const rcvPrefix = `RCV-${year}-`;
+    const existingNumbers = db.prepare(`
+      SELECT rcv_number FROM store_receivings WHERE rcv_number LIKE ?
+    `).all(`${rcvPrefix}%`);
+    const usedNumbers = new Set(existingNumbers.map(row => row.rcv_number));
+    const sequencePattern = new RegExp(`^RCV-${year}-(\\d+)$`);
+    let nextSequence = existingNumbers.reduce((next, row) => {
+      const match = sequencePattern.exec(row.rcv_number || '');
+      const sequence = match ? Number(match[1]) : 0;
+      return Number.isSafeInteger(sequence) ? Math.max(next, sequence + 1) : next;
+    }, 1);
+    let generatedNumber;
+    do {
+      generatedNumber = `${rcvPrefix}${String(nextSequence).padStart(4, '0')}`;
+      nextSequence += 1;
+    } while (usedNumbers.has(generatedNumber));
+    const rcvNumber = data.rcvNumber || data.rcv_no || generatedNumber;
     const orderIdVal = data.orderId || data.order_id || data.pendingOrderId || '';
 
     const dateVal = rcvDate || data.rcv_date || new Date().toISOString().slice(0, 10);
@@ -960,90 +1148,132 @@ export class PackingService {
     };
   }
 
+  static getOrderStockSummary(orderRow) {
+    const orderId = orderRow.order_id;
+    const plannedSizes = {
+      '7': Number(orderRow.size_7 || 0),
+      '8': Number(orderRow.size_8 || 0),
+      '9': Number(orderRow.size_9 || 0),
+      '10': Number(orderRow.size_10 || 0),
+      '11': Number(orderRow.size_11 || 0)
+    };
+
+    const existingReqs = db.prepare(`
+      SELECT requested_pairs, sizes_json, status
+      FROM glove_requisitions
+      WHERE order_id = ? AND COALESCE(is_voided, 0) = 0
+    `).all(orderId);
+
+    const requestedSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+    let requestedPairs = 0;
+    let pendingReqPairs = 0;
+    for (const reqRow of existingReqs) {
+      const parsed = parseRequisitionSizes(reqRow.sizes_json);
+      const reqQty = Number(reqRow.requested_pairs || 0);
+      requestedPairs += reqQty;
+      if (reqRow.status === 'PENDING') {
+        pendingReqPairs += reqQty;
+      }
+      for (const size of REQUISITION_SIZES) {
+        requestedSizes[size] += Number(parsed[size] || 0);
+      }
+    }
+
+    const remainingOrderSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+    for (const size of REQUISITION_SIZES) {
+      remainingOrderSizes[size] = Math.max(0, plannedSizes[size] - requestedSizes[size]);
+    }
+
+    const grnRows = db.prepare(`
+      SELECT rcv_number, rcvd_pairs
+      FROM store_receivings
+      WHERE (order_id = ? OR po_number = ?) AND COALESCE(is_voided, 0) = 0
+    `).all(orderId, orderId);
+    const receivedPairs = grnRows.reduce((sum, row) => sum + Number(row.rcvd_pairs || 0), 0);
+
+    const receivedSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+    if (grnRows.length > 0) {
+      const sizeStmt = db.prepare(`SELECT size_code, rcvd_pairs FROM receiving_size_breakdowns WHERE rcv_number = ?`);
+      for (const grn of grnRows) {
+        for (const sRow of sizeStmt.all(grn.rcv_number)) {
+          const code = String(sRow.size_code || '');
+          if (REQUISITION_SIZES.includes(code)) {
+            receivedSizes[code] += Number(sRow.rcvd_pairs || 0);
+          }
+        }
+      }
+    }
+
+    const allocRow = db.prepare(`
+      SELECT COALESCE(SUM(allocated_pairs), 0) AS total_alloc
+      FROM grn_req_allocations
+      WHERE order_id = ?
+    `).get(orderId);
+    const issuedPairs = Number(allocRow?.total_alloc || 0);
+    const availableDockPairs = Math.max(0, receivedPairs - issuedPairs);
+    const unclaimedDockPairs = Math.max(0, availableDockPairs - pendingReqPairs);
+
+    return {
+      plannedSizes,
+      requestedSizes,
+      remainingOrderSizes,
+      requestedPairs,
+      pendingReqPairs,
+      receivedPairs,
+      receivedSizes,
+      issuedPairs,
+      availableDockPairs,
+      unclaimedDockPairs
+    };
+  }
+
   static getPendingOrders() {
     try {
       const rows = db.prepare(`SELECT * FROM pending_orders ORDER BY created_at DESC, order_id DESC`).all();
-      return rows.map(r => ({
-        orderId: r.order_id,
-        buyer: r.buyer_name,
-        maker: r.maker_contractor,
-        po: r.po_number,
-        article: r.article_name,
-        color: r.color_shade,
-        sizes: {
-          '7': Number(r.size_7 || 0),
-          '8': Number(r.size_8 || 0),
-          '9': Number(r.size_9 || 0),
-          '10': Number(r.size_10 || 0),
-          '11': Number(r.size_11 || 0)
-        },
-        totalQty: Number(r.total_qty || 0),
-        notes: r.notes || ''
-      }));
+      return rows.map(r => {
+        const stock = this.getOrderStockSummary(r);
+        return {
+          orderId: r.order_id,
+          buyer: r.buyer_name,
+          maker: r.maker_contractor,
+          po: r.po_number,
+          article: r.article_name,
+          color: r.color_shade,
+          sizes: stock.plannedSizes,
+          totalQty: Number(r.total_qty || 0),
+          notes: r.notes || '',
+          receivedPairs: stock.receivedPairs,
+          issuedPairs: stock.issuedPairs,
+          requestedPairs: stock.requestedPairs,
+          pendingReqPairs: stock.pendingReqPairs,
+          availableDockPairs: stock.availableDockPairs,
+          unclaimedDockPairs: stock.unclaimedDockPairs,
+          remainingOrderSizes: stock.remainingOrderSizes,
+          receivedSizes: stock.receivedSizes
+        };
+      });
     } catch {
       return [];
     }
   }
 
-  static upsertPendingOrderAdmin(payload) {
-    const orderId = String(payload.orderId || '').trim();
-    const buyer = String(payload.buyer || '').trim();
-    const maker = String(payload.maker || '').trim();
-    const po = String(payload.po || '').trim();
-    const article = String(payload.article || '').trim();
-    const color = String(payload.color || 'Standard').trim();
-    const sizes = payload.sizes || {};
-    const s7 = Math.max(0, Number(sizes['7'] || 0));
-    const s8 = Math.max(0, Number(sizes['8'] || 0));
-    const s9 = Math.max(0, Number(sizes['9'] || 0));
-    const s10 = Math.max(0, Number(sizes['10'] || 0));
-    const s11 = Math.max(0, Number(sizes['11'] || 0));
-    const totalQty = Math.max(0, Number(payload.totalQty ?? (s7 + s8 + s9 + s10 + s11)));
-
-    if (!orderId || !maker || !article) {
-      throw new Error('orderId, maker, and article are required');
-    }
-
-    db.prepare(`
-      INSERT INTO pending_orders (
-        order_id, buyer_name, maker_contractor, po_number, article_name, color_shade,
-        size_7, size_8, size_9, size_10, size_11, total_qty, notes
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(order_id) DO UPDATE SET
-        buyer_name = excluded.buyer_name,
-        maker_contractor = excluded.maker_contractor,
-        po_number = excluded.po_number,
-        article_name = excluded.article_name,
-        color_shade = excluded.color_shade,
-        size_7 = excluded.size_7,
-        size_8 = excluded.size_8,
-        size_9 = excluded.size_9,
-        size_10 = excluded.size_10,
-        size_11 = excluded.size_11,
-        total_qty = excluded.total_qty,
-        notes = excluded.notes
-    `).run(
-      orderId,
-      buyer,
-      maker,
-      po,
-      article,
-      color,
-      s7,
-      s8,
-      s9,
-      s10,
-      s11,
-      totalQty,
-      payload.notes || ''
-    );
-
-    return this.getPendingOrders();
+  static createPendingOrderAdmin(payload, actor = 'Super User', role = 'SUPER_USER') {
+    this.enforceRolePermission(role, 'ORDER_CREATE');
+    const { orderId } = createPendingOrder(db, payload, {
+      actor,
+      role,
+      recordAuditLog: entry => this.recordAuditLog(entry)
+    });
+    return { orderId, orders: this.getPendingOrders() };
   }
 
-  static deletePendingOrderAdmin(orderId) {
-    db.prepare(`DELETE FROM pending_orders WHERE order_id = ?`).run(String(orderId || '').trim());
+  static deletePendingOrderAdmin(orderId, actor = 'Super User', role = 'SUPER_USER') {
+    this.enforceRolePermission(role, 'ORDER_DELETE');
+    deletePendingOrder(db, orderId, {
+      actor,
+      role,
+      recordAuditLog: entry => this.recordAuditLog(entry)
+    });
     return this.getPendingOrders();
   }
 
@@ -1235,6 +1465,7 @@ export class PackingService {
     SUPER_USER: [
       'ORDER_CREATE',
       'ORDER_ADJUST',
+      'ORDER_DELETE',
       'ORDER_SHORT_CLOSE',
       'GRN_RECEIVE',
       'GRN_VOID',
@@ -1322,6 +1553,13 @@ export class PackingService {
 
     db.exec('BEGIN IMMEDIATE');
     try {
+      const existingReq = db
+        .prepare(`SELECT status FROM glove_requisitions WHERE req_number = ?`)
+        .get(reqNumber);
+      if (existingReq && existingReq.status !== 'PENDING') {
+        throw new Error(`Requisition ${reqNumber} is already ${existingReq.status}.`);
+      }
+
       const grnRows = db
         .prepare(
           `SELECT * FROM store_receivings
@@ -1390,18 +1628,23 @@ export class PackingService {
       const custId = firstCust?.id || 'CUST-001';
       const prodId = firstProd?.id || 'GLV-001';
       db.prepare(`
-        INSERT INTO glove_requisitions (req_number, order_id, customer_id, product_id, requested_pairs, status, is_voided)
-        VALUES (?, ?, ?, ?, ?, 'ISSUED', 0)
+        INSERT INTO glove_requisitions (req_number, order_id, customer_id, product_id, requested_pairs, issued_pairs, status, issued_at, is_voided)
+        VALUES (?, ?, ?, ?, ?, ?, 'ISSUED', CURRENT_TIMESTAMP, 0)
         ON CONFLICT(req_number) DO UPDATE SET
           order_id = excluded.order_id,
           requested_pairs = excluded.requested_pairs,
+          issued_pairs = excluded.issued_pairs,
           status = 'ISSUED',
+          issued_at = CURRENT_TIMESTAMP,
           is_voided = 0
-      `).run(reqNumber, orderId, custId, prodId, qty);
+      `).run(reqNumber, orderId, custId, prodId, qty, qty);
 
       db.prepare(`
-        INSERT OR IGNORE INTO packing_wip (req_number, current_step, step1_checking_in, step4_packing_good)
+        INSERT INTO packing_wip (req_number, current_step, step1_checking_in, step4_packing_good)
         VALUES (?, 'STEP_1', ?, 0)
+        ON CONFLICT(req_number) DO UPDATE SET
+          step1_checking_in = step1_checking_in + excluded.step1_checking_in,
+          updated_at = CURRENT_TIMESTAMP
       `).run(reqNumber, qty);
 
       this.recordAuditLog({
@@ -1421,7 +1664,8 @@ export class PackingService {
         reqNumber,
         issuedPairs: qty,
         remainingDockPoolPairs: availableDockPairs - qty,
-        allocations: allocationsCreated
+        allocations: allocationsCreated,
+        requisition: this.getRequisition(reqNumber)
       };
     } catch (err) {
       try {

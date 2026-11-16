@@ -13,6 +13,12 @@ describe('Enterprise MES Gap Implementation Test Suite', () => {
   });
 
   test('1. Size Breakdown Matrix & Challan in Inward Receiving', () => {
+    const year = new Date().getFullYear();
+    const highestExistingSequence = db.prepare(`SELECT rcv_number FROM store_receivings`).all()
+      .reduce((highest, row) => {
+        const match = new RegExp(`^RCV-${year}-(\\d+)$`).exec(row.rcv_number || '');
+        return match ? Math.max(highest, Number(match[1])) : highest;
+      }, 0);
     const rcv = PackingService.createReceiving({
       rcvDate: '2026-10-31',
       makerContractor: 'Hall B',
@@ -33,6 +39,7 @@ describe('Enterprise MES Gap Implementation Test Suite', () => {
     });
 
     assert.ok(rcv.rcv_number.startsWith('RCV-'));
+    assert.ok(Number(rcv.rcv_number.slice(`RCV-${year}-`.length)) > highestExistingSequence);
     assert.equal(rcv.order_qty, 3090);
     assert.equal(rcv.rcvd_pairs, 942);
     assert.equal(rcv.balance_qty, 2148);

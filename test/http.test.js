@@ -1,14 +1,62 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { app } from '../src/server.js';
-import { seedDemoSheet } from '../src/db.js';
+import { db, seedDemoSheet } from '../src/db.js';
+import { AuthService } from '../src/services/authService.js';
 
 describe('HTTP Endpoints & UI Static Files Test Suite', () => {
   let server;
   let baseUrl;
+  let adminCookie;
+  let inwardCookie;
+  let adminUsername;
+  let adminPassword;
+  let packingCookie;
+  const testUserIds = [];
+  const testTokens = [];
 
   before(async () => {
     seedDemoSheet();
+    const suffix = randomUUID();
+    adminUsername = `http-admin-${suffix}`;
+    adminPassword = `Test-${suffix}-Password`;
+    const admin = AuthService.createUser({
+      name: 'HTTP Test Administrator',
+      username: adminUsername,
+      password: adminPassword,
+      role: 'SUPER_USER',
+      station: 'Test'
+    });
+    const adminSession = AuthService.createSession(admin.userId);
+    adminCookie = `mes_session=${adminSession.token}`;
+    testUserIds.push(admin.userId);
+    testTokens.push(adminSession.token);
+
+    const inward = AuthService.createUser({
+      name: 'HTTP Test Inward',
+      username: `http-inward-${suffix}`,
+      password: `Test-${suffix}-Password`,
+      role: 'INWARD_CLERK',
+      station: 'Test'
+    });
+    const inwardSession = AuthService.createSession(inward.userId);
+    inwardCookie = `mes_session=${inwardSession.token}`;
+    testUserIds.push(inward.userId);
+    testTokens.push(inwardSession.token);
+
+    const packingSupervisor = AuthService.createUser({
+      name: 'HTTP Test Packing Supervisor',
+      username: `http-pack-${suffix}`,
+      password: `Test-${suffix}-Password`,
+      role: 'PACKING_SUPERVISOR',
+      station: 'Packing Hall'
+    });
+    const packingSession = AuthService.createSession(packingSupervisor.userId);
+    packingCookie = `mes_session=${packingSession.token}`;
+    testUserIds.push(packingSupervisor.userId);
+    testTokens.push(packingSession.token);
+
     await new Promise((resolve) => {
       server = app.listen(0, () => {
         const port = server.address().port;
@@ -22,7 +70,16 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
     }
+    testTokens.forEach(token => AuthService.destroySession(token));
+    testUserIds.forEach(userId => AuthService.deleteUser(userId));
   });
+
+  function apiFetch(url, options = {}, cookie = adminCookie) {
+    return fetch(url, {
+      ...options,
+      headers: { ...(options.headers || {}), Cookie: cookie }
+    });
+  }
 
   test('Static Files: Hub index.html loads successfully', async () => {
     const res = await fetch(`${baseUrl}/`);
@@ -54,8 +111,86 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
     assert.ok(html.includes('2nd Packing'));
   });
 
+  test('API authentication: rejects anonymous requests and denies cross-station admin access', async () => {
+    const anonymous = await fetch(`${baseUrl}/api/store/dropdowns`);
+    assert.equal(anonymous.status, 401);
+
+    const inwardAdmin = await apiFetch(`${baseUrl}/api/admin/overview`, {}, inwardCookie);
+    assert.equal(inwardAdmin.status, 403);
+
+    const adminUsers = await apiFetch(`${baseUrl}/api/admin/users`);
+    assert.equal(adminUsers.status, 200);
+    const usersJson = await adminUsers.json();
+    assert.equal(usersJson.success, true);
+    assert.ok(usersJson.data.every(user => !Object.hasOwn(user, 'password_hash')));
+  });
+
+  test('API authentication: login creates an HTTP-only session and initial setup cannot be repeated', async () => {
+    const login = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: adminUsername, password: adminPassword })
+    });
+    assert.equal(login.status, 200);
+    assert.match(login.headers.get('set-cookie') || '', /HttpOnly/);
+
+    const bootstrap = await fetch(`${baseUrl}/api/auth/bootstrap`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Second Administrator',
+        username: `second-${randomUUID().slice(0, 20)}`,
+        password: 'Another-Secure-Password'
+      })
+    });
+    assert.equal(bootstrap.status, 409);
+  });
+
+  test('API authentication: Super User password updates re-hash passwords and revoke existing sessions', async () => {
+    const suffix = randomUUID();
+    const username = `pw-${suffix}`;
+    const oldPassword = `Old-${suffix}-Password`;
+    const user = AuthService.createUser({
+      name: 'Password Reset Test User',
+      username,
+      password: oldPassword,
+      role: 'INWARD_CLERK',
+      station: 'Test'
+    });
+    const session = AuthService.createSession(user.userId);
+    testUserIds.push(user.userId);
+    testTokens.push(session.token);
+    const endpoint = `${baseUrl}/api/admin/users/${encodeURIComponent(user.userId)}/password`;
+
+    const denied = await apiFetch(endpoint, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 'New-Secure-Password' })
+    }, inwardCookie);
+    assert.equal(denied.status, 403);
+
+    const invalid = await apiFetch(endpoint, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 'short' })
+    });
+    assert.equal(invalid.status, 400);
+    assert.ok(AuthService.verifyCredentials(username, oldPassword));
+
+    const updated = await apiFetch(endpoint, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 'New-Secure-Password' })
+    });
+    assert.equal(updated.status, 200);
+    assert.equal((await updated.json()).success, true);
+    assert.equal(AuthService.verifyCredentials(username, oldPassword), null);
+    assert.ok(AuthService.verifyCredentials(username, 'New-Secure-Password'));
+    assert.equal(AuthService.getSessionUser(session.token), null);
+  });
+
   test('API: /api/inventory/gloves returns seeded glove inventory', async () => {
-    const res = await fetch(`${baseUrl}/api/inventory/gloves`);
+    const res = await apiFetch(`${baseUrl}/api/inventory/gloves`);
     assert.equal(res.status, 200);
     const json = await res.json();
     assert.equal(json.success, true);
@@ -63,7 +198,7 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
   });
 
   test('API: /api/inventory/materials returns packaging accessories inventory', async () => {
-    const res = await fetch(`${baseUrl}/api/inventory/materials`);
+    const res = await apiFetch(`${baseUrl}/api/inventory/materials`);
     assert.equal(res.status, 200);
     const json = await res.json();
     assert.equal(json.success, true);
@@ -71,7 +206,7 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
   });
 
   test('API: /api/store/receivings returns seeded contractor shipment sheet', async () => {
-    const res = await fetch(`${baseUrl}/api/store/receivings`);
+    const res = await apiFetch(`${baseUrl}/api/store/receivings`);
     assert.equal(res.status, 200);
     const json = await res.json();
     assert.equal(json.success, true);
@@ -86,7 +221,7 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
   });
 
   test('API: /api/store/dropdowns returns makers, customers and articles', async () => {
-    const res = await fetch(`${baseUrl}/api/store/dropdowns`);
+    const res = await apiFetch(`${baseUrl}/api/store/dropdowns`);
     assert.equal(res.status, 200);
     const json = await res.json();
     assert.equal(json.success, true);
@@ -95,8 +230,130 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
     assert.ok(json.data.articles.length >= 10);
   });
 
+  test('API: pending-order creation assigns server IDs and does not update existing orders', async () => {
+    const requestedId = `ORD-CLIENT-${randomUUID()}`;
+    const payload = {
+      orderId: requestedId,
+      buyer: 'HTTP Order Test',
+      maker: 'HTTP Test Maker',
+      po: `PO-${randomUUID()}`,
+      article: 'HTTP Test Article',
+      color: 'Black',
+      sizes: { '7': 2, '8': 3, '9': 4, '10': 3, '11': 2 },
+      totalQty: 14
+    };
+
+    const createOrder = async (orderPayload) => {
+      const response = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderPayload)
+      });
+      assert.equal(response.status, 200);
+      return response.json();
+    };
+
+    const created = await createOrder(payload);
+    assert.equal(created.success, true);
+    assert.match(created.data.orderId, /^ORD-\d{4}-\d{3,}$/);
+    assert.notEqual(created.data.orderId, requestedId);
+    assert.ok(created.data.orders.some(order => order.orderId === created.data.orderId));
+
+    const createdAgain = await createOrder({ ...payload, maker: 'Second Maker' });
+    assert.notEqual(createdAgain.data.orderId, created.data.orderId);
+    assert.equal(
+      createdAgain.data.orders.find(order => order.orderId === created.data.orderId).maker,
+      'HTTP Test Maker'
+    );
+
+    const deleteCreated = await apiFetch(`${baseUrl}/api/admin/pending-orders/${created.data.orderId}`, {
+      method: 'DELETE'
+    });
+    assert.equal(deleteCreated.status, 200);
+    const deleteCreatedAgain = await apiFetch(`${baseUrl}/api/admin/pending-orders/${createdAgain.data.orderId}`, {
+      method: 'DELETE'
+    });
+    assert.equal(deleteCreatedAgain.status, 200);
+  });
+
+  test('API: Packing Hall can save and reload order-linked requisitions', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      WHERE p.name = 'Model A9'
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    let orderId;
+    let reqNumber;
+    try {
+      const orderResponse = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'HTTP Packing Test',
+          po: `PO-${randomUUID()}`,
+          article: master.article,
+          sizes: { '7': 2, '8': 3, '9': 4, '10': 3, '11': 2 },
+          totalQty: 14
+        })
+      });
+      assert.equal(orderResponse.status, 200);
+      orderId = (await orderResponse.json()).data.orderId;
+
+      const pendingOrdersResponse = await apiFetch(
+        `${baseUrl}/api/admin/pending-orders`,
+        {},
+        packingCookie
+      );
+      assert.equal(pendingOrdersResponse.status, 200);
+      const pendingOrders = await pendingOrdersResponse.json();
+      assert.ok(pendingOrders.data.some(order => order.orderId === orderId));
+
+      const deniedResponse = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 1 } })
+      }, inwardCookie);
+      assert.equal(deniedResponse.status, 403);
+
+      const createResponse = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 2, '8': 3, '9': 4, '10': 3, '11': 2 } })
+      }, packingCookie);
+      assert.equal(createResponse.status, 200);
+      const created = await createResponse.json();
+      assert.equal(created.success, true);
+      reqNumber = created.data.reqNumber;
+      assert.match(reqNumber, /^REQ-\d{4}-\d{4,}$/);
+      assert.equal(created.data.order_id, orderId);
+      assert.deepEqual(created.data.sizes, { '7': 2, '8': 3, '9': 4, '10': 3, '11': 2 });
+
+      const listResponse = await apiFetch(`${baseUrl}/api/requisitions`, {}, packingCookie);
+      assert.equal(listResponse.status, 200);
+      const listed = await listResponse.json();
+      assert.ok(listed.data.some(requisition => requisition.req_number === reqNumber));
+
+      const invalidResponse = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': -1 } })
+      }, packingCookie);
+      assert.equal(invalidResponse.status, 400);
+    } finally {
+      if (reqNumber) {
+        db.prepare('DELETE FROM packing_wip WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM glove_requisitions WHERE req_number = ?').run(reqNumber);
+      }
+      if (orderId) db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+    }
+  });
+
   test('API: POST /api/store/receivings creates receiving and calculates balance', async () => {
-    const res = await fetch(`${baseUrl}/api/store/receivings`, {
+    const res = await apiFetch(`${baseUrl}/api/store/receivings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -113,5 +370,458 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
     const json = await res.json();
     assert.equal(json.success, true);
     assert.equal(json.data.balance_qty, 50);
+  });
+
+  test('API: Order REQ full persistence lifecycle (Inward issue -> Stages 1-3 -> M-REQ -> Stage 4 -> AQL -> Stage 5 -> Reload hydration)', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      WHERE p.name = 'Model A9'
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    const qcUser = AuthService.createUser({
+      name: 'HTTP Test QC Inspector',
+      username: `http-qc-${randomUUID()}`,
+      password: `Test-${randomUUID()}-Password`,
+      role: 'QC_INSPECTOR',
+      station: 'Final QC'
+    });
+    const qcSession = AuthService.createSession(qcUser.userId);
+    const qcCookie = `mes_session=${qcSession.token}`;
+    testUserIds.push(qcUser.userId);
+    testTokens.push(qcSession.token);
+    let orderId;
+    let rcvNumber;
+    let reqNumber;
+    let matReqNumber;
+
+    try {
+      const orderResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'Lifecycle Maker',
+          po: `PO-${randomUUID()}`,
+          article: master.article,
+          sizes: { '7': 20, '8': 20, '9': 20, '10': 20, '11': 20 },
+          totalQty: 100
+        })
+      });
+      assert.equal(orderResp.status, 200);
+      orderId = (await orderResp.json()).data.orderId;
+
+      const grnResp = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rcvDate: '31-10-2026',
+          orderId,
+          makerContractor: 'Lifecycle Maker',
+          customerName: master.buyer,
+          poNumber: orderId,
+          articleName: master.article,
+          orderQty: 100,
+          rcvdPairs: 100
+        })
+      }, inwardCookie);
+      assert.equal(grnResp.status, 200);
+      rcvNumber = (await grnResp.json()).data.rcv_number;
+
+      const reqResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 20, '8': 20, '9': 20, '10': 20, '11': 20 } })
+      }, packingCookie);
+      assert.equal(reqResp.status, 200);
+      reqNumber = (await reqResp.json()).data.reqNumber;
+
+      // Inward clerk issues the saved requisition against order GRNs
+      const issueResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/issue-req`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reqNumber, requestedPairs: 100 })
+      }, inwardCookie);
+      assert.equal(issueResp.status, 200);
+      const issued = await issueResp.json();
+      assert.equal(issued.success, true);
+      assert.equal(issued.data.requisition.status, 'ISSUED');
+      assert.equal(issued.data.requisition.wip.step1_checking_in, 100);
+
+      // Duplicate issuance must fail cleanly
+      const dupIssueResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/issue-req`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reqNumber, requestedPairs: 100 })
+      }, inwardCookie);
+      assert.equal(dupIssueResp.status, 400);
+
+      // Stages 1-3 incremental progression
+      const s1Resp = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step1-checking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goodPairs: 95, defectPairs: 5, defectReason: 'Stitching Skip' })
+      }, packingCookie);
+      assert.equal(s1Resp.status, 200);
+      assert.equal((await s1Resp.json()).data.wip.step2_ironing_in, 95);
+
+      const s2Resp = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step2-ironing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goodPairs: 92, defectPairs: 3, defectReason: 'Crease / Soil Rejects' })
+      }, packingCookie);
+      assert.equal(s2Resp.status, 200);
+      assert.equal((await s2Resp.json()).data.wip.step3_matching_in, 92);
+
+      const s3Resp = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step3-matching`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goodPairs: 90, defectPairs: 2, defectReason: 'Mismatch / Unpaired Gloves' })
+      }, packingCookie);
+      assert.equal(s3Resp.status, 200);
+      assert.equal((await s3Resp.json()).data.wip.step3_matching_good, 90);
+
+      // Stage 4 must fail until M-REQ is created and issued
+      const blockedS4 = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step4-packing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packedPairs: 50 })
+      }, packingCookie);
+      assert.equal(blockedS4.status, 400);
+
+      const mreqCreateResp = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/material-requisition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      }, packingCookie);
+      assert.equal(mreqCreateResp.status, 200);
+      matReqNumber = (await mreqCreateResp.json()).data.mat_req_number;
+
+      const mreqIssueResp = await apiFetch(`${baseUrl}/api/material-requisitions/${matReqNumber}/issue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      }, packingCookie);
+      assert.equal(mreqIssueResp.status, 200);
+      assert.equal((await mreqIssueResp.json()).data.status, 'ISSUED');
+
+      // Incremental Stage 4 packing
+      const s4Part1 = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step4-packing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packedPairs: 40 })
+      }, packingCookie);
+      assert.equal(s4Part1.status, 200);
+      assert.equal((await s4Part1.json()).data.wip.step4_packing_good, 40);
+
+      const s4Part2 = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step4-packing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packedPairs: 50 })
+      }, packingCookie);
+      assert.equal(s4Part2.status, 200);
+      assert.equal((await s4Part2.json()).data.wip.step4_packing_good, 90);
+
+      // Stage 5 gated must block before AQL pass
+      const blockedS5 = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step5-cartons-gated`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pairsPerCarton: 30 })
+      }, packingCookie);
+      assert.equal(blockedS5.status, 400);
+
+      // Wrong role for AQL audit must fail (403) while passing AQL as QC Inspector unlocks Stage 5
+      const deniedAql = await apiFetch(`${baseUrl}/api/qc/${reqNumber}/aql-audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foundDefects: 0 })
+      }, packingCookie);
+      assert.equal(deniedAql.status, 403);
+
+      const passAql = await apiFetch(`${baseUrl}/api/qc/${reqNumber}/aql-audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foundDefects: 0 })
+      }, qcCookie);
+      assert.equal(passAql.status, 200);
+      assert.equal((await passAql.json()).data.isApproved, true);
+
+      const s5Resp = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step5-cartons-gated`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pairsPerCarton: 30 })
+      }, packingCookie);
+      assert.equal(s5Resp.status, 200);
+      const s5Data = (await s5Resp.json()).data;
+      assert.equal(s5Data.wip.step5_cartons_packed, 3);
+      assert.equal(s5Data.wip.step5_pairs_packed, 90);
+      assert.equal(s5Data.cartons.length, 3);
+
+      // Reload hydration endpoint includes wip, materialReq, cartons, alterations
+      const listResp = await apiFetch(`${baseUrl}/api/requisitions`, {}, packingCookie);
+      assert.equal(listResp.status, 200);
+      const listed = (await listResp.json()).data.find(r => r.req_number === reqNumber);
+      assert.ok(listed);
+      assert.equal(listed.materialReq.status, 'ISSUED');
+      assert.equal(listed.cartons.length, 3);
+      assert.equal(listed.alterations.length, 3);
+      assert.equal(listed.wip.final_qc_status, 'APPROVED_DISPATCH');
+    } finally {
+      if (reqNumber) {
+        db.prepare('DELETE FROM cartons WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM alterations WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM material_requisitions WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM grn_req_allocations WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM packing_wip WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM glove_requisitions WHERE req_number = ?').run(reqNumber);
+      }
+      if (rcvNumber) db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
+      if (orderId) {
+        db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+      }
+    }
+  });
+
+  test('API: Order requisition creation caps against unclaimed GRN stock and remaining unrequested order balance', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      WHERE p.name = 'Model A9'
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    let orderId;
+    let rcvNumber;
+    let req1Number;
+    let req2Number;
+
+    try {
+      const orderResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'Cap Check Maker',
+          po: `PO-${randomUUID()}`,
+          article: master.article,
+          sizes: { '7': 20, '8': 20, '9': 20, '10': 20, '11': 20 },
+          totalQty: 100
+        })
+      });
+      assert.equal(orderResp.status, 200);
+      orderId = (await orderResp.json()).data.orderId;
+
+      const grnResp = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rcvDate: '31-10-2026',
+          orderId,
+          makerContractor: 'Cap Check Maker',
+          customerName: master.buyer,
+          poNumber: orderId,
+          articleName: master.article,
+          orderQty: 100,
+          rcvdPairs: 60
+        })
+      }, inwardCookie);
+      assert.equal(grnResp.status, 200);
+      rcvNumber = (await grnResp.json()).data.rcv_number;
+
+      // Requesting 80 pairs when only 60 GRN pairs exist must fail
+      const overStockResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 16, '8': 16, '9': 16, '10': 16, '11': 16 } })
+      }, packingCookie);
+      assert.equal(overStockResp.status, 400);
+
+      // Creating REQ-1 for 40 pairs succeeds
+      const req1Resp = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 15, '8': 10, '9': 5, '10': 5, '11': 5 } })
+      }, packingCookie);
+      assert.equal(req1Resp.status, 200);
+      req1Number = (await req1Resp.json()).data.reqNumber;
+
+      // Pending order metadata reflects 60 received, 40 pending requested, 20 unclaimed
+      const ordersResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {}, packingCookie);
+      assert.equal(ordersResp.status, 200);
+      const orderSummary = (await ordersResp.json()).data.find(o => o.orderId === orderId);
+      assert.equal(orderSummary.receivedPairs, 60);
+      assert.equal(orderSummary.pendingReqPairs, 40);
+      assert.equal(orderSummary.unclaimedDockPairs, 20);
+      assert.equal(orderSummary.remainingOrderSizes['7'], 5);
+
+      // Exceeding size 7 remaining balance (5 left of 20 planned) must fail
+      const overSizeResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 6, '8': 0, '9': 0, '10': 0, '11': 0 } })
+      }, packingCookie);
+      assert.equal(overSizeResp.status, 400);
+
+      // Exceeding remaining unclaimed stock (20 left) must fail
+      const overUnclaimedResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 5, '8': 5, '9': 5, '10': 5, '11': 5 } })
+      }, packingCookie);
+      assert.equal(overUnclaimedResp.status, 400);
+
+      // Requesting within remaining size and unclaimed stock (20 pairs) succeeds
+      const req2Resp = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 5, '8': 5, '9': 5, '10': 5, '11': 0 } })
+      }, packingCookie);
+      assert.equal(req2Resp.status, 200);
+      req2Number = (await req2Resp.json()).data.reqNumber;
+    } finally {
+      for (const reqNo of [req1Number, req2Number]) {
+        if (!reqNo) continue;
+        db.prepare('DELETE FROM packing_wip WHERE req_number = ?').run(reqNo);
+        db.prepare('DELETE FROM glove_requisitions WHERE req_number = ?').run(reqNo);
+      }
+      if (rcvNumber) db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
+      if (orderId) db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+    }
+  });
+
+  test('API & DB: Stage 1-4 rejects <= 0 payloads, allows legitimate consecutive Stage 4 partials, and rolls back mid-step failures', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    let orderId;
+    let rcvNumber;
+    let reqNumber;
+
+    try {
+      const orderResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'Tx Maker',
+          po: `PO-${randomUUID()}`,
+          article: master.article,
+          sizes: { '7': 50, '8': 50, '9': 50, '10': 50, '11': 50 },
+          totalQty: 250
+        })
+      });
+      orderId = (await orderResp.json()).data.orderId;
+
+      const grnResp = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rcvDate: '31-10-2026',
+          orderId,
+          makerContractor: 'Tx Maker',
+          customerName: master.buyer,
+          poNumber: orderId,
+          articleName: master.article,
+          orderQty: 250,
+          rcvdPairs: 250
+        })
+      }, inwardCookie);
+      rcvNumber = (await grnResp.json()).data.rcv_number;
+
+      const reqResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 50, '8': 50, '9': 50, '10': 50, '11': 50 } })
+      }, packingCookie);
+      reqNumber = (await reqResp.json()).data.reqNumber;
+
+      const issueResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/issue-req`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reqNumber, requestedPairs: 250 })
+      }, inwardCookie);
+      assert.equal(issueResp.status, 200);
+
+      // Mid-transaction failure test: trigger aborts alteration insert after packing_wip update -> UPDATE must roll back cleanly
+      db.exec(`
+        CREATE TEMP TRIGGER abort_alt_insert_test BEFORE INSERT ON alterations
+        WHEN NEW.req_number = '${reqNumber}'
+        BEGIN
+          SELECT RAISE(ABORT, 'simulated alteration failure');
+        END;
+      `);
+      const abortedResp = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step1-checking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goodPairs: 50, defectPairs: 10, defectReason: 'Test rollback' })
+      }, packingCookie);
+      assert.equal(abortedResp.status, 400);
+      assert.match((await abortedResp.json()).error || '', /simulated alteration failure/);
+      db.exec(`DROP TRIGGER IF EXISTS abort_alt_insert_test;`);
+
+      const wipAfterAbort = db.prepare('SELECT step1_checking_good, step1_checking_defects, step2_ironing_in FROM packing_wip WHERE req_number = ?').get(reqNumber);
+      assert.equal(wipAfterAbort.step1_checking_good, 0);
+      assert.equal(wipAfterAbort.step1_checking_defects, 0);
+      assert.equal(wipAfterAbort.step2_ironing_in, 0);
+
+      // Advance Stages 1-3 + M-REQ
+      assert.equal((await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step1-checking`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goodPairs: 250, defectPairs: 0 })
+      }, packingCookie)).status, 200);
+      assert.equal((await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step2-ironing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goodPairs: 250, defectPairs: 0 })
+      }, packingCookie)).status, 200);
+      assert.equal((await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step3-matching`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goodPairs: 250, defectPairs: 0 })
+      }, packingCookie)).status, 200);
+
+      const mreqRes = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/material-requisition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }, packingCookie);
+      assert.equal(mreqRes.status, 200);
+      const matReqNo = (await mreqRes.json()).data.mat_req_number;
+      const issueMreqRes = await apiFetch(`${baseUrl}/api/material-requisitions/${matReqNo}/issue`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }, packingCookie);
+      assert.equal(issueMreqRes.status, 200);
+
+      // Zero and negative Stage 4 payloads must fail 400
+      assert.equal((await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step4-packing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ packedPairs: 0 })
+      }, packingCookie)).status, 400);
+      assert.equal((await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step4-packing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ packedPairs: -10 })
+      }, packingCookie)).status, 400);
+
+      // Two consecutive legitimate identical partial Stage 4 submits (100 + 100) must both succeed
+      assert.equal((await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step4-packing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ packedPairs: 100 })
+      }, packingCookie)).status, 200);
+      const secondPartial = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step4-packing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ packedPairs: 100 })
+      }, packingCookie);
+      assert.equal(secondPartial.status, 200);
+      assert.equal((await secondPartial.json()).data.wip.step4_packing_good, 200);
+
+      // Over-packing past remaining 50 fails 400
+      assert.equal((await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step4-packing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ packedPairs: 60 })
+      }, packingCookie)).status, 400);
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS abort_alt_insert_test;');
+      if (reqNumber) {
+        db.prepare('DELETE FROM cartons WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM alterations WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM material_requisitions WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM grn_req_allocations WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM packing_wip WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM glove_requisitions WHERE req_number = ?').run(reqNumber);
+      }
+      if (rcvNumber) db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
+      if (orderId) db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+    }
   });
 });

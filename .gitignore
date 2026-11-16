@@ -16,3 +16,8 @@ coverage/
 
 # vendored upstream checkout of bdfinst/agentic-dev-team (install separately)
 .agentic-dev-team/
+
+# Playwright E2E artifacts & isolated test database
+test-results/
+playwright-report/
+.playwright-tmp/

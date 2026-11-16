@@ -16,3 +16,12 @@ This project includes the UI/UX Pro Max design intelligence skill installed at `
 Rules:
 - Before designing or restyling screens, palettes, charts, or dense tables, query the design intelligence engine via `npm run uupm -- "<query>" --domain <color|ux|chart|typography|style>` or `npm run uupm:design-system -- "<query>" -p "Meridian Works MES"`.
 - Keep shop-floor printable slips (`GRN`, `REQ`, `M-REQ`, `A-REQ`, `@media print`) 100% monochrome black-and-white while using semantic status tokens on screen.
+
+## Everything Claude Code (ECC) & Playwright Verification Harness
+
+This project installs **Everything Claude Code (`affaan-m/ECC`)** under `.agents/` and an automated **Playwright** E2E & visual QA harness (`playwright.config.ts`, `e2e/`), governed by the always-on rule [`.agents/rules/ecc-harness.md`](.agents/rules/ecc-harness.md).
+
+Rules:
+- Use the ECC workflows/skills under `.agents/` (`tdd-workflow`, `e2e-testing`, `browser-qa`, `click-path-audit`, `verification-loop`, `delivery-gate`) whenever applicable instead of ad-hoc shortcuts.
+- Never skip automated browser verification or hand off UI/layout/interactive checks as "manual verification steps" for the user: run `npm run test:e2e` (isolated via `MES_DB_PATH` in `e2e/start-test-server.mjs`) and assert layout, viewport geometry, interactive states, and zero console/page/5xx errors in Playwright.
+- Before claiming any task done, run the full post-edit verification sequence (`npm run lint`, `npm run test:unit`, `npm test`, `npm run build`, `npm run test:e2e`, `npm run graphify`, or `npm run verify:all`) with zero failures or skipped assertions.

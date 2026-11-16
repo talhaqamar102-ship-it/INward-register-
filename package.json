@@ -8,7 +8,10 @@
     "start": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test --test-concurrency=1 test/packing-system.test.js test/http.test.js test/enterprise-gaps.test.js test/db-reliability.test.js",
+    "test": "node --test --test-concurrency=1 test/packing-system.test.js test/http.test.js test/enterprise-gaps.test.js test/db-reliability.test.js test/order-integrity.test.js",
+    "test:unit": "tsx --test src/utils/requisitionLogic.test.ts",
+    "test:e2e": "playwright test",
+    "verify:all": "npm run lint && npm run test:unit && npm test && npm run build && npm run test:e2e && npm run graphify",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "graphify": "tsx scripts/graphify.ts update .",
@@ -30,6 +33,7 @@
     "vite": "^8.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",

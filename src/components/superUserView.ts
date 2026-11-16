@@ -16,10 +16,11 @@ import {
   canVoidGrnBatch,
   canVoidRequisitionLot,
   PHASED_ROLLOUT_RECORD,
-  DEFAULT_MES_POLICY_CONFIG
+  DEFAULT_MES_POLICY_CONFIG,
+  escapeHtml
 } from '../utils/requisitionLogic';
 
-export type SuperUserTab = 'dashboard' | 'tracking' | 'orders' | 'creation' | 'reports';
+export type SuperUserTab = 'dashboard' | 'tracking' | 'orders' | 'creation' | 'users' | 'reports';
 export type SuperUserReportType =
   | 'order_grn_balance'
   | 'req_traceability'
@@ -28,6 +29,7 @@ export type SuperUserReportType =
 
 export interface SystemUserRecord {
   userId: string;
+  username: string;
   name: string;
   role: MesUserRole;
   station: string;
@@ -36,6 +38,9 @@ export interface SystemUserRecord {
 
 export interface SuperUserRenderContext {
   activeTab: SuperUserTab;
+  adminNavCollapsed?: boolean;
+  demoDrawerOpen?: boolean;
+  locationSearch?: string;
   activeReport: SuperUserReportType;
   trackingSearch: string;
   trackingStatusFilter: string;
@@ -73,10 +78,10 @@ export interface SuperUserRenderContext {
 
 function renderReconciliationBadge(rec: ReconciliationResult): string {
   if (rec.isReconciled) {
-    return `<span class="su-badge su-badge-reconciled" title="${rec.detail.replace(/"/g, '&quot;')}">RECONCILED &#10003;</span>`;
+    return `<span class="su-badge su-badge-reconciled" title="${escapeHtml(rec.detail)}">RECONCILED &#10003;</span>`;
   }
   const deltaSign = rec.deltaPairs > 0 ? `+${rec.deltaPairs}` : `${rec.deltaPairs}`;
-  return `<span class="su-badge su-badge-variance" title="${rec.detail.replace(/"/g, '&quot;')}">VARIANCE &Delta; (${deltaSign} Prs &bull; ${rec.failingGate})</span>`;
+  return `<span class="su-badge su-badge-variance" title="${escapeHtml(rec.detail)}">VARIANCE &Delta; (${deltaSign} Prs &bull; ${escapeHtml(rec.failingGate)})</span>`;
 }
 
 function renderStageMiniTrack(activeStage: string, awaitingQc: boolean, isClosed: boolean): string {
@@ -91,7 +96,7 @@ function renderStageMiniTrack(activeStage: string, awaitingQc: boolean, isClosed
   const currentIdx = isClosed ? 5 : stageOrder.indexOf(activeStage);
 
   return `
-    <div style="display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10.5px;">
+    <div style="display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 11px;">
       ${stages
         .map((s, idx) => {
           const isDone = currentIdx > idx || isClosed;
@@ -172,7 +177,7 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
           : 0,
       fill: 'var(--su-grn-accent)',
       border: 'var(--su-grn-primary)',
-      textColor: 'var(--su-grn-primary)',
+      textColor: 'var(--su-grn-deep)',
       filter: 'RECEIVING'
     },
     {
@@ -202,7 +207,7 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
           : 0,
       fill: 'var(--su-mreq-primary)',
       border: 'var(--su-mreq-dark)',
-      textColor: 'var(--su-mreq-primary)',
+      textColor: 'var(--su-mreq-dark)',
       filter: 'HOLD_QC'
     },
     {
@@ -245,25 +250,43 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
           <span class="admin-meta-caption">Click any stage bar to filter Live Tracking</span>
         </div>
         <div style="padding: 16px 16px 12px; font-variant-numeric: tabular-nums;">
+          ${
+            s.orderRollups.length === 0
+              ? `
+            <div class="su-empty-cta-box">
+              <div style="font-size: 13px; font-weight: 800; color: var(--su-text-primary);">
+                No active orders in the production pipeline yet
+              </div>
+              <div style="font-size: 12px; color: var(--su-text-muted); max-width: 380px;">
+                Create a Master Order in <strong>Order Creation</strong> to start tracking Receiving, WIP, Alteration, and Stage 5 Carton volumes.
+              </div>
+              <button type="button" class="btn-primary" data-admin-tab-jump="orders">
+                Create First Master Order
+              </button>
+            </div>
+          `
+              : `
           <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; align-items: end; height: 185px; padding-top: 22px; border-bottom: 2px solid var(--su-axis-border);">
             ${stageBars
               .map(b => {
                 const barHeightPx =
                   b.pairs > 0 ? Math.max(14, Math.round((b.pairs / maxStageVal) * 128)) : 4;
                 return `
-                <div
-                  onclick="document.querySelector('[data-admin-tab=\\'tracking\\']')?.click()"
-                  style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; cursor: pointer;"
-                  title="${b.label}: ${b.pairs.toLocaleString()} Pairs (${b.pctOfPlan}% of Order Book)"
+                <button
+                  type="button"
+                  class="su-stage-bar-btn"
+                  data-tracking-filter="${b.filter}"
+                  aria-label="Filter Live Tracking by ${escapeHtml(b.label)}: ${b.pairs.toLocaleString()} Pairs (${b.pctOfPlan}% of Order Book)"
+                  title="${escapeHtml(b.label)}: ${b.pairs.toLocaleString()} Pairs (${b.pctOfPlan}% of Order Book)"
                 >
-                  <div style="font-size: 11px; font-weight: 800; color: ${b.textColor}; margin-bottom: 2px; white-space: nowrap;">
+                  <span style="font-size: 11px; font-weight: 800; color: ${b.textColor}; margin-bottom: 2px; white-space: nowrap;">
                     ${b.pairs.toLocaleString()}
-                  </div>
-                  <div style="font-size: 9.5px; color: var(--su-text-muted); margin-bottom: 5px;">
+                  </span>
+                  <span style="font-size: 11px; color: var(--su-text-muted); margin-bottom: 5px;">
                     ${b.pctOfPlan}%
-                  </div>
-                  <div style="width: 72%; height: ${barHeightPx}px; background: ${b.fill}; border: 1.5px solid ${b.border}; border-bottom: none; border-radius: 3px 3px 0 0; transition: height 0.2s ease;"></div>
-                </div>
+                  </span>
+                  <span style="display: block; width: 72%; height: ${barHeightPx}px; background: ${b.fill}; border: 1.5px solid ${b.border}; border-bottom: none; border-radius: 3px 3px 0 0; transition: height 0.2s ease;"></span>
+                </button>
               `;
               })
               .join('')}
@@ -273,14 +296,16 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
               .map(
                 b => `
               <div>
-                <div style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 800; color: ${b.textColor};">${b.step}</div>
-                <div style="font-size: 10.5px; font-weight: 800; color: var(--su-text-primary); line-height: 1.2; margin-top: 1px;">${b.label}</div>
-                <div style="font-size: 9.5px; color: var(--su-text-muted); margin-top: 2px; line-height: 1.15;">${b.sub}</div>
+                <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 800; color: ${b.textColor};">${b.step}</div>
+                <div style="font-size: 11px; font-weight: 800; color: var(--su-text-primary); line-height: 1.2; margin-top: 1px;">${b.label}</div>
+                <div style="font-size: 11px; color: var(--su-text-muted); margin-top: 2px; line-height: 1.15;">${b.sub}</div>
               </div>
             `
               )
               .join('')}
           </div>
+          `
+          }
         </div>
       </section>
 
@@ -309,7 +334,7 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
                 <span class="su-badge su-badge-areq">A-0001</span>
               </div>
               <div style="font-size: 11px; color: var(--su-text-secondary);">
-                Create a Master Order in <strong>3. Order Creation</strong> or click <strong>Load 600-Pair Demo</strong> above to see its live visual node tree.
+                Create a Master Order in <strong>Order Creation</strong> or open the <strong>Demo Scenario Controls</strong> drawer above to see its live visual node tree.
               </div>
             </div>
           `
@@ -336,16 +361,16 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
               <div style="border: 1px solid var(--su-border); border-radius: 5px; padding: 10px 12px; margin-bottom: 10px; background: var(--su-white);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px; flex-wrap: wrap;">
                   <div>
-                    <strong style="font-size: 12.5px; color: var(--su-req-primary);">${o.orderId}</strong>
-                    <span style="font-size: 11px; color: var(--su-text-secondary); margin-left: 6px;">${o.buyer} &bull; ${o.article} &bull; Plan: <strong>${o.plannedQty.toLocaleString()} Prs</strong></span>
+                    <strong style="font-size: 12.5px; color: var(--su-req-primary);">${escapeHtml(o.orderId)}</strong>
+                    <span style="font-size: 11px; color: var(--su-text-secondary); margin-left: 6px;">${escapeHtml(o.buyer)} &bull; ${escapeHtml(o.article)} &bull; Plan: <strong>${o.plannedQty.toLocaleString()} Prs</strong></span>
                   </div>
                   <div style="display: flex; align-items: center; gap: 6px;">
                     ${renderReconciliationBadge(o.reconciliation)}
-                    <button type="button" class="table-btn" style="font-size: 10.5px; padding: 2px 8px;" onclick="window.adminInspectOrderInTracking('${o.orderId.replace(/'/g, "\\'")}')">Inspect Graph &rarr;</button>
+                    <button type="button" class="table-btn" style="font-size: 11px; padding: 2px 8px;" data-su-action="inspect-order" data-order-id="${escapeHtml(o.orderId)}">Inspect Graph &rarr;</button>
                   </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 95px 1fr 48px; align-items: center; gap: 8px; font-size: 10.5px; margin-bottom: 4px;">
+                <div style="display: grid; grid-template-columns: 95px 1fr 48px; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 4px;">
                   <span style="color: var(--su-grn-dark); font-weight: 700;">GRN Supply:</span>
                   <div style="height: 8px; background: var(--su-grn-fill-soft); border: 1px solid var(--su-grn-border); border-radius: 2px; overflow: hidden;">
                     <div style="width: ${rcvdPct}%; height: 100%; background: var(--su-grn-primary);"></div>
@@ -353,7 +378,7 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
                   <span style="text-align: right; font-weight: 800; color: var(--su-grn-dark);">${rcvdPct}%</span>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 95px 1fr 48px; align-items: center; gap: 8px; font-size: 10.5px; margin-bottom: 8px;">
+                <div style="display: grid; grid-template-columns: 95px 1fr 48px; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 8px;">
                   <span style="color: var(--su-req-primary); font-weight: 700;">REQ Execution:</span>
                   <div style="height: 8px; background: var(--su-bg-tertiary); border: 1px solid var(--su-border); border-radius: 2px; overflow: hidden; display: flex;">
                     <div style="width: ${s5Pct}%; height: 100%; background: var(--su-complete-primary);" title="Stage 5 Packed: ${o.packedStage5Qty} Prs"></div>
@@ -361,11 +386,11 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
                     <div style="width: ${wipPct}%; height: 100%; background: var(--su-req-accent);" title="Stages 1-3 WIP: ${wipOnly} Prs"></div>
                     <div style="width: ${altPct}%; height: 100%; background: var(--su-areq-primary);" title="Alteration/Scrap: ${o.inAlterationQty + o.scrappedQty} Prs"></div>
                   </div>
-                  <span style="text-align: right; font-weight: 800; color: var(--su-complete-primary);">${s5Pct}% S5</span>
+                  <span style="text-align: right; font-weight: 800; color: var(--su-complete-dark);">${s5Pct}% S5</span>
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 10px; background: var(--su-bg-primary); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--su-border-subtle);">
-                  <span style="font-weight: 800; color: var(--su-req-primary);">${o.orderId}</span>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 12px; background: var(--su-bg-primary); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--su-border-subtle);">
+                  <span style="font-weight: 800; color: var(--su-req-primary);">${escapeHtml(o.orderId)}</span>
                   <span style="color: var(--su-text-muted);">&rarr;</span>
                   ${
                     o.grnBatches.length === 0
@@ -373,7 +398,7 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
                       : o.grnBatches
                           .map(
                             g =>
-                              `<button type="button" class="su-chip-btn su-badge su-badge-grn" style="font-size: 10px; padding: 1px 6px;" onclick="window.adminInspectOrderInTracking('${o.orderId.replace(/'/g, "\\'")}', '${g.grnCode}')">${g.grnCode} (${g.rcvdPairs})</button>`
+                              `<button type="button" class="su-chip-btn su-badge su-badge-grn" style="font-size: 12px; padding: 1px 6px;" data-su-action="inspect-order" data-order-id="${escapeHtml(o.orderId)}" data-ref-code="${escapeHtml(g.grnCode)}">${escapeHtml(g.grnCode)} (${g.rcvdPairs})</button>`
                           )
                           .join('')
                   }
@@ -384,7 +409,7 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
                       : o.reqBatches
                           .map(
                             r =>
-                              `<button type="button" class="su-chip-btn su-badge su-badge-req" style="font-size: 10px; padding: 1px 6px;" onclick="window.adminInspectOrderInTracking('${o.orderId.replace(/'/g, "\\'")}', '${r.reqNumber}')">${r.reqNumber} &rarr; <span style="color: var(--su-mreq-primary);">${r.mreqNo}</span> | <span style="color: var(--su-areq-primary);">${r.altReqNo}</span> (${r.askingPairs})</button>`
+                              `<button type="button" class="su-chip-btn su-badge su-badge-req" style="font-size: 12px; padding: 1px 6px;" data-su-action="inspect-order" data-order-id="${escapeHtml(o.orderId)}" data-ref-code="${escapeHtml(r.reqNumber)}">${escapeHtml(r.reqNumber)} &rarr; <span style="color: var(--su-mreq-dark);">${escapeHtml(r.mreqNo)}</span> | <span style="color: var(--su-areq-primary);">${escapeHtml(r.altReqNo)}</span> (${r.askingPairs})</button>`
                           )
                           .join('')
                   }
@@ -402,7 +427,7 @@ function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): string {
 
 function renderOrderGrnChipsWithOverflow(ord: SuperUserOrderRollup): string {
   if (ord.grnBatches.length === 0) {
-    return `<span style="font-size: 10.5px; color: var(--su-text-muted);">0 GRNs</span>`;
+    return `<span style="font-size: 11px; color: var(--su-text-muted);">0 GRNs</span>`;
   }
   const scored = ord.grnBatches.map(g => ({
     item: g,
@@ -419,23 +444,28 @@ function renderOrderGrnChipsWithOverflow(ord: SuperUserOrderRollup): string {
             <button
               type="button"
               class="su-chip-btn su-badge su-badge-grn"
-              style="font-size: 10px; padding: 1px 6px;"
-              title="${g.grnCode}: ${g.rcvdPairs} Prs (${g.allocationStatus}) — Click to inspect in Live Tracking"
-              onclick="window.adminInspectOrderInTracking('${ord.orderId.replace(/'/g, "\\'")}', '${g.grnCode}')"
-            >${g.grnCode} (${g.rcvdPairs})</button>
+              style="font-size: 11px; padding: 1px 6px;"
+              title="${escapeHtml(g.grnCode)}: ${g.rcvdPairs} Prs (${escapeHtml(g.allocationStatus)}) — Click to inspect in Live Tracking"
+              data-su-action="inspect-order"
+              data-order-id="${escapeHtml(ord.orderId)}"
+              data-ref-code="${escapeHtml(g.grnCode)}"
+            >${escapeHtml(g.grnCode)} (${g.rcvdPairs})</button>
             <button
               type="button"
               class="su-chip-btn"
-              style="font-size: 9.5px; padding: 1px 4px; background: var(--su-bg-primary); color: var(--su-text-secondary);"
-              title="Open Printable GRN Slip (${g.grnCode})"
-              onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('GRN', '${g.grnCode}', '${ord.orderId.replace(/'/g, "\\'")}')"
+              style="font-size: 11px; padding: 1px 4px; background: var(--su-bg-primary); color: var(--su-text-secondary);"
+              title="Open Printable GRN Slip (${escapeHtml(g.grnCode)})"
+              data-su-action="open-slip"
+              data-slip-type="GRN"
+              data-ref-code="${escapeHtml(g.grnCode)}"
+              data-order-id="${escapeHtml(ord.orderId)}"
             >Slip</button>
           </span>
         `)
         .join('')}
       ${
         sliced.overflowCount > 0
-          ? `<button type="button" class="su-chip-btn su-badge su-badge-grn" style="font-size: 10px; padding: 1px 6px;" onclick="window.adminInspectOrderInTracking('${ord.orderId.replace(/'/g, "\\'")}')">+${sliced.overflowCount} more</button>`
+          ? `<button type="button" class="su-chip-btn su-badge su-badge-grn" style="font-size: 11px; padding: 1px 6px;" data-su-action="inspect-order" data-order-id="${escapeHtml(ord.orderId)}">+${sliced.overflowCount} more</button>`
           : ''
       }
     </div>
@@ -444,7 +474,7 @@ function renderOrderGrnChipsWithOverflow(ord: SuperUserOrderRollup): string {
 
 function renderOrderReqChipsWithOverflow(ord: SuperUserOrderRollup): string {
   if (ord.reqBatches.length === 0) {
-    return `<span style="font-size: 10.5px; color: var(--su-text-muted);">0 REQs</span>`;
+    return `<span style="font-size: 11px; color: var(--su-text-muted);">0 REQs</span>`;
   }
   const scored = ord.reqBatches.map(r => ({
     item: r,
@@ -470,23 +500,28 @@ function renderOrderReqChipsWithOverflow(ord: SuperUserOrderRollup): string {
             <button
               type="button"
               class="su-chip-btn su-badge su-badge-req"
-              style="font-size: 10px; padding: 1px 6px;"
-              title="${r.reqNumber} | ${r.mreqNo} | ${r.altReqNo} (${r.issuedPairs || r.askingPairs} Prs) — Click to inspect in Live Tracking"
-              onclick="window.adminInspectOrderInTracking('${ord.orderId.replace(/'/g, "\\'")}', '${r.reqNumber}')"
-            >${r.reqNumber}&middot;M&middot;A (${r.issuedPairs || r.askingPairs})</button>
+              style="font-size: 11px; padding: 1px 6px;"
+              title="${escapeHtml(r.reqNumber)} | ${escapeHtml(r.mreqNo)} | ${escapeHtml(r.altReqNo)} (${r.issuedPairs || r.askingPairs} Prs) — Click to inspect in Live Tracking"
+              data-su-action="inspect-order"
+              data-order-id="${escapeHtml(ord.orderId)}"
+              data-ref-code="${escapeHtml(r.reqNumber)}"
+            >${escapeHtml(r.reqNumber)}&middot;M&middot;A (${r.issuedPairs || r.askingPairs})</button>
             <button
               type="button"
               class="su-chip-btn"
-              style="font-size: 9.5px; padding: 1px 4px; background: var(--su-bg-primary); color: var(--su-text-secondary);"
-              title="Open Printable REQ Slip (${r.reqNumber})"
-              onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('REQ', '${r.reqNumber}', '${ord.orderId.replace(/'/g, "\\'")}')"
+              style="font-size: 11px; padding: 1px 4px; background: var(--su-bg-primary); color: var(--su-text-secondary);"
+              title="Open Printable REQ Slip (${escapeHtml(r.reqNumber)})"
+              data-su-action="open-slip"
+              data-slip-type="REQ"
+              data-ref-code="${escapeHtml(r.reqNumber)}"
+              data-order-id="${escapeHtml(ord.orderId)}"
             >Slip</button>
           </span>
         `)
         .join('')}
       ${
         sliced.overflowCount > 0
-          ? `<button type="button" class="su-chip-btn su-badge su-badge-req" style="font-size: 10px; padding: 1px 6px;" onclick="window.adminInspectOrderInTracking('${ord.orderId.replace(/'/g, "\\'")}')">+${sliced.overflowCount} more</button>`
+          ? `<button type="button" class="su-chip-btn su-badge su-badge-req" style="font-size: 11px; padding: 1px 6px;" data-su-action="inspect-order" data-order-id="${escapeHtml(ord.orderId)}">+${sliced.overflowCount} more</button>`
           : ''
       }
     </div>
@@ -496,26 +531,33 @@ function renderOrderReqChipsWithOverflow(ord: SuperUserOrderRollup): string {
 function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: number): string {
   const s = ctx.rollupSummary;
   const hasDemoOrder = s.orderRollups.some(o => o.orderId === 'ORD-2026-600');
+  const rawSearch = ctx.locationSearch ?? (typeof window !== 'undefined' ? window.location.search : '');
+  const hasDemoParam = /(?:^|[?&])demo=1(?:&|$)/.test(rawSearch);
+  const demoDrawerOpen = hasDemoOrder || Boolean(ctx.demoDrawerOpen) || hasDemoParam;
 
   return `
-    <!-- 5.6: Flagged & Removable 600-Pair Demo Scenario Bar -->
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 8px 14px; margin-bottom: 12px; background: var(--su-bg-primary); border: 1px solid var(--su-border); border-radius: 4px;">
-      <div style="font-size: 11.5px; color: var(--su-text-secondary);">
-        <strong style="color: var(--su-text-primary);">Reconciliation Health:</strong>
-        <span class="su-badge su-badge-reconciled" style="margin-left: 6px;">${s.reconciledOrdersCount} / ${s.totalOrders} Orders Reconciled &#10003;</span>
-        ${
-          s.varianceOrdersCount > 0
-            ? `<span class="su-badge su-badge-variance" style="margin-left: 6px;">${s.varianceOrdersCount} Order Variance &Delta;</span>`
-            : ''
-        }
-      </div>
-      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    <!-- 5.6: Flagged & Removable 600-Pair Demo Scenario Drawer -->
+    <details class="su-demo-drawer"${demoDrawerOpen ? ' open' : ''}>
+      <summary>
+        <div>
+          <strong style="color: var(--su-text-primary);">Reconciliation Health:</strong>
+          <span class="su-badge su-badge-reconciled" style="margin-left: 6px;">${s.reconciledOrdersCount} / ${s.totalOrders} Orders Reconciled &#10003;</span>
+          ${
+            s.varianceOrdersCount > 0
+              ? `<span class="su-badge su-badge-variance" style="margin-left: 6px;">${s.varianceOrdersCount} Order Variance &Delta;</span>`
+              : ''
+          }
+        </div>
+        <span class="admin-meta-caption">Demo Scenario Controls &bull; Toggle</span>
+      </summary>
+      <div class="su-demo-drawer-actions">
         <button
           type="button"
           class="btn-outline"
           id="btn-load-demo-600-inprogress"
-          style="padding: 4px 10px; font-size: 11px;"
-          onclick="window.adminLoadDemo600Scenario && window.adminLoadDemo600Scenario('IN_PROGRESS')"
+          style="padding: 4px 10px; font-size: 12px;"
+          data-su-action="load-demo"
+          data-demo-phase="IN_PROGRESS"
         >
           Load 600-Pair Demo (Step 5: S4 Hold + A-REQ Cycle 1/2)
         </button>
@@ -523,8 +565,9 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
           type="button"
           class="btn-primary"
           id="btn-load-demo-600-complete"
-          style="padding: 4px 10px; font-size: 11px;"
-          onclick="window.adminLoadDemo600Scenario && window.adminLoadDemo600Scenario('COMPLETED')"
+          style="padding: 4px 10px; font-size: 12px;"
+          data-su-action="load-demo"
+          data-demo-phase="COMPLETED"
         >
           Load 600-Pair Demo (1-Order &rarr; 3-GRNs &rarr; 3-REQs Complete)
         </button>
@@ -532,8 +575,9 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
           type="button"
           class="btn-outline"
           id="btn-load-demo-600-variance"
-          style="padding: 4px 10px; font-size: 11px; color: var(--su-areq-primary); border-color: var(--su-areq-border);"
-          onclick="window.adminLoadDemo600Scenario && window.adminLoadDemo600Scenario('DELIBERATE_VARIANCE')"
+          style="padding: 4px 10px; font-size: 12px; color: var(--su-areq-dark); border-color: var(--su-areq-border);"
+          data-su-action="load-demo"
+          data-demo-phase="DELIBERATE_VARIANCE"
         >
           Force Deliberate Variance (11.6 &Delta;)
         </button>
@@ -544,8 +588,8 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
             type="button"
             class="btn-outline"
             id="btn-remove-demo-600"
-            style="padding: 4px 10px; font-size: 11px; color: var(--su-areq-primary); border-color: var(--su-areq-border);"
-            onclick="window.adminRemoveDemo600Scenario && window.adminRemoveDemo600Scenario()"
+            style="padding: 4px 10px; font-size: 12px; color: var(--su-areq-dark); border-color: var(--su-areq-border);"
+            data-su-action="remove-demo"
           >
             Remove Demo Scenario
           </button>
@@ -553,13 +597,13 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
             : ''
         }
       </div>
-    </div>
+    </details>
 
     <!-- Row 1: 4 Factory Pulse KPI Cards (5.1 & 5.5: Above the fold at 1440px desktop) -->
     <div class="admin-kpi-grid" data-testid="su-pulse-cards-grid" style="margin-bottom: 10px;">
       <div class="admin-kpi-card su-kpi-grn">
         <div class="admin-kpi-label">1. Order Book vs. Dock Receiving</div>
-        <div class="admin-kpi-value" style="font-variant-numeric: tabular-nums; color: var(--su-grn-primary);">
+        <div class="admin-kpi-value" style="font-variant-numeric: tabular-nums; color: var(--su-grn-deep);">
           ${s.totalReceivedGrnPairs.toLocaleString()} / ${s.totalPlannedPairs.toLocaleString()} Prs
         </div>
         <div class="admin-kpi-sub" style="font-variant-numeric: tabular-nums;">
@@ -569,7 +613,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
 
       <div class="admin-kpi-card su-kpi-mreq">
         <div class="admin-kpi-label">2. Dock Available Stock Pool</div>
-        <div class="admin-kpi-value" style="font-variant-numeric: tabular-nums; color: var(--su-mreq-primary);">
+        <div class="admin-kpi-value" style="font-variant-numeric: tabular-nums; color: var(--su-mreq-dark);">
           ${s.totalDockAvailablePairs.toLocaleString()} Prs Ready
         </div>
         <div class="admin-kpi-sub" style="font-variant-numeric: tabular-nums;">
@@ -583,7 +627,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
           ${s.totalFloorWipPairs.toLocaleString()} Prs in WIP
         </div>
         <div class="admin-kpi-sub" style="font-variant-numeric: tabular-nums;">
-          Stage 4 Hold (Awaiting QC): <strong style="color: var(--su-mreq-primary);">${s.stage4ReadyForQcPairs.toLocaleString()} Prs</strong> &bull; Packed S5: <strong style="color: var(--su-complete-primary);">${s.stage5PackedPairs.toLocaleString()} Prs</strong>
+          Stage 4 Hold (Awaiting QC): <strong style="color: var(--su-mreq-dark);">${s.stage4ReadyForQcPairs.toLocaleString()} Prs</strong> &bull; Packed S5: <strong style="color: var(--su-complete-dark);">${s.stage5PackedPairs.toLocaleString()} Prs</strong>
         </div>
       </div>
 
@@ -593,7 +637,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
           ${s.totalAlterationPairs.toLocaleString()} Rework &bull; ${s.totalScrappedPairs.toLocaleString()} Scrap
         </div>
         <div class="admin-kpi-sub" style="font-variant-numeric: tabular-nums;">
-          Completed Orders: <strong style="color: var(--su-complete-primary);">${s.completedOrders}/${s.totalOrders}</strong> &bull; Debit: <strong style="color: var(--su-areq-primary);">PKR ${totalScrapDeduction.toLocaleString()}</strong>
+          Completed Orders: <strong style="color: var(--su-complete-dark);">${s.completedOrders}/${s.totalOrders}</strong> &bull; Debit: <strong style="color: var(--su-areq-primary);">PKR ${totalScrapDeduction.toLocaleString()}</strong>
         </div>
       </div>
     </div>
@@ -634,13 +678,13 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
                       .map(
                         req => `
                 <tr>
-                  <td class="font-bold">${req.parentOrderId}</td>
-                  <td><button type="button" class="su-chip-btn su-badge su-badge-req" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('REQ', '${req.reqNumber}', '${req.parentOrderId}')">${req.reqNumber}</button></td>
-                  <td><button type="button" class="su-chip-btn su-badge su-badge-mreq" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('M-REQ', '${req.mreqNo}', '${req.parentOrderId}')">${req.mreqNo}</button></td>
-                  <td>${req.article}</td>
-                  <td class="text-right font-bold" style="color: var(--su-mreq-primary);">${req.stage4Passed.toLocaleString()} Prs</td>
+                  <td class="font-bold">${escapeHtml(req.parentOrderId)}</td>
+                  <td><button type="button" class="su-chip-btn su-badge su-badge-req" data-su-action="open-slip" data-slip-type="REQ" data-ref-code="${escapeHtml(req.reqNumber)}" data-order-id="${escapeHtml(req.parentOrderId)}">${escapeHtml(req.reqNumber)}</button></td>
+                  <td><button type="button" class="su-chip-btn su-badge su-badge-mreq" data-su-action="open-slip" data-slip-type="M-REQ" data-ref-code="${escapeHtml(req.mreqNo)}" data-order-id="${escapeHtml(req.parentOrderId)}">${escapeHtml(req.mreqNo)}</button></td>
+                  <td>${escapeHtml(req.article)}</td>
+                  <td class="text-right font-bold" style="color: var(--su-mreq-dark);">${req.stage4Passed.toLocaleString()} Prs</td>
                   <td class="text-center">
-                    <button type="button" class="table-btn" onclick="window.adminOpenReqInScreen('${req.reqNumber}', 'screen-qc')">Inspect in Final QC &rarr;</button>
+                    <button type="button" class="table-btn" data-su-action="open-req-screen" data-req-number="${escapeHtml(req.reqNumber)}" data-target-screen="screen-qc">Inspect in Final QC &rarr;</button>
                   </td>
                 </tr>
               `
@@ -688,13 +732,13 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
                       ...s.activeAlterationReqs.map(
                         req => `
                   <tr>
-                    <td><button type="button" class="su-chip-btn su-badge su-badge-areq" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('A-REQ', '${req.altReqNo}', '${req.parentOrderId}')">${req.altReqNo}</button></td>
-                    <td class="font-bold">${req.parentOrderId}</td>
-                    <td class="font-bold">${req.maker || '---'}</td>
+                    <td><button type="button" class="su-chip-btn su-badge su-badge-areq" data-su-action="open-slip" data-slip-type="A-REQ" data-ref-code="${escapeHtml(req.altReqNo)}" data-order-id="${escapeHtml(req.parentOrderId)}">${escapeHtml(req.altReqNo)}</button></td>
+                    <td class="font-bold">${escapeHtml(req.parentOrderId)}</td>
+                    <td class="font-bold">${escapeHtml(req.maker || '---')}</td>
                     <td><span class="su-badge su-badge-areq">Rework &bull; Cycle ${Math.min(2, Math.max(1, req.alterationCycleCount || 1))}/2</span></td>
                     <td class="text-right font-bold" style="color: var(--su-areq-primary);">${req.inAlterationPairs.toLocaleString()} Prs</td>
                     <td class="text-center">
-                      <button type="button" class="table-btn" onclick="window.adminOpenReqInScreen('${req.reqNumber}', 'screen-repair')">Open Bay #2</button>
+                      <button type="button" class="table-btn" data-su-action="open-req-screen" data-req-number="${escapeHtml(req.reqNumber)}" data-target-screen="screen-repair">Open Bay #2</button>
                     </td>
                   </tr>
                 `
@@ -702,13 +746,13 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
                       ...s.unfulfilledMreqReqs.map(
                         req => `
                   <tr>
-                    <td><button type="button" class="su-chip-btn su-badge su-badge-mreq" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('M-REQ', '${req.mreqNo}', '${req.parentOrderId}')">${req.mreqNo}</button></td>
-                    <td class="font-bold">${req.parentOrderId}</td>
-                    <td>${req.maker || '---'}</td>
-                    <td><span class="su-badge su-badge-mreq">Unfulfilled M-REQ (${req.mreqStatus})</span></td>
-                    <td class="text-right font-bold" style="color: var(--su-mreq-primary);">${req.issuedPairs.toLocaleString()} Prs</td>
+                    <td><button type="button" class="su-chip-btn su-badge su-badge-mreq" data-su-action="open-slip" data-slip-type="M-REQ" data-ref-code="${escapeHtml(req.mreqNo)}" data-order-id="${escapeHtml(req.parentOrderId)}">${escapeHtml(req.mreqNo)}</button></td>
+                    <td class="font-bold">${escapeHtml(req.parentOrderId)}</td>
+                    <td>${escapeHtml(req.maker || '---')}</td>
+                    <td><span class="su-badge su-badge-mreq">Unfulfilled M-REQ (${escapeHtml(req.mreqStatus)})</span></td>
+                    <td class="text-right font-bold" style="color: var(--su-mreq-dark);">${req.issuedPairs.toLocaleString()} Prs</td>
                     <td class="text-center">
-                      <button type="button" class="table-btn" onclick="window.adminOpenReqInScreen('${req.reqNumber}', 'screen-packing')">Fulfill M-REQ</button>
+                      <button type="button" class="table-btn" data-su-action="open-req-screen" data-req-number="${escapeHtml(req.reqNumber)}" data-target-screen="screen-packing">Fulfill M-REQ</button>
                     </td>
                   </tr>
                 `
@@ -716,13 +760,13 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
                       ...s.pendingIssueReqs.map(
                         req => `
                   <tr>
-                    <td><button type="button" class="su-chip-btn su-badge su-badge-req" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('REQ', '${req.reqNumber}', '${req.parentOrderId}')">${req.reqNumber}</button></td>
-                    <td class="font-bold">${req.parentOrderId}</td>
-                    <td>${req.maker || '---'}</td>
-                    <td><span class="su-badge su-badge-grn">Awaiting Dock Issue (${req.mreqNo})</span></td>
-                    <td class="text-right font-bold" style="color: var(--su-grn-primary);">${req.askingPairs.toLocaleString()} Prs</td>
+                    <td><button type="button" class="su-chip-btn su-badge su-badge-req" data-su-action="open-slip" data-slip-type="REQ" data-ref-code="${escapeHtml(req.reqNumber)}" data-order-id="${escapeHtml(req.parentOrderId)}">${escapeHtml(req.reqNumber)}</button></td>
+                    <td class="font-bold">${escapeHtml(req.parentOrderId)}</td>
+                    <td>${escapeHtml(req.maker || '---')}</td>
+                    <td><span class="su-badge su-badge-grn">Awaiting Dock Issue (${escapeHtml(req.mreqNo)})</span></td>
+                    <td class="text-right font-bold" style="color: var(--su-grn-deep);">${req.askingPairs.toLocaleString()} Prs</td>
                     <td class="text-center">
-                      <button type="button" class="table-btn" onclick="window.adminOpenReqInScreen('${req.reqNumber}', 'screen-grn')">Issue at Dock</button>
+                      <button type="button" class="table-btn" data-su-action="open-req-screen" data-req-number="${escapeHtml(req.reqNumber)}" data-target-screen="screen-grn">Issue at Dock</button>
                     </td>
                   </tr>
                 `
@@ -774,7 +818,12 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
                 ? `
               <tr>
                 <td colspan="15" class="text-center" style="padding: 28px 16px; color: var(--su-text-muted);">
-                  No Master Orders created yet. Go to <strong>3. Order Creation</strong> to create a Buyer Order and issue it to Inward Receiving.
+                  <div style="margin-bottom: 10px;">
+                    No Master Orders created yet. Go to <strong>Order Creation</strong> to create a Buyer Order and issue it to Inward Receiving.
+                  </div>
+                  <button type="button" class="btn-outline" data-admin-tab-jump="orders">
+                    Go to Order Creation
+                  </button>
                 </td>
               </tr>
             `
@@ -783,32 +832,32 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
                       o => `
               <tr>
                 <td class="font-bold">
-                  <button type="button" class="su-chip-btn" style="color: var(--su-req-primary); background: var(--su-req-bg); border-color: var(--su-req-border);" onclick="window.adminInspectOrderInTracking('${o.orderId.replace(/'/g, "\\'")}')">${o.orderId}</button>
+                  <button type="button" class="su-chip-btn" style="color: var(--su-req-primary); background: var(--su-req-bg); border-color: var(--su-req-border);" data-su-action="inspect-order" data-order-id="${escapeHtml(o.orderId)}">${escapeHtml(o.orderId)}</button>
                 </td>
-                <td>${o.buyer}</td>
-                <td>${o.maker}</td>
-                <td class="font-bold">${o.po}</td>
-                <td class="font-bold">${o.article}</td>
+                <td>${escapeHtml(o.buyer)}</td>
+                <td>${escapeHtml(o.maker)}</td>
+                <td class="font-bold">${escapeHtml(o.po)}</td>
+                <td class="font-bold">${escapeHtml(o.article)}</td>
                 <td class="text-right font-bold">${o.plannedQty.toLocaleString()}</td>
                 <td class="text-right">
-                  <div class="font-bold" style="color: var(--su-grn-primary); margin-bottom: 3px;">${o.receivedGrnQty.toLocaleString()} Prs (${o.grnBatches.length})</div>
+                  <div class="font-bold" style="color: var(--su-grn-deep); margin-bottom: 3px;">${o.receivedGrnQty.toLocaleString()} Prs (${o.grnBatches.length})</div>
                   ${renderOrderGrnChipsWithOverflow(o)}
                 </td>
                 <td class="text-right">${o.contractorBalanceQty.toLocaleString()}</td>
-                <td class="text-right font-bold" style="color: var(--su-mreq-primary);">${o.dockAvailableQty.toLocaleString()}</td>
+                <td class="text-right font-bold" style="color: var(--su-mreq-dark);">${o.dockAvailableQty.toLocaleString()}</td>
                 <td class="text-right">
                   <div class="font-bold" style="color: var(--su-req-primary); margin-bottom: 3px;">${o.issuedReqQty.toLocaleString()} Prs (${o.reqBatches.length})</div>
                   ${renderOrderReqChipsWithOverflow(o)}
                 </td>
                 <td class="text-right">
-                  ${o.inFloorWipQty.toLocaleString()} ${o.awaitingFinalQcQty > 0 ? `<span class="su-badge su-badge-mreq" style="font-size: 9.5px; padding: 0 4px;">S4:${o.awaitingFinalQcQty}</span>` : ''}
+                  ${o.inFloorWipQty.toLocaleString()} ${o.awaitingFinalQcQty > 0 ? `<span class="su-badge su-badge-mreq" style="font-size: 12px; padding: 0 4px;">S4:${o.awaitingFinalQcQty}</span>` : ''}
                 </td>
                 <td class="text-right" style="color: var(--su-areq-primary); font-weight: 700;">
                   ${o.inAlterationQty} / ${o.scrappedQty}
                 </td>
-                <td class="text-right font-bold" style="color: var(--su-complete-primary);">${o.packedStage5Qty.toLocaleString()}</td>
+                <td class="text-right font-bold" style="color: var(--su-complete-dark);">${o.packedStage5Qty.toLocaleString()}</td>
                 <td class="text-center">${renderReconciliationBadge(o.reconciliation)}</td>
-                <td class="text-center"><span class="${getSuperUserStatusBadgeClass(o.orderStatus)}">${o.orderStatus}</span></td>
+                <td class="text-center"><span class="${getSuperUserStatusBadgeClass(o.orderStatus)}">${escapeHtml(o.orderStatus)}</span></td>
               </tr>
             `
                     )
@@ -891,38 +940,47 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
     <section class="panel-card" style="padding: 12px 16px; margin-bottom: 14px;">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
         <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px; flex-wrap: wrap;">
-          <label for="admin-tracking-search" style="font-size: 11px; font-weight: 700; color: var(--su-text-primary); text-transform: uppercase; white-space: nowrap;">
+          <label for="admin-tracking-search" style="font-size: 12px; font-weight: 700; color: var(--su-text-primary); text-transform: uppercase; white-space: nowrap;">
             Search:
           </label>
           <input
             type="text"
             id="admin-tracking-search"
-            class="form-input"
-            style="max-width: 260px;"
+            class="form-input su-tracking-search-input"
             placeholder="Order #, PO #, GRN-0001, REQ-0001, M-REQ, A-REQ..."
-            value="${ctx.trackingSearch}"
+            value="${escapeHtml(ctx.trackingSearch || '')}"
           />
 
           <select
             id="admin-tracking-buyer-filter"
             class="form-select"
-            style="max-width: 180px; font-size: 11.5px;"
+            style="max-width: 190px; font-size: 12px;"
             aria-label="Filter by Buyer"
-            onchange="window.adminSetTrackingBuyerFilter && window.adminSetTrackingBuyerFilter(this.value)"
+            data-su-change="tracking-buyer-filter"
+            ${uniqueBuyers.length === 0 ? 'disabled' : ''}
           >
-            <option value="ALL" ${buyerFilter === 'ALL' ? 'selected' : ''}>All Buyers (${uniqueBuyers.length})</option>
-            ${uniqueBuyers.map(b => `<option value="${b}" ${buyerFilter === b ? 'selected' : ''}>${b}</option>`).join('')}
+            ${
+              uniqueBuyers.length === 0
+                ? `<option value="ALL" selected>No Buyers yet</option>`
+                : `<option value="ALL" ${buyerFilter === 'ALL' ? 'selected' : ''}>All Buyers (${uniqueBuyers.length})</option>
+                   ${uniqueBuyers.map(b => `<option value="${escapeHtml(b)}" ${buyerFilter === b ? 'selected' : ''}>${escapeHtml(b)}</option>`).join('')}`
+            }
           </select>
 
           <select
             id="admin-tracking-maker-filter"
             class="form-select"
-            style="max-width: 190px; font-size: 11.5px;"
+            style="max-width: 200px; font-size: 12px;"
             aria-label="Filter by Contractor"
-            onchange="window.adminSetTrackingMakerFilter && window.adminSetTrackingMakerFilter(this.value)"
+            data-su-change="tracking-maker-filter"
+            ${uniqueMakers.length === 0 ? 'disabled' : ''}
           >
-            <option value="ALL" ${makerFilter === 'ALL' ? 'selected' : ''}>All Contractors (${uniqueMakers.length})</option>
-            ${uniqueMakers.map(m => `<option value="${m}" ${makerFilter === m ? 'selected' : ''}>${m}</option>`).join('')}
+            ${
+              uniqueMakers.length === 0
+                ? `<option value="ALL" selected>No Contractors yet</option>`
+                : `<option value="ALL" ${makerFilter === 'ALL' ? 'selected' : ''}>All Contractors (${uniqueMakers.length})</option>
+                   ${uniqueMakers.map(m => `<option value="${escapeHtml(m)}" ${makerFilter === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}`
+            }
           </select>
 
           ${
@@ -932,16 +990,18 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
               <button
                 type="button"
                 class="btn-outline"
-                style="padding: 4px 8px; font-size: 11px;"
-                onclick="window.adminSetAllOrdersExpanded(true)"
+                style="padding: 4px 10px; font-size: 12px;"
+                data-su-action="expand-all"
+                data-expanded="true"
               >
                 Expand All
               </button>
               <button
                 type="button"
                 class="btn-outline"
-                style="padding: 4px 8px; font-size: 11px;"
-                onclick="window.adminSetAllOrdersExpanded(false)"
+                style="padding: 4px 10px; font-size: 12px;"
+                data-su-action="expand-all"
+                data-expanded="false"
               >
                 Collapse All
               </button>
@@ -952,19 +1012,19 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
         </div>
 
         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-          <button type="button" class="${statusFilter === 'ALL' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="ALL" style="padding: 5px 10px; font-size: 11px;">
+          <button type="button" class="${statusFilter === 'ALL' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="ALL">
             All Orders (${s.orderRollups.length})
           </button>
-          <button type="button" class="${statusFilter === 'RECEIVING' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="RECEIVING" style="padding: 5px 10px; font-size: 11px;">
+          <button type="button" class="${statusFilter === 'RECEIVING' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="RECEIVING">
             Dock Receiving
           </button>
-          <button type="button" class="${statusFilter === 'WIP' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="WIP" style="padding: 5px 10px; font-size: 11px;">
+          <button type="button" class="${statusFilter === 'WIP' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="WIP">
             In Floor WIP
           </button>
-          <button type="button" class="${statusFilter === 'HOLD_QC' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="HOLD_QC" style="padding: 5px 10px; font-size: 11px;">
+          <button type="button" class="${statusFilter === 'HOLD_QC' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="HOLD_QC">
             Stage 4 Hold (Final QC)
           </button>
-          <button type="button" class="${statusFilter === 'COMPLETED' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="COMPLETED" style="padding: 5px 10px; font-size: 11px;">
+          <button type="button" class="${statusFilter === 'COMPLETED' ? 'btn-primary' : 'btn-outline'} admin-tracking-filter-btn" data-tracking-filter="COMPLETED">
             Completed (${s.completedOrders})
           </button>
         </div>
@@ -976,9 +1036,9 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
         <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid var(--su-border-subtle); font-size: 11px; color: var(--su-text-secondary);">
           <span>Showing orders <strong>${startIdx + 1}&ndash;${Math.min(filteredOrders.length, startIdx + pageSize)}</strong> of <strong>${filteredOrders.length}</strong></span>
           <div style="display: inline-flex; gap: 6px; align-items: center;">
-            <button type="button" class="btn-outline" style="padding: 2px 8px; font-size: 11px;" ${safePage <= 1 ? 'disabled' : ''} onclick="window.adminSetTrackingPage && window.adminSetTrackingPage(${safePage - 1})">&larr; Prev</button>
+            <button type="button" class="btn-outline" style="padding: 2px 8px; font-size: 11px;" ${safePage <= 1 ? 'disabled' : ''} data-su-action="tracking-page" data-page="${safePage - 1}">&larr; Prev</button>
             <span>Page <strong>${safePage}</strong> / ${totalPages}</span>
-            <button type="button" class="btn-outline" style="padding: 2px 8px; font-size: 11px;" ${safePage >= totalPages ? 'disabled' : ''} onclick="window.adminSetTrackingPage && window.adminSetTrackingPage(${safePage + 1})">Next &rarr;</button>
+            <button type="button" class="btn-outline" style="padding: 2px 8px; font-size: 11px;" ${safePage >= totalPages ? 'disabled' : ''} data-su-action="tracking-page" data-page="${safePage + 1}">Next &rarr;</button>
           </div>
         </div>
       `
@@ -988,7 +1048,7 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
 
     <!-- Real-Time WIP Analytics Bar Chart (Planned Demand vs. Actual Packed Pairs per Active Requisition) -->
     ${(() => {
-      const series = buildRequisitionAnalyticsSeries(s);
+      const series = buildRequisitionAnalyticsSeries(s, undefined, true);
       return renderRequisitionWipAnalyticsChart({
         series,
         mode: 'super-user'
@@ -1004,9 +1064,9 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
           No Matching Orders in Live Tracking
         </div>
         <div style="font-size: 12.5px; color: var(--su-text-secondary); margin-bottom: 14px;">
-          Create a Master Order in <strong>3. Order Creation</strong>, receive partial or full GRN batches at <strong>Inward Register</strong>, and draw Packing Hall Requisitions (<code>REQ-0001</code>, <code>REQ-0002</code>...) to see the live parent-child tree here.
+          Create a Master Order in <strong>Order Creation</strong>, receive partial or full GRN batches at <strong>Inward Register</strong>, and draw Packing Hall Requisitions to see the live parent-child tree here.
         </div>
-        <button type="button" class="btn-primary" data-admin-tab-jump="orders">Go to 3. Order Creation &rarr;</button>
+        <button type="button" class="btn-primary" data-admin-tab-jump="orders">Go to Order Creation &rarr;</button>
       </section>
     `
         : pagedOrders
@@ -1037,7 +1097,7 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
               );
 
               return `
-        <section class="su-order-card ${isExpanded ? 'expanded' : 'collapsed'}" id="tracking-order-card-${ord.orderId}" data-order-card="${ord.orderId}">
+        <section class="su-order-card ${isExpanded ? 'expanded' : 'collapsed'}" id="tracking-order-card-${escapeHtml(ord.orderId)}" data-order-card="${escapeHtml(ord.orderId)}">
           <!-- Tier 1: Parent Master Order Header Banner (6.2) -->
           <div class="su-order-card-header">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -1045,24 +1105,25 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                 type="button"
                 class="btn-outline"
                 style="padding: 3px 8px; font-size: 11px; font-weight: 800;"
-                onclick="window.adminToggleOrderExpand('${ord.orderId.replace(/'/g, "\\'")}')"
+                data-su-action="toggle-order-expand"
+                data-order-id="${escapeHtml(ord.orderId)}"
                 aria-expanded="${isExpanded ? 'true' : 'false'}"
               >
                 ${isExpanded ? '&#9660; Collapse' : '&#9654; Expand'}
               </button>
               <div>
                 <div style="font-size: 13.5px; font-weight: 800; color: var(--su-text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                  <span style="color: var(--su-req-primary);">MASTER ORDER: ${ord.orderId}</span>
+                  <span style="color: var(--su-req-primary);">MASTER ORDER: ${escapeHtml(ord.orderId)}</span>
                   <span style="font-weight: 400; color: var(--su-text-muted);">|</span>
-                  <span>PO #${ord.po}</span>
+                  <span>PO #${escapeHtml(ord.po)}</span>
                   <span style="font-weight: 400; color: var(--su-text-muted);">|</span>
-                  <span>${ord.article} (${ord.color})</span>
+                  <span>${escapeHtml(ord.article)} (${escapeHtml(ord.color)})</span>
                   <span style="font-weight: 400; color: var(--su-text-muted);">|</span>
                   <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--su-text-secondary);">Plan: <strong>${ord.plannedQty.toLocaleString()} Prs</strong></span>
                   ${renderReconciliationBadge(ord.reconciliation)}
                 </div>
                 <div style="font-size: 11.5px; color: var(--su-text-secondary); margin-top: 2px;">
-                  Buyer: <strong style="color: var(--su-text-primary);">${ord.buyer}</strong> &bull; Contractor / Maker: <strong style="color: var(--su-text-primary);">${ord.maker}</strong> &bull;
+                  Buyer: <strong style="color: var(--su-text-primary);">${escapeHtml(ord.buyer)}</strong> &bull; Contractor / Maker: <strong style="color: var(--su-text-primary);">${escapeHtml(ord.maker)}</strong> &bull;
                   Planned Sizes: <strong>7:${ord.sizes['7'] || 0} | 8:${ord.sizes['8'] || 0} | 9:${ord.sizes['9'] || 0} | 10:${ord.sizes['10'] || 0} | 11:${ord.sizes['11'] || 0}</strong> &bull;
                   Packed S5 Sizes: <strong>7:${ord.packedSizes['7'] || 0} | 8:${ord.packedSizes['8'] || 0} | 9:${ord.packedSizes['9'] || 0} | 10:${ord.packedSizes['10'] || 0} | 11:${ord.packedSizes['11'] || 0}</strong>
                 </div>
@@ -1072,9 +1133,9 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <!-- 6.6: Planned vs. Packed visual progress bar per Order -->
               <div style="display: flex; flex-direction: column; gap: 2px; min-width: 155px;" title="Planned: ${ord.plannedQty} Prs | Stage 5 Packed: ${ord.packedStage5Qty} Prs | Stage 4 QC Hold: ${ord.awaitingFinalQcQty} Prs | Floor WIP: ${wipOnly} Prs | Alteration/Scrap: ${ord.inAlterationQty + ord.scrappedQty} Prs">
-                <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--su-text-secondary);">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; font-family: var(--font-mono); color: var(--su-text-secondary);">
                   <span>GRN:${pctReceived}%</span>
-                  <strong style="color: var(--su-complete-primary);">Packed:${ord.packedStage5Qty}/${ord.plannedQty} (${pctPacked}%)</strong>
+                  <strong style="color: var(--su-complete-dark);">Packed:${ord.packedStage5Qty}/${ord.plannedQty} (${pctPacked}%)</strong>
                 </div>
                 <div style="height: 7px; background: var(--su-border-subtle); border: 1px solid var(--su-border); border-radius: 3px; overflow: hidden; display: flex;">
                   <div style="width: ${s5Pct}%; height: 100%; background: var(--su-complete-primary);"></div>
@@ -1084,12 +1145,13 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                 </div>
               </div>
 
-              <span class="${getSuperUserStatusBadgeClass(ord.orderStatus)}">${ord.orderStatus}</span>
+              <span class="${getSuperUserStatusBadgeClass(ord.orderStatus)}">${escapeHtml(ord.orderStatus)}</span>
               <button
                 type="button"
                 class="btn-outline"
                 style="padding: 4px 10px; font-size: 11px; border-color: var(--su-grn-border); background: var(--su-grn-bg); color: var(--su-grn-dark); font-weight: 700;"
-                onclick="window.adminQuickReceiveGrnForOrder('${ord.orderId.replace(/'/g, "\\'")}')"
+                data-su-action="quick-receive-grn"
+                data-order-id="${escapeHtml(ord.orderId)}"
               >
                 + Receive GRN Batch (Dock)
               </button>
@@ -1097,7 +1159,8 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                 type="button"
                 class="btn-primary"
                 style="padding: 4px 10px; font-size: 11px;"
-                onclick="window.adminQuickCreateReqForOrder('${ord.orderId.replace(/'/g, "\\'")}')"
+                data-su-action="quick-create-req"
+                data-order-id="${escapeHtml(ord.orderId)}"
               >
                 + Draw REQ Batch (Packing Hall)
               </button>
@@ -1107,9 +1170,10 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                 <button
                   type="button"
                   class="btn-outline"
-                  style="padding: 4px 8px; font-size: 10.5px;"
+                  style="padding: 4px 8px; font-size: 11px;"
                   title="Close order short-shipped at ${ord.receivedGrnQty} received pairs"
-                  onclick="window.adminCloseOrderShort && window.adminCloseOrderShort('${ord.orderId.replace(/'/g, "\\'")}')"
+                  data-su-action="short-close-order"
+                  data-order-id="${escapeHtml(ord.orderId)}"
                 >
                   Short-Close Order
                 </button>
@@ -1125,36 +1189,36 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
             <!-- Parent Order Quantitative Reconciliation Strip (3.1 - 3.5) -->
             <div class="su-order-reconcile-strip">
               <div>
-                <div style="color: var(--su-text-muted); font-size: 10.5px; text-transform: uppercase;">Planned Qty</div>
+                <div style="color: var(--su-text-muted); font-size: 12px; text-transform: uppercase;">Planned Qty</div>
                 <div style="font-weight: 800; font-size: 13px; color: var(--su-text-primary);">${ord.plannedQty.toLocaleString()} Prs</div>
               </div>
               <div>
-                <div style="color: var(--su-grn-dark); font-size: 10.5px; text-transform: uppercase; font-weight: 700;">Rcvd (${ord.grnBatches.length} GRNs)</div>
-                <div style="font-weight: 800; font-size: 13px; color: var(--su-grn-primary);">${ord.receivedGrnQty.toLocaleString()} Prs (${pctReceived}%)</div>
+                <div style="color: var(--su-grn-dark); font-size: 12px; text-transform: uppercase; font-weight: 700;">Rcvd (${ord.grnBatches.length} GRNs)</div>
+                <div style="font-weight: 800; font-size: 13px; color: var(--su-grn-deep);">${ord.receivedGrnQty.toLocaleString()} Prs (${pctReceived}%)</div>
               </div>
               <div>
-                <div style="color: var(--su-text-muted); font-size: 10.5px; text-transform: uppercase;">Contractor Bal</div>
+                <div style="color: var(--su-text-muted); font-size: 12px; text-transform: uppercase;">Contractor Bal</div>
                 <div style="font-weight: 800; font-size: 13px; color: var(--su-text-primary);">${ord.contractorBalanceQty.toLocaleString()} Prs</div>
               </div>
               <div>
-                <div style="color: var(--su-text-muted); font-size: 10.5px; text-transform: uppercase;">Dock Pool</div>
-                <div style="font-weight: 800; font-size: 13px; color: var(--su-mreq-primary);">${ord.dockAvailableQty.toLocaleString()} Prs</div>
+                <div style="color: var(--su-text-muted); font-size: 12px; text-transform: uppercase;">Dock Pool</div>
+                <div style="font-weight: 800; font-size: 13px; color: var(--su-mreq-dark);">${ord.dockAvailableQty.toLocaleString()} Prs</div>
               </div>
               <div>
-                <div style="color: var(--su-req-primary); font-size: 10.5px; text-transform: uppercase; font-weight: 700;">Issued (${ord.reqBatches.length} REQs)</div>
+                <div style="color: var(--su-req-primary); font-size: 12px; text-transform: uppercase; font-weight: 700;">Issued (${ord.reqBatches.length} REQs)</div>
                 <div style="font-weight: 800; font-size: 13px; color: var(--su-req-primary);">${ord.issuedReqQty.toLocaleString()} Prs</div>
               </div>
               <div>
-                <div style="color: var(--su-mreq-primary); font-size: 10.5px; text-transform: uppercase; font-weight: 700;">Floor WIP / S4 Hold</div>
-                <div style="font-weight: 800; font-size: 13px; color: var(--su-mreq-primary);">${ord.inFloorWipQty.toLocaleString()} Prs ${ord.awaitingFinalQcQty > 0 ? `(S4: ${ord.awaitingFinalQcQty})` : ''}</div>
+                <div style="color: var(--su-mreq-dark); font-size: 12px; text-transform: uppercase; font-weight: 700;">Floor WIP / S4 Hold</div>
+                <div style="font-weight: 800; font-size: 13px; color: var(--su-mreq-dark);">${ord.inFloorWipQty.toLocaleString()} Prs ${ord.awaitingFinalQcQty > 0 ? `(S4: ${ord.awaitingFinalQcQty})` : ''}</div>
               </div>
               <div>
-                <div style="color: var(--su-areq-primary); font-size: 10.5px; text-transform: uppercase; font-weight: 700;">Alter (A) / Scrap</div>
+                <div style="color: var(--su-areq-primary); font-size: 12px; text-transform: uppercase; font-weight: 700;">Alter (A) / Scrap</div>
                 <div style="font-weight: 800; font-size: 13px; color: var(--su-areq-primary);">${ord.inAlterationQty} / ${ord.scrappedQty} Prs</div>
               </div>
               <div>
-                <div style="color: var(--su-complete-dark); font-size: 10.5px; text-transform: uppercase; font-weight: 700;">Packed Stage 5</div>
-                <div style="font-weight: 800; font-size: 13px; color: var(--su-complete-primary);">${ord.packedStage5Qty.toLocaleString()} Prs (${ord.packedStage5Cartons} Ctns)</div>
+                <div style="color: var(--su-complete-dark); font-size: 12px; text-transform: uppercase; font-weight: 700;">Packed Stage 5</div>
+                <div style="font-weight: 800; font-size: 13px; color: var(--su-complete-dark);">${ord.packedStage5Qty.toLocaleString()} Prs (${ord.packedStage5Cartons} Ctns)</div>
               </div>
             </div>
 
@@ -1189,7 +1253,7 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                           ? `
                         <tr>
                           <td colspan="7" class="text-center" style="padding: 16px; color: var(--su-text-muted); font-size: 12px;">
-                            No GRN batches received yet for ${ord.orderId}. Click <strong>+ Receive GRN Batch</strong> above when contractor goods arrive at Dock.
+                            No GRN batches received yet for ${escapeHtml(ord.orderId)}. Click <strong>+ Receive GRN Batch</strong> above when contractor goods arrive at Dock.
                           </td>
                         </tr>
                       `
@@ -1198,27 +1262,27 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                                 const isHighlighted = ctx.highlightedRefCode === g.grnCode;
                                 const voidCheck = canVoidGrnBatch(g);
                                 return `
-                        <tr id="tracking-chip-row-${g.grnCode}" style="${isHighlighted ? 'background: var(--su-grn-bg);' : ''}">
+                        <tr id="tracking-chip-row-${escapeHtml(g.grnCode)}" style="${isHighlighted ? 'background: var(--su-grn-bg);' : ''}">
                           <td class="font-bold">Batch #${g.orderBatchSeq}</td>
-                          <td><span class="su-badge su-badge-grn" style="font-family: var(--font-mono);">${g.grnCode}</span></td>
-                          <td>${g.date}</td>
+                          <td><span class="su-badge su-badge-grn" style="font-family: var(--font-mono);">${escapeHtml(g.grnCode)}</span></td>
+                          <td>${escapeHtml(g.date)}</td>
                           <td class="text-center" style="font-size: 11px;">
                             ${g.sizes['7'] || 0}/${g.sizes['8'] || 0}/${g.sizes['9'] || 0}/${g.sizes['10'] || 0}/${g.sizes['11'] || 0}
                           </td>
                           <td class="text-right font-bold" style="color: var(--su-grn-dark);">${g.rcvdPairs.toLocaleString()} Prs</td>
-                          <td style="font-size: 10.5px;">
-                            <div><span class="${getSuperUserStatusBadgeClass(g.allocationStatus)}">${g.allocationStatus}</span></div>
+                          <td style="font-size: 11px;">
+                            <div><span class="${getSuperUserStatusBadgeClass(g.allocationStatus)}">${escapeHtml(g.allocationStatus)}</span></div>
                             ${
                               g.allocatedToReqs.length > 0
-                                ? `<div style="font-family: var(--font-mono); color: var(--su-text-secondary); margin-top: 2px;">&rarr; ${g.allocatedToReqs.map(a => `${a.reqNumber} (${a.pairs})`).join(', ')}</div>`
+                                ? `<div style="font-family: var(--font-mono); color: var(--su-text-secondary); margin-top: 2px;">&rarr; ${g.allocatedToReqs.map(a => `${escapeHtml(a.reqNumber)} (${a.pairs})`).join(', ')}</div>`
                                 : `<div style="color: var(--su-text-muted); margin-top: 2px;">Dock Pool: ${g.unallocatedPairs} Prs</div>`
                             }
                           </td>
                           <td class="text-center" style="white-space: nowrap;">
-                            <button type="button" class="table-btn" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('GRN', '${g.grnCode}', '${ord.orderId.replace(/'/g, "\\'")}')">Slip</button>
+                            <button type="button" class="table-btn" data-su-action="open-slip" data-slip-type="GRN" data-ref-code="${escapeHtml(g.grnCode)}" data-order-id="${escapeHtml(ord.orderId)}">Slip</button>
                             ${
                               voidCheck.allowed
-                                ? `<button type="button" class="table-btn" style="color: var(--su-areq-primary);" title="${voidCheck.reason}" onclick="window.adminVoidGrnBatch && window.adminVoidGrnBatch(${g.sr}, '${g.grnCode}')">Void</button>`
+                                ? `<button type="button" class="table-btn" style="color: var(--su-areq-primary);" title="${escapeHtml(voidCheck.reason)}" data-su-action="void-grn" data-grn-sr="${g.sr}" data-grn-code="${escapeHtml(g.grnCode)}">Void</button>`
                                 : ''
                             }
                           </td>
@@ -1235,11 +1299,11 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
               <!-- Child Stream 2: Packing Hall Requisitions with M-REQ, A-REQ & Per-REQ Reconciliation Badge (6.4 & 6.5) -->
               <div style="border: 1px solid var(--su-req-border); border-radius: 5px; background: var(--su-white); overflow: hidden;">
                 <div style="padding: 8px 12px; background: var(--su-req-bg); border-bottom: 1px solid var(--su-req-border); display: flex; justify-content: space-between; align-items: center;">
-                  <span style="font-size: 11.5px; font-weight: 800; color: var(--su-req-primary); text-transform: uppercase;">
+                  <span style="font-size: 12px; font-weight: 800; color: var(--su-req-primary); text-transform: uppercase;">
                     Execution Stream: Packing Hall Requisitions (${ord.reqBatches.length} REQs &rarr; M &amp; A)
                   </span>
-                  <span style="font-size: 11px; color: var(--su-req-deep);">
-                    Issued: <strong>${ord.issuedReqQty.toLocaleString()}</strong> Prs &bull; Packed S5: <strong style="color: var(--su-complete-primary);">${ord.packedStage5Qty.toLocaleString()}</strong> Prs
+                  <span style="font-size: 12px; color: var(--su-req-deep);">
+                    Issued: <strong>${ord.issuedReqQty.toLocaleString()}</strong> Prs &bull; Packed S5: <strong style="color: var(--su-complete-dark);">${ord.packedStage5Qty.toLocaleString()}</strong> Prs
                   </span>
                 </div>
                 <div class="table-responsive">
@@ -1261,7 +1325,7 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                           ? `
                         <tr>
                           <td colspan="7" class="text-center" style="padding: 16px; color: var(--su-text-muted); font-size: 12px;">
-                            No Packing Requisitions drawn yet for ${ord.orderId}. Click <strong>+ Draw REQ Batch</strong> to generate <code>REQ-0001</code> (with <code>M-REQ-0001</code> &amp; <code>A-REQ-0001</code>).
+                            No Packing Requisitions drawn yet for ${escapeHtml(ord.orderId)}. Click <strong>+ Draw REQ Batch</strong> to generate <code>REQ-0001</code> (with <code>M-REQ-0001</code> &amp; <code>A-REQ-0001</code>).
                           </td>
                         </tr>
                       `
@@ -1274,25 +1338,25 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                                   outputPairs: r.packedStage5Pairs
                                 });
                                 return `
-                        <tr id="tracking-chip-row-${r.reqNumber}" style="${isHighlighted ? 'background: var(--su-req-bg);' : ''}">
+                        <tr id="tracking-chip-row-${escapeHtml(r.reqNumber)}" style="${isHighlighted ? 'background: var(--su-req-bg);' : ''}">
                           <td style="font-family: var(--font-mono);">
                             <div>
-                              <button type="button" class="su-chip-btn su-badge su-badge-req" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('REQ', '${r.reqNumber}', '${ord.orderId.replace(/'/g, "\\'")}')">#${r.orderReqSeq} &bull; ${r.reqNumber}</button>
+                              <button type="button" class="su-chip-btn su-badge su-badge-req" data-su-action="open-slip" data-slip-type="REQ" data-ref-code="${escapeHtml(r.reqNumber)}" data-order-id="${escapeHtml(ord.orderId)}">#${r.orderReqSeq} &bull; ${escapeHtml(r.reqNumber)}</button>
                             </div>
                             ${
                               r.allocatedFromGrns.length > 0
-                                ? `<div style="font-size: 10px; color: var(--su-grn-dark); margin-top: 2px;">From: ${r.allocatedFromGrns.map(a => `${a.grnCode}(${a.pairs})`).join(' + ')}</div>`
+                                ? `<div style="font-size: 11px; color: var(--su-grn-dark); margin-top: 2px;">From: ${r.allocatedFromGrns.map(a => `${escapeHtml(a.grnCode)}(${a.pairs})`).join(' + ')}</div>`
                                 : ''
                             }
                           </td>
                           <td style="font-family: var(--font-mono); font-size: 11px;">
                             <div style="margin-bottom: 2px;">
-                              <button type="button" class="su-chip-btn su-badge su-badge-mreq" style="font-size: 10px; padding: 1px 5px;" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('M-REQ', '${r.mreqNo}', '${ord.orderId.replace(/'/g, "\\'")}')">${r.mreqNo}</button>
-                              <span style="color: var(--su-text-secondary); font-size: 10px;">(${r.mreqStatus})</span>
+                              <button type="button" class="su-chip-btn su-badge su-badge-mreq" style="font-size: 11px; padding: 1px 5px;" data-su-action="open-slip" data-slip-type="M-REQ" data-ref-code="${escapeHtml(r.mreqNo)}" data-order-id="${escapeHtml(ord.orderId)}">${escapeHtml(r.mreqNo)}</button>
+                              <span style="color: var(--su-text-secondary); font-size: 11px;">(${escapeHtml(r.mreqStatus)})</span>
                             </div>
                             <div>
-                              <button type="button" class="su-chip-btn su-badge su-badge-areq" style="font-size: 10px; padding: 1px 5px;" onclick="window.adminOpenDocumentSlip && window.adminOpenDocumentSlip('A-REQ', '${r.altReqNo}', '${ord.orderId.replace(/'/g, "\\'")}')">${r.altReqNo}</button>
-                              <span style="color: var(--su-text-secondary); font-size: 10px;">(${r.inAlterationPairs} rework${r.alterationCycleCount > 0 ? ` C${r.alterationCycleCount}/2` : ''})</span>
+                              <button type="button" class="su-chip-btn su-badge su-badge-areq" style="font-size: 11px; padding: 1px 5px;" data-su-action="open-slip" data-slip-type="A-REQ" data-ref-code="${escapeHtml(r.altReqNo)}" data-order-id="${escapeHtml(ord.orderId)}">${escapeHtml(r.altReqNo)}</button>
+                              <span style="color: var(--su-text-secondary); font-size: 11px;">(${r.inAlterationPairs} rework${r.alterationCycleCount > 0 ? ` C${r.alterationCycleCount}/2` : ''})</span>
                             </div>
                           </td>
                           <td class="text-right font-bold" style="color: var(--su-req-primary);">
@@ -1302,22 +1366,22 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                             ${renderStageMiniTrack(r.activeStage, r.awaitingFinalQc, r.reqLifecycleStatus === 'CLOSED ✓')}
                             ${
                               r.awaitingFinalQc
-                                ? `<div style="margin-top: 3px;"><span class="su-badge su-badge-mreq" style="font-size: 9.5px;">[STAGE 4 DONE &mdash; AWAITING FINAL QC]</span></div>`
+                                ? `<div style="margin-top: 3px;"><span class="su-badge su-badge-mreq" style="font-size: 11px;">[STAGE 4 DONE &mdash; AWAITING FINAL QC]</span></div>`
                                 : ''
                             }
                           </td>
-                          <td class="text-right" style="font-family: var(--font-mono); font-size: 11px;">
-                            <span style="color: var(--su-req-accent);">WIP:${r.inFloorWipPairs}</span> | <span style="color: var(--su-areq-primary);">A:${r.inAlterationPairs}/S:${r.scrappedPairs}</span> | <span style="color: var(--su-complete-primary); font-weight: 700;">S5:${r.packedStage5Pairs}</span>
+                          <td class="text-right" style="font-family: var(--font-mono); font-size: 12px;">
+                            <span style="color: var(--su-req-accent);">WIP:${r.inFloorWipPairs}</span> | <span style="color: var(--su-areq-primary);">A:${r.inAlterationPairs}/S:${r.scrappedPairs}</span> | <span style="color: var(--su-complete-dark); font-weight: 700;">S5:${r.packedStage5Pairs}</span>
                           </td>
                           <td class="text-center">
                             <div style="margin-bottom: 3px;">${renderReconciliationBadge(r.reconciliation)}</div>
-                            <span class="${getSuperUserStatusBadgeClass(r.reqLifecycleStatus)}">${r.reqLifecycleStatus}</span>
+                            <span class="${getSuperUserStatusBadgeClass(r.reqLifecycleStatus)}">${escapeHtml(r.reqLifecycleStatus)}</span>
                           </td>
                           <td class="text-center" style="white-space: nowrap;">
-                            <button type="button" class="table-btn" onclick="window.adminOpenReqInScreen('${r.reqNumber}', 'screen-packing')">Floor</button>
+                            <button type="button" class="table-btn" data-su-action="open-req-screen" data-req-number="${escapeHtml(r.reqNumber)}" data-target-screen="screen-packing">Floor</button>
                             ${
                               voidCheck.allowed
-                                ? `<button type="button" class="table-btn" style="color: var(--su-areq-primary);" title="${voidCheck.reason}" onclick="window.adminVoidReqBatch && window.adminVoidReqBatch('${r.reqNumber}')">Void</button>`
+                                ? `<button type="button" class="table-btn" style="color: var(--su-areq-primary);" title="${escapeHtml(voidCheck.reason)}" data-su-action="void-req" data-req-number="${escapeHtml(r.reqNumber)}">Void</button>`
                                 : ''
                             }
                           </td>
@@ -1346,13 +1410,6 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
   const ov = ctx.adminOverview;
   const counts = ov.dbHealth.tableCounts || {};
   const totalRows = Object.values(counts).reduce((sum: number, n: any) => sum + Number(n || 0), 0);
-  const systemUsers: SystemUserRecord[] = ctx.systemUsers || [
-    { userId: 'USR-01', name: 'M. Tariq (Plant Director)', role: 'SUPER_USER', station: 'Command Center', active: true },
-    { userId: 'USR-02', name: 'A. Raza (Dock Clerk)', role: 'INWARD_CLERK', station: 'Dock Receiving', active: true },
-    { userId: 'USR-03', name: 'S. Mahmood (Hall Supervisor)', role: 'PACKING_SUPERVISOR', station: 'Packing Hall #1', active: true },
-    { userId: 'USR-04', name: 'F. Iqbal (AQL Lead)', role: 'QC_INSPECTOR', station: 'Final QC Gate', active: true },
-    { userId: 'USR-05', name: 'K. Hussain (Rework Lead)', role: 'ALTERATION_LEAD', station: 'Alteration Bay #2', active: true }
-  ];
   const auditTrail: AuditTrailEntry[] = ctx.auditTrail || [];
 
   return `
@@ -1360,16 +1417,17 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
     <section class="panel-card" style="margin-bottom: 14px;">
       <div class="panel-card-header">
         <div class="panel-card-title">
-          <span>3. Super User Master Order Creation &amp; Pending Orders Hub (SQLite Persistent)</span>
+          <span>1. Super User Master Order Creation &amp; Pending Orders Hub (SQLite Persistent)</span>
           <span class="panel-counter-badge">${ctx.pendingOrders.length} Database Orders</span>
         </div>
         <span class="admin-meta-caption">Parent Order Container &mdash; Receives Multiple GRNs (0001, 0002...) &amp; Multiple REQs (0001, 0002... &rarr; M &amp; A)</span>
       </div>
       <div style="padding: 14px 16px;">
-        <div style="display: grid; grid-template-columns: 1fr 1.2fr 1.2fr 1fr 1.2fr 1fr; gap: 10px; margin-bottom: 12px; align-items: end;">
+        <div class="su-order-form-grid">
           <div class="form-group">
-            <label for="admin-pending-order-id">Order Reference #</label>
-            <input type="text" id="admin-pending-order-id" class="form-input" placeholder="e.g. ORD-2026-001" value="ORD-2026-${String(ctx.pendingOrders.length + 1).padStart(3, '0')}" />
+            <label for="admin-pending-order-id">Order Reference (system assigned)</label>
+            <input type="text" id="admin-pending-order-id" class="form-input" placeholder="Assigned on save" readonly aria-readonly="true" />
+            <small>Assigned by the server after save; this reference cannot be changed.</small>
           </div>
 
           <div class="form-group">
@@ -1378,9 +1436,9 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
               <option value="">-- Choose Buyer --</option>
               ${(ov.customers.length
                 ? ov.customers.map(
-                    (c: any) => `<option value="${c.name}">${c.name} (${c.country || 'Global'})</option>`
+                    (c: any) => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${escapeHtml(c.country || 'Global')})</option>`
                   )
-                : ctx.dropdownOptions.customers.map(c => `<option value="${c}">${c}</option>`)
+                : ctx.dropdownOptions.customers.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
               ).join('')}
               ${
                 !ov.customers.length && !ctx.dropdownOptions.customers.length
@@ -1397,10 +1455,10 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
 
           <div class="form-group">
-            <label for="admin-pending-order-maker">Contractor / Maker</label>
-            <select id="admin-pending-order-maker" class="form-select">
+            <label for="admin-pending-order-maker">Contractor / Maker <span class="su-required-mark" aria-hidden="true">*</span></label>
+            <select id="admin-pending-order-maker" class="form-select" required aria-required="true">
               <option value="">-- Choose Contractor --</option>
-              ${ctx.dropdownOptions.makers.map(m => `<option value="${m}">${m}</option>`).join('')}
+              ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}
             </select>
           </div>
 
@@ -1408,15 +1466,15 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             <label for="admin-pending-order-po">PO Number</label>
             <input type="text" id="admin-pending-order-po" class="form-input" placeholder="e.g. 27351" list="admin-po-preset-list" />
             <datalist id="admin-po-preset-list">
-              ${ctx.dropdownOptions.poList.map(p => `<option value="${p}">${p}</option>`).join('')}
+              ${ctx.dropdownOptions.poList.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
             </datalist>
           </div>
 
           <div class="form-group">
-            <label for="admin-pending-order-article">Article</label>
-            <select id="admin-pending-order-article" class="form-select">
+            <label for="admin-pending-order-article">Article <span class="su-required-mark" aria-hidden="true">*</span></label>
+            <select id="admin-pending-order-article" class="form-select" required aria-required="true">
               <option value="">-- Choose Article --</option>
-              ${ctx.dropdownOptions.articles.map(a => `<option value="${a}">${a}</option>`).join('')}
+              ${ctx.dropdownOptions.articles.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}
             </select>
           </div>
 
@@ -1426,12 +1484,12 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
         </div>
 
-        <div style="background: var(--ink-50); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px 12px; margin-bottom: 12px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <span style="font-weight: 700; color: var(--ink-950); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em;">
+        <div class="su-order-matrix-card">
+          <div class="su-order-matrix-header">
+            <span style="font-weight: 700; color: var(--ink-950); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;">
               Planned Order Size Breakdown Matrix (Pairs)
             </span>
-            <span style="font-size: 11px; color: var(--ink-600);">
+            <span style="font-size: 12px; color: var(--ink-700);">
               Enter pairs for each size. The order total calculates automatically.
             </span>
           </div>
@@ -1459,13 +1517,19 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </table>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <span style="font-size: 11.5px; color: var(--ink-600);">
+        <div class="su-order-action-row">
+          <span style="font-size: 12px; color: var(--su-text-secondary);">
+            <span class="su-required-mark" aria-hidden="true">*</span> Required fields &bull;
             Orders are saved directly to SQLite (<code>pending_orders</code>) and populate the Inward Receiving dropdown for multiple GRN batches and Packing Hall REQs.
           </span>
-          <button class="btn-primary" id="btn-admin-add-pending-order" style="padding: 7px 18px;">
-            Save Order to Database &amp; Issue to Inward Goods
-          </button>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-outline" id="btn-admin-reset-pending-order">
+              Reset Form
+            </button>
+            <button type="button" class="btn-primary" id="btn-admin-add-pending-order" style="padding: 7px 18px;">
+              Save &amp; Issue Master Order
+            </button>
+          </div>
         </div>
 
         <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
@@ -1492,7 +1556,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
               ${
                 ctx.pendingOrders.length === 0
                   ? `
-                <tr><td colspan="14" class="table-empty-cell">No orders in database yet. Fill out the form above and click "Save Order to Database &amp; Issue to Inward Goods".</td></tr>
+                <tr><td colspan="14" class="table-empty-cell">No orders in database yet. Fill out the form above and click "Save &amp; Issue Master Order".</td></tr>
               `
                   : ctx.pendingOrders
                       .map(o => {
@@ -1501,12 +1565,12 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                         );
                         return `
                   <tr>
-                    <td class="font-bold">${o.orderId}</td>
-                    <td>${o.buyer || '---'}</td>
-                    <td>${o.maker}</td>
-                    <td class="font-bold">${o.po || '---'}</td>
-                    <td class="font-bold">${o.article}</td>
-                    <td>${o.color || 'Standard'}</td>
+                    <td class="font-bold">${escapeHtml(o.orderId)}</td>
+                    <td>${escapeHtml(o.buyer || '---')}</td>
+                    <td>${escapeHtml(o.maker)}</td>
+                    <td class="font-bold">${escapeHtml(o.po || '---')}</td>
+                    <td class="font-bold">${escapeHtml(o.article)}</td>
+                    <td>${escapeHtml(o.color || 'Standard')}</td>
                     <td class="text-center">${o.sizes?.['7'] ?? '-'}</td>
                     <td class="text-center">${o.sizes?.['8'] ?? '-'}</td>
                     <td class="text-center">${o.sizes?.['9'] ?? '-'}</td>
@@ -1517,8 +1581,8 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                       ${rollup ? `${rollup.grnBatches.length} GRNs &middot; ${rollup.reqBatches.length} REQs` : '0 GRNs &middot; 0 REQs'}
                     </td>
                     <td class="text-center" style="white-space: nowrap;">
-                      <button type="button" class="table-btn" onclick="window.adminInspectOrderInTracking('${o.orderId.replace(/'/g, "\\'")}')">Track</button>
-                      <button type="button" class="table-btn" title="Remove Order" onclick="window.adminRemovePendingOrder('${o.orderId.replace(/'/g, "\\'")}')">Delete</button>
+                      <button type="button" class="table-btn" data-su-action="inspect-order" data-order-id="${escapeHtml(o.orderId)}">Track</button>
+                      <button type="button" class="table-btn" title="Remove Order" data-su-action="remove-pending-order" data-order-id="${escapeHtml(o.orderId)}">Delete</button>
                     </td>
                   </tr>
                 `;
@@ -1531,16 +1595,16 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       </div>
     </section>
 
-    <!-- 7.2: Collapsible Master Registries (Buyers, Articles, Contractors/Makers, System Users & RBAC, Audit Trail) -->
+    <!-- 7.2: Collapsible Master Registries (Buyers, Articles, Contractors/Makers, Audit Trail) -->
     <div class="two-column-grid" style="margin-bottom: 14px;">
       <!-- Collapsible Registry 1: Customer & Buyer Master -->
       <details class="su-collapsible-registry" open>
         <summary>
-          <span>1. Customer &amp; Buyer Master Registry (${ov.customers.length} Buyers)</span>
+          <span>2. Customer &amp; Buyer Master Registry (${ov.customers.length} Buyers)</span>
           <span class="admin-meta-caption">AQL Inspection Rules &bull; Click to Toggle</span>
         </summary>
         <div class="su-collapsible-body">
-          <div style="display: grid; grid-template-columns: 1.1fr 1fr 1.1fr auto; gap: 8px; align-items: end; margin-bottom: 12px;">
+          <div class="su-customer-form-grid">
             <div class="form-group">
               <label for="admin-cust-name">Customer Name</label>
               <input type="text" id="admin-cust-name" class="form-input" placeholder="e.g. Alpine Tactical" />
@@ -1556,7 +1620,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                 <option value="THOROUGH">THOROUGH (100%)</option>
               </select>
             </div>
-            <button class="btn-primary" id="btn-admin-save-customer">Save Buyer</button>
+            <button type="button" class="btn-primary" id="btn-admin-save-customer">Save Buyer</button>
           </div>
           <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
             <table class="data-table">
@@ -1568,10 +1632,10 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                   .map(
                     (c: any) => `
                   <tr>
-                    <td class="font-bold">${c.id}</td>
-                    <td>${c.name}</td>
-                    <td>${c.country || '---'}</td>
-                    <td class="text-center"><span class="status-pill">${c.inspection_preference}</span></td>
+                    <td class="font-bold">${escapeHtml(c.id)}</td>
+                    <td>${escapeHtml(c.name)}</td>
+                    <td>${escapeHtml(c.country || '---')}</td>
+                    <td class="text-center"><span class="status-pill">${escapeHtml(c.inspection_preference)}</span></td>
                   </tr>
                 `
                   )
@@ -1585,11 +1649,11 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       <!-- Collapsible Registry 2: Glove Product / Article Master -->
       <details class="su-collapsible-registry" open>
         <summary>
-          <span>2. Glove Article &amp; Packaging BOM Master (${ov.products.length} Articles)</span>
+          <span>3. Glove Article &amp; Packaging BOM Master (${ov.products.length} Articles)</span>
           <span class="admin-meta-caption">Per-Pair Accessory Ratios &bull; Click to Toggle</span>
         </summary>
         <div class="su-collapsible-body">
-          <div style="display: grid; grid-template-columns: 1.2fr 1.2fr 0.7fr 0.7fr auto; gap: 8px; align-items: end; margin-bottom: 12px;">
+          <div class="su-article-form-grid">
             <div class="form-group">
               <label for="admin-prod-name">Article Name</label>
               <input type="text" id="admin-prod-name" class="form-input" placeholder="e.g. Stealth Pro V2" />
@@ -1597,7 +1661,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             <div class="form-group">
               <label for="admin-prod-cust">Buyer</label>
               <select id="admin-prod-cust" class="form-select">
-                ${ov.customers.map((c: any) => `<option value="${c.id}">${c.name}</option>`).join('')}
+                ${ov.customers.map((c: any) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
               </select>
             </div>
             <div class="form-group">
@@ -1608,7 +1672,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
               <label for="admin-prod-carton">Pairs/Ctn</label>
               <input type="number" id="admin-prod-carton" class="form-input" value="50" min="1" />
             </div>
-            <button class="btn-primary" id="btn-admin-save-product">Save Article</button>
+            <button type="button" class="btn-primary" id="btn-admin-save-product">Save Article</button>
           </div>
           <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
             <table class="data-table">
@@ -1620,9 +1684,9 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                   .map(
                     (p: any) => `
                   <tr>
-                    <td class="font-bold">${p.id}</td>
-                    <td class="font-bold">${p.name}</td>
-                    <td>${p.customer_name || p.customer_id}</td>
+                    <td class="font-bold">${escapeHtml(p.id)}</td>
+                    <td class="font-bold">${escapeHtml(p.name)}</td>
+                    <td>${escapeHtml(p.customer_name || p.customer_id)}</td>
                     <td class="text-right">${p.polybag_per_pair}</td>
                     <td class="text-right">${p.silica_gel_per_pair}</td>
                     <td class="text-right">${p.stickers_per_pair}</td>
@@ -1642,7 +1706,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       <!-- Collapsible Registry 3: Contractors / Makers & PO Dropdowns -->
       <details class="su-collapsible-registry">
         <summary>
-          <span>3. Contractors / Makers (${ctx.dropdownOptions.makers.length}) &amp; PO Registry (${ctx.dropdownOptions.poList.length})</span>
+          <span>4. Contractors / Makers (${ctx.dropdownOptions.makers.length}) &amp; PO Registry (${ctx.dropdownOptions.poList.length})</span>
           <span class="admin-meta-caption">Synchronized across Dock &amp; Alteration Bay</span>
         </summary>
         <div class="su-collapsible-body">
@@ -1657,8 +1721,8 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                 .map(
                   m => `
                 <span class="admin-tag-item">
-                  <span>${m}</span>
-                  <button type="button" class="admin-tag-remove" title="Remove" onclick="window.adminRemoveDropdownItem('makers', '${m.replace(/'/g, "\\'")}')">&times;</button>
+                  <span>${escapeHtml(m)}</span>
+                  <button type="button" class="admin-tag-remove" title="Remove" data-su-action="remove-dropdown-item" data-list-key="makers" data-item-val="${escapeHtml(m)}">&times;</button>
                 </span>
               `
                 )
@@ -1676,8 +1740,8 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                 .map(
                   po => `
                 <span class="admin-tag-item">
-                  <span>PO #${po}</span>
-                  <button type="button" class="admin-tag-remove" title="Remove" onclick="window.adminRemoveDropdownItem('poList', '${po.replace(/'/g, "\\'")}')">&times;</button>
+                  <span>PO #${escapeHtml(po)}</span>
+                  <button type="button" class="admin-tag-remove" title="Remove" data-su-action="remove-dropdown-item" data-list-key="poList" data-item-val="${escapeHtml(po)}">&times;</button>
                 </span>
               `
                 )
@@ -1687,61 +1751,9 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </details>
 
-      <!-- Collapsible Registry 4: System Users & Role-Based Access Control (7.2 & 10.4) -->
-      <details class="su-collapsible-registry">
-        <summary>
-          <span>4. System Users &amp; Role-Based Access Control (${systemUsers.length} Users)</span>
-          <span class="admin-meta-caption">RBAC Enforcement Matrix</span>
-        </summary>
-        <div class="su-collapsible-body">
-          <div style="display: grid; grid-template-columns: 1.2fr 1.1fr 1fr auto; gap: 8px; align-items: end; margin-bottom: 12px;">
-            <div class="form-group">
-              <label for="admin-user-name">Operator Name</label>
-              <input type="text" id="admin-user-name" class="form-input" placeholder="e.g. H. Malik" />
-            </div>
-            <div class="form-group">
-              <label for="admin-user-role">Assigned Role</label>
-              <select id="admin-user-role" class="form-select">
-                <option value="SUPER_USER">SUPER_USER (All Permissions)</option>
-                <option value="INWARD_CLERK">INWARD_CLERK (GRN + Dock Issue)</option>
-                <option value="PACKING_SUPERVISOR">PACKING_SUPERVISOR (REQ + WIP)</option>
-                <option value="QC_INSPECTOR">QC_INSPECTOR (Final QC Gate)</option>
-                <option value="ALTERATION_LEAD">ALTERATION_LEAD (A-REQ + Scrap)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="admin-user-station">Station</label>
-              <input type="text" id="admin-user-station" class="form-input" placeholder="e.g. Dock #1" value="Packing Hall #1" />
-            </div>
-            <button type="button" class="btn-primary" id="btn-admin-add-system-user" onclick="window.adminAddSystemUser && window.adminAddSystemUser()">Add User</button>
-          </div>
-          <div class="table-responsive" style="max-height: 170px; overflow-y: auto;">
-            <table class="data-table">
-              <thead>
-                <tr><th>User ID</th><th>Operator</th><th>RBAC Role</th><th>Station</th><th>Authorized Actions</th></tr>
-              </thead>
-              <tbody>
-                ${systemUsers
-                  .map(
-                    u => `
-                  <tr>
-                    <td class="font-bold">${u.userId}</td>
-                    <td class="font-bold">${u.name}</td>
-                    <td><span class="su-badge su-badge-req">${u.role}</span></td>
-                    <td>${u.station}</td>
-                    <td style="font-size: 10px; font-family: var(--font-mono); color: var(--su-text-secondary);">${(ROLE_PERMISSIONS[u.role] || []).slice(0, 4).join(', ')}${(ROLE_PERMISSIONS[u.role] || []).length > 4 ? '...' : ''}</td>
-                  </tr>
-                `
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </details>
     </div>
 
-    <!-- Collapsible Registry 5: Immutable Audit Trail & SQLite Snapshot Administration (10.3 & 10.5) -->
+    <!-- Collapsible Registry 4: Immutable Audit Trail & SQLite Snapshot Administration (10.3 & 10.5) -->
     <div class="two-column-grid">
       <details class="su-collapsible-registry">
         <summary>
@@ -1764,12 +1776,12 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                         .map(
                           a => `
                   <tr>
-                    <td class="font-bold" style="font-family: var(--font-mono);">${a.auditId}</td>
-                    <td style="font-family: var(--font-mono); font-size: 10.5px;">${a.timestamp}</td>
-                    <td><strong>${a.actor}</strong> <span style="font-size: 10px; color: var(--su-text-secondary);">(${a.role})</span></td>
-                    <td><span class="su-badge su-badge-req">${a.action}</span></td>
-                    <td class="font-bold">${a.entityId}</td>
-                    <td style="font-size: 11px;">${a.beforeSummary} &rarr; <strong>${a.afterSummary}</strong></td>
+                    <td class="font-bold" style="font-family: var(--font-mono);">${escapeHtml(a.auditId)}</td>
+                    <td style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(a.timestamp)}</td>
+                    <td><strong>${escapeHtml(a.actor)}</strong> <span style="font-size: 11px; color: var(--su-text-secondary);">(${escapeHtml(a.role)})</span></td>
+                    <td><span class="su-badge su-badge-req">${escapeHtml(a.action)}</span></td>
+                    <td class="font-bold">${escapeHtml(a.entityId)}</td>
+                    <td style="font-size: 11px;">${escapeHtml(a.beforeSummary)} &rarr; <strong>${escapeHtml(a.afterSummary)}</strong></td>
                   </tr>
                 `
                         )
@@ -1784,7 +1796,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       <details class="su-collapsible-registry">
         <summary>
           <span>6. SQLite WAL Database &amp; Snapshot Administration (${ov.dbHealth.totalTables} Tables &bull; ${totalRows} Rows)</span>
-          <span class="admin-meta-caption">Engine: ${String(ov.dbHealth.journalMode).toUpperCase()}</span>
+          <span class="admin-meta-caption">Engine: ${escapeHtml(String(ov.dbHealth.journalMode).toUpperCase())}</span>
         </summary>
         <div class="su-collapsible-body">
           <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
@@ -1802,7 +1814,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             ctx.lastBackupPath
               ? `
             <div style="margin-bottom: 10px; padding: 8px 10px; background: var(--ink-50); border: 1px solid var(--border-strong); border-radius: 4px; font-size: 11.5px;">
-              <strong>Latest Snapshot:</strong> <code>${ctx.lastBackupPath}</code>
+              <strong>Latest Snapshot:</strong> <code>${escapeHtml(ctx.lastBackupPath)}</code>
             </div>
           `
               : ''
@@ -1817,7 +1829,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                   .map(
                     tbl => `
                   <tr>
-                    <td style="font-family: var(--font-mono); font-size: 11.5px; font-weight: 700;">${tbl}</td>
+                    <td style="font-family: var(--font-mono); font-size: 11.5px; font-weight: 700;">${escapeHtml(tbl)}</td>
                     <td class="text-right font-bold">${counts[tbl]}</td>
                     <td class="text-center"><span class="status-pill">OK</span></td>
                   </tr>
@@ -1831,11 +1843,11 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       </details>
     </div>
 
-    <!-- 12.2: Phased Rollout Record & Active MES Policy Configuration -->
+    <!-- Phased Rollout Record & Active MES Policy Configuration -->
     <details class="su-collapsible-registry" style="margin-top: 12px;">
       <summary>
-        <span>7. Phased Rollout Record (Phase A &bull; Phase B &bull; Phase C) &amp; Active MES Policy Defaults</span>
-        <span class="admin-meta-caption">Checklist 12.2 &bull; R1 / 3.8 / 4.6 / 4.7 Policies</span>
+        <span>Phased Rollout Record (Phase A &bull; Phase B &bull; Phase C) &amp; Active MES Policy Defaults</span>
+        <span class="admin-meta-caption">R1 / 3.8 / 4.6 / 4.7 Policies</span>
       </summary>
       <div class="su-collapsible-body">
         <div class="table-responsive" style="margin-bottom: 10px;">
@@ -1902,17 +1914,17 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
             .map(
               o => `
         <tr>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${o.orderId}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px;">${o.buyer}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px;">${o.maker}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${o.po}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px;">${o.article} (${o.color})</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${o.grnBatches.map(g => `${g.grnCode}(${g.rcvdPairs})`).join(', ') || 'None'}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${escapeHtml(o.orderId)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px;">${escapeHtml(o.buyer)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px;">${escapeHtml(o.maker)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${escapeHtml(o.po)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px;">${escapeHtml(o.article)} (${escapeHtml(o.color)})</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${o.grnBatches.map(g => `${escapeHtml(g.grnCode)}(${g.rcvdPairs})`).join(', ') || 'None'}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${o.plannedQty.toLocaleString()}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${o.receivedGrnQty.toLocaleString()}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${o.contractorBalanceQty.toLocaleString()}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center; font-weight: 700;">${o.reconciliation.badgeText}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${o.orderStatus}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center; font-weight: 700;">${escapeHtml(o.reconciliation.badgeText)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${escapeHtml(o.orderStatus)}</td>
         </tr>
       `
             )
@@ -1933,7 +1945,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
           <div><span>Contractor Balance Owed:</span> <strong>${s.totalContractorBalancePairs.toLocaleString()} Pairs</strong></div>
         </div>
         <div style="font-size: 11px; padding: 6px 10px; margin-bottom: 8px; border: 1px solid var(--border-strong); background: var(--ink-50);">
-          <strong>Acceptance Criteria &amp; Worked Formula (8.6):</strong> <code>Planned (${s.totalPlannedPairs}) = Received GRNs (${s.totalReceivedGrnPairs}) + Contractor Balance (${s.totalContractorBalancePairs})</code> and <code>Received GRNs (${s.totalReceivedGrnPairs}) = Dock Pool (${s.totalDockAvailablePairs}) + Issued to REQs (${s.totalIssuedReqPairs})</code>.
+          <strong>Reconciliation Rule:</strong> <code>Planned (${s.totalPlannedPairs}) = Received GRNs (${s.totalReceivedGrnPairs}) + Contractor Balance (${s.totalContractorBalancePairs})</code> and <code>Received GRNs (${s.totalReceivedGrnPairs}) = Dock Pool (${s.totalDockAvailablePairs}) + Issued to REQs (${s.totalIssuedReqPairs})</code>.
         </div>
         <table class="size-matrix-table" style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11.5px;">
           <thead>
@@ -1999,17 +2011,17 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
             .map(
               r => `
         <tr>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${r.parentOrderId}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; font-family: monospace; font-weight: 700;">${r.reqNumber}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; font-family: monospace;">${r.mreqNo}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; font-family: monospace;">${r.altReqNo}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px;">${r.article}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${escapeHtml(r.parentOrderId)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; font-family: monospace; font-weight: 700;">${escapeHtml(r.reqNumber)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; font-family: monospace;">${escapeHtml(r.mreqNo)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; font-family: monospace;">${escapeHtml(r.altReqNo)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px;">${escapeHtml(r.article)}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${r.issuedPairs.toLocaleString()}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right;">${r.inFloorWipPairs.toLocaleString()}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right;">${r.inAlterationPairs} / ${r.scrappedPairs}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${r.packedStage5Pairs.toLocaleString()}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center; font-weight: 700;">${r.reconciliation.badgeText}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${r.reqLifecycleStatus}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center; font-weight: 700;">${escapeHtml(r.reconciliation.badgeText)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${escapeHtml(r.reqLifecycleStatus)}</td>
         </tr>
       `
             )
@@ -2030,7 +2042,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
           <div><span>Stage 5 Sealed Output:</span> <strong>${s.stage5PackedPairs.toLocaleString()} Pairs (${s.stage5PackedCartons} Cartons)</strong></div>
         </div>
         <div style="font-size: 11px; padding: 6px 10px; margin-bottom: 8px; border: 1px solid var(--border-strong); background: var(--ink-50);">
-          <strong>Acceptance Criteria &amp; Worked Formula (8.6):</strong> Per-REQ Floor Gate: <code>Issued (${s.totalIssuedReqPairs}) = Floor WIP (${s.totalFloorWipPairs}) + Stage 5 Packed (${s.stage5PackedPairs}) + Active Alteration (${s.totalAlterationPairs}) + Scrapped (${s.totalScrappedPairs})</code>.
+          <strong>Reconciliation Rule:</strong> Per-REQ Floor Gate: <code>Issued (${s.totalIssuedReqPairs}) = Floor WIP (${s.totalFloorWipPairs}) + Stage 5 Packed (${s.stage5PackedPairs}) + Active Alteration (${s.totalAlterationPairs}) + Scrapped (${s.totalScrappedPairs})</code>.
         </div>
         <table class="size-matrix-table" style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11.5px;">
           <thead>
@@ -2093,10 +2105,10 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
             .map(
               o => `
         <tr>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${o.orderId}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${o.maker}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px;">${o.po}</td>
-          <td style="border: 1px solid var(--border-strong); padding: 6px;">${o.article}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${escapeHtml(o.orderId)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${escapeHtml(o.maker)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px;">${escapeHtml(o.po)}</td>
+          <td style="border: 1px solid var(--border-strong); padding: 6px;">${escapeHtml(o.article)}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right;">${o.receivedGrnQty.toLocaleString()}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${o.inAlterationQty.toLocaleString()}</td>
           <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${o.scrappedQty.toLocaleString()} (PKR ${(o.scrappedQty * 150).toLocaleString()})</td>
@@ -2120,7 +2132,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
           <div><span>Total Financial Deduction:</span> <strong>PKR ${totalDebit.toLocaleString()}</strong></div>
         </div>
         <div style="font-size: 11px; padding: 6px 10px; margin-bottom: 8px; border: 1px solid var(--border-strong); background: var(--ink-50);">
-          <strong>Acceptance Criteria &amp; Worked Formula (8.6):</strong> Any pair failing Cycle 2/2 in Alteration Bay is automatically condemned to Scrap and debited at PKR 150/Pr (<code>${s.totalScrappedPairs} Scrapped Prs &times; PKR 150 = PKR ${(s.totalScrappedPairs * 150).toLocaleString()}</code>).
+          <strong>Reconciliation Rule:</strong> Any pair failing Cycle 2/2 in Alteration Bay is automatically condemned to Scrap and debited at PKR 150/Pr (<code>${s.totalScrappedPairs} Scrapped Prs &times; PKR 150 = PKR ${(s.totalScrappedPairs * 150).toLocaleString()}</code>).
         </div>
         <table class="size-matrix-table" style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11.5px;">
           <thead>
@@ -2175,15 +2187,15 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
           .map(
             o => `
       <tr>
-        <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${o.orderId}</td>
-        <td style="border: 1px solid var(--border-strong); padding: 6px;">${o.buyer}</td>
-        <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${o.po}</td>
-        <td style="border: 1px solid var(--border-strong); padding: 6px;">${o.article}</td>
+        <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${escapeHtml(o.orderId)}</td>
+        <td style="border: 1px solid var(--border-strong); padding: 6px;">${escapeHtml(o.buyer)}</td>
+        <td style="border: 1px solid var(--border-strong); padding: 6px; font-weight: 700;">${escapeHtml(o.po)}</td>
+        <td style="border: 1px solid var(--border-strong); padding: 6px;">${escapeHtml(o.article)}</td>
         <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right;">${o.awaitingFinalQcQty.toLocaleString()} Prs</td>
         <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${o.packedStage5Qty.toLocaleString()} Prs</td>
         <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: right; font-weight: 700;">${o.packedStage5Cartons} Ctns</td>
-        <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center; font-weight: 700;">${o.reconciliation.badgeText}</td>
-        <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${o.orderStatus}</td>
+        <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center; font-weight: 700;">${escapeHtml(o.reconciliation.badgeText)}</td>
+        <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${escapeHtml(o.orderStatus)}</td>
       </tr>
     `
           )
@@ -2204,7 +2216,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
         <div><span>Master Export Cartons:</span> <strong>${s.stage5PackedCartons} Cartons</strong></div>
       </div>
       <div style="font-size: 11px; padding: 6px 10px; margin-bottom: 8px; border: 1px solid var(--border-strong); background: var(--ink-50);">
-        <strong>Acceptance Criteria &amp; Worked Formula (8.6):</strong> Stage 5 Master Carton Packing is locked until Final QC passes after Stage 4. Order closes as <code>COMPLETED &amp; DISPATCHED</code> when <code>Received &ge; Planned</code>, <code>Dock Pool = 0</code>, and <code>Stage 5 Packed + Scrapped = Issued</code>.
+        <strong>Reconciliation Rule:</strong> Stage 5 Master Carton Packing is locked until Final QC passes after Stage 4. Order closes as <code>COMPLETED &amp; DISPATCHED</code> when <code>Received &ge; Planned</code>, <code>Dock Pool = 0</code>, and <code>Stage 5 Packed + Scrapped = Issued</code>.
       </div>
       <table class="size-matrix-table" style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11.5px;">
         <thead>
@@ -2263,7 +2275,7 @@ function renderReportVisualChart(ctx: SuperUserRenderContext): string {
               return `
               <div style="display: grid; grid-template-columns: 180px 1fr 170px; align-items: center; gap: 10px; font-size: 11.5px;">
                 <div>
-                  <strong style="color: var(--su-req-primary);">${o.orderId}</strong> <span style="color: var(--su-text-muted);">(${o.maker})</span>
+                  <strong style="color: var(--su-req-primary);">${escapeHtml(o.orderId)}</strong> <span style="color: var(--su-text-muted);">(${escapeHtml(o.maker)})</span>
                 </div>
                 <div style="height: 14px; background: var(--su-grn-fill-soft); border: 1px solid var(--su-grn-border); border-radius: 3px; overflow: hidden; display: flex;">
                   <div style="width: ${rcvdPct}%; height: 100%; background: var(--su-grn-primary);"></div>
@@ -2304,17 +2316,17 @@ function renderReportVisualChart(ctx: SuperUserRenderContext): string {
                 Math.round(((r.inAlterationPairs + r.scrappedPairs) / base) * 100)
               );
               return `
-              <div style="display: grid; grid-template-columns: 220px 1fr 170px; align-items: center; gap: 10px; font-size: 11.5px;">
-                <div style="font-family: var(--font-mono); font-size: 11px;">
-                  <strong style="color: var(--su-req-primary);">${r.reqNumber}</strong> <span style="color: var(--su-text-muted);">(${r.parentOrderId})</span>
+              <div style="display: grid; grid-template-columns: 220px 1fr 170px; align-items: center; gap: 10px; font-size: 12px;">
+                <div style="font-family: var(--font-mono); font-size: 12px;">
+                  <strong style="color: var(--su-req-primary);">${escapeHtml(r.reqNumber)}</strong> <span style="color: var(--su-text-muted);">(${escapeHtml(r.parentOrderId)})</span>
                 </div>
                 <div style="height: 14px; background: var(--su-bg-tertiary); border: 1px solid var(--su-border); border-radius: 3px; overflow: hidden; display: flex;">
                   <div style="width: ${s5Pct}%; height: 100%; background: var(--su-complete-primary);"></div>
                   <div style="width: ${wipPct}%; height: 100%; background: var(--su-mreq-primary);"></div>
                   <div style="width: ${altPct}%; height: 100%; background: var(--su-areq-primary);"></div>
                 </div>
-                <div style="text-align: right; font-family: var(--font-mono); font-size: 11px;">
-                  S5: <strong style="color: var(--su-complete-primary);">${r.packedStage5Pairs}</strong> | WIP: <strong style="color: var(--su-mreq-primary);">${r.inFloorWipPairs}</strong>
+                <div style="text-align: right; font-family: var(--font-mono); font-size: 12px;">
+                  S5: <strong style="color: var(--su-complete-dark);">${r.packedStage5Pairs}</strong> | WIP: <strong style="color: var(--su-mreq-dark);">${r.inFloorWipPairs}</strong>
                 </div>
               </div>
             `;
@@ -2388,9 +2400,127 @@ function renderReportsTab(ctx: SuperUserRenderContext): string {
     ${renderReportVisualChart(ctx)}
 
     <section class="panel-card" style="padding: 16px;" id="admin-report-preview-surface">
-      ${built.html}
+      <div class="su-report-sheet-wrap">
+        ${built.html}
+      </div>
     </section>
   `;
+}
+
+function renderUsersTab(ctx: SuperUserRenderContext): string {
+  const systemUsers = ctx.systemUsers || [];
+  return `
+    <section class="panel-card su-users-panel">
+      <div class="panel-card-header">
+        <div class="panel-card-title">
+          <span>User Management</span>
+          <span class="panel-counter-badge">${systemUsers.length} Accounts</span>
+        </div>
+        <span class="admin-meta-caption">Create station accounts and manage their sign-in passwords</span>
+      </div>
+      <div class="su-users-content">
+        <div class="su-user-form-grid">
+          <div class="form-group">
+            <label for="admin-user-name">Operator Name</label>
+            <input type="text" id="admin-user-name" class="form-input" placeholder="e.g. H. Malik" />
+          </div>
+          <div class="form-group">
+            <label for="admin-user-username">Username</label>
+            <input type="text" id="admin-user-username" class="form-input" autocomplete="off" placeholder="e.g. h.malik" />
+          </div>
+          <div class="form-group">
+            <label for="admin-user-password">Password</label>
+            <input type="password" id="admin-user-password" class="form-input" autocomplete="new-password" placeholder="At least 8 characters" />
+            <span class="form-hint">This is the account's sign-in password.</span>
+          </div>
+          <div class="form-group">
+            <label for="admin-user-role">Assigned Role</label>
+            <select id="admin-user-role" class="form-select">
+              <option value="SUPER_USER">SUPER_USER (All Permissions)</option>
+              <option value="INWARD_CLERK">INWARD_CLERK (GRN + Dock Issue)</option>
+              <option value="PACKING_SUPERVISOR">PACKING_SUPERVISOR (REQ + WIP)</option>
+              <option value="QC_INSPECTOR">QC_INSPECTOR (Final QC Gate)</option>
+              <option value="ALTERATION_LEAD">ALTERATION_LEAD (A-REQ + Scrap)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="admin-user-station">Station</label>
+            <select id="admin-user-station" class="form-select">
+              <option value="Super User">Super User</option>
+              <option value="Dock #1">Inward Register (Dock #1)</option>
+              <option value="Packing Hall #1" selected>Packing Hall</option>
+              <option value="Final QC">Final QC</option>
+              <option value="Alteration Bay">Alteration Bay</option>
+            </select>
+          </div>
+          <button type="button" class="btn-primary" id="btn-admin-add-system-user" data-su-action="add-system-user">Create Account</button>
+        </div>
+      </div>
+    </section>
+    <section class="panel-card su-users-panel">
+      <div class="panel-card-header">
+        <div class="panel-card-title"><span>Existing Accounts</span></div>
+        <span class="admin-meta-caption">Changing a password signs that account out on all devices.</span>
+      </div>
+      <div class="su-users-content">
+        <div class="table-responsive">
+          <table class="data-table su-user-table">
+            <thead>
+              <tr><th>Operator</th><th>Username</th><th>Role</th><th>Station</th><th>Status</th><th>Authorized Actions</th><th>Set Sign-in Password</th></tr>
+            </thead>
+            <tbody>
+              ${systemUsers.map(user => {
+                const perms = ROLE_PERMISSIONS[user.role] || [];
+                const summaryPreview = perms.length > 0
+                  ? `${perms.length} action${perms.length === 1 ? '' : 's'} (${escapeHtml(perms.slice(0, 2).join(', '))}${perms.length > 2 ? ', +' + (perms.length - 2) + ' more' : ''})`
+                  : 'No permissions';
+                return `
+                <tr>
+                  <td class="font-bold">${escapeHtml(user.name)}</td>
+                  <td>${escapeHtml(user.username)}</td>
+                  <td><span class="su-badge su-badge-req">${escapeHtml(user.role)}</span></td>
+                  <td>${escapeHtml(user.station || 'Unassigned')}</td>
+                  <td>${user.active ? 'Active' : 'Disabled'}</td>
+                  <td class="su-user-permissions">
+                    <details class="su-perm-disclosure">
+                      <summary>${summaryPreview}</summary>
+                      <div class="su-perm-list">
+                        ${perms.map(perm => `<span class="su-badge">${escapeHtml(perm)}</span>`).join('') || '<span>None</span>'}
+                      </div>
+                    </details>
+                  </td>
+                  <td>
+                    <div class="su-user-password-control">
+                      <input type="password" class="form-input" data-admin-user-password="${escapeHtml(user.userId)}"
+                        autocomplete="new-password" aria-label="New sign-in password for ${escapeHtml(user.username)}"
+                        placeholder="At least 8 characters" />
+                      <button type="button" class="btn-outline" data-admin-reset-password="${escapeHtml(user.userId)}">Update</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+              }).join('') || '<tr><td colspan="7">No station accounts have been created yet.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderAdminNavIcon(section: 'dashboard' | 'tracking' | 'orders' | 'users' | 'reports'): string {
+  switch (section) {
+    case 'dashboard':
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>`;
+    case 'tracking':
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`;
+    case 'orders':
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
+    case 'users':
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
+    case 'reports':
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+  }
 }
 
 export function renderSuperUserScreen(ctx: SuperUserRenderContext): string {
@@ -2409,6 +2539,8 @@ export function renderSuperUserScreen(ctx: SuperUserRenderContext): string {
     tabBody = renderDashboardTab(ctx, totalScrapDeduction);
   } else if (ctx.activeTab === 'tracking') {
     tabBody = renderLiveTrackingTab(ctx);
+  } else if (ctx.activeTab === 'users') {
+    tabBody = renderUsersTab(ctx);
   } else if (isCreationTab) {
     tabBody = renderOrderCreationTab(ctx);
   } else {
@@ -2419,77 +2551,89 @@ export function renderSuperUserScreen(ctx: SuperUserRenderContext): string {
     <div class="superuser-command-center" data-testid="superuser-command-center">
       <!-- Sub-Header Bar -->
       <div class="sub-header-bar">
-        <div class="sub-header-title">
-          <span>Super User Control Center &mdash; Executive Dashboard, Live Order-to-REQ Tracking, Order Creation &amp; Reports</span>
-        </div>
+        <h1 class="sub-header-title">
+          <span>Super User Control Center &mdash; Dashboard, Live Tracking, Order Creation, User Management &amp; Reports</span>
+        </h1>
         <div class="sub-header-right">
-          <button class="btn-outline" id="btn-admin-refresh" style="padding: 4px 10px; font-size: 11.5px;">
+          <button class="btn-outline" id="btn-admin-refresh" style="padding: 4px 10px; font-size: 12px;">
             Sync Database
-          </button>
-          <button class="btn-primary" id="btn-admin-lock" style="padding: 4px 10px; font-size: 11.5px;">
-            Lock Session
           </button>
         </div>
       </div>
 
-      <main class="main-viewport">
-        <!-- 4-Item Super User Navigation Menu (1.1) -->
-        <div class="admin-subnav" style="margin-bottom: 14px;">
-          <div class="admin-subnav-tabs" role="tablist" aria-label="Super User Navigation">
-            <button
-              type="button"
-              class="admin-tab-btn ${ctx.activeTab === 'dashboard' ? 'active' : ''}"
-              data-admin-tab="dashboard"
-            >
-              1. Dashboard
-            </button>
-            <button
-              type="button"
-              class="admin-tab-btn ${ctx.activeTab === 'tracking' ? 'active' : ''}"
-              data-admin-tab="tracking"
-            >
-              2. Live Tracking (${s.totalOrders} Orders &bull; ${s.totalGrnCount} GRNs &bull; ${s.totalReqCount} REQs)
-            </button>
-            <button
-              type="button"
-              class="admin-tab-btn ${isCreationTab ? 'active' : ''}"
-              data-admin-tab="orders"
-            >
-              3. Order Creation (${ctx.pendingOrders.length})
-            </button>
-            <button
-              type="button"
-              class="admin-tab-btn ${ctx.activeTab === 'reports' ? 'active' : ''}"
-              data-admin-tab="reports"
-            >
-              4. Reports
-            </button>
+      <main id="main-content" class="main-viewport" tabindex="-1">
+        <div class="admin-workspace-layout ${ctx.adminNavCollapsed ? 'admin-nav-collapsed' : ''}">
+          <aside class="admin-sidebar" aria-label="Super User navigation">
+            <div class="admin-sidebar-heading">
+              <span class="admin-sidebar-label">Super User</span>
+              <button type="button" class="admin-sidebar-toggle" id="btn-admin-nav-toggle"
+                aria-label="${ctx.adminNavCollapsed ? 'Expand' : 'Collapse'} Super User menu"
+                aria-expanded="${!ctx.adminNavCollapsed}">
+                ${ctx.adminNavCollapsed ? 'Expand' : 'Collapse'}
+              </button>
+            </div>
+            <nav class="admin-subnav-tabs" aria-label="Super User Navigation">
+              <button type="button" class="admin-tab-btn ${ctx.activeTab === 'dashboard' ? 'active' : ''}"
+                aria-label="Dashboard" data-admin-tab="dashboard"${ctx.activeTab === 'dashboard' ? ' aria-current="page"' : ''}${ctx.adminNavCollapsed ? ' title="Dashboard"' : ''}>
+                <span class="admin-tab-heading">
+                  <span class="admin-tab-icon" aria-hidden="true">${renderAdminNavIcon('dashboard')}</span>
+                  <span class="admin-tab-label">Dashboard</span>
+                </span>
+              </button>
+              <button type="button" class="admin-tab-btn ${ctx.activeTab === 'tracking' ? 'active' : ''}"
+                aria-label="Live Tracking" data-admin-tab="tracking"${ctx.activeTab === 'tracking' ? ' aria-current="page"' : ''}${ctx.adminNavCollapsed ? ' title="Live Tracking"' : ''}>
+                <span class="admin-tab-heading">
+                  <span class="admin-tab-icon" aria-hidden="true">${renderAdminNavIcon('tracking')}</span>
+                  <span class="admin-tab-label">Live Tracking</span>
+                </span>
+                <span class="admin-tab-count">${s.totalOrders} Orders &bull; ${s.totalGrnCount} GRNs &bull; ${s.totalReqCount} REQs</span>
+              </button>
+              <button type="button" class="admin-tab-btn ${isCreationTab ? 'active' : ''}"
+                aria-label="Order Creation" data-admin-tab="orders"${isCreationTab ? ' aria-current="page"' : ''}${ctx.adminNavCollapsed ? ' title="Order Creation"' : ''}>
+                <span class="admin-tab-heading">
+                  <span class="admin-tab-icon" aria-hidden="true">${renderAdminNavIcon('orders')}</span>
+                  <span class="admin-tab-label">Order Creation</span>
+                </span>
+                <span class="admin-tab-count">${ctx.pendingOrders.length}</span>
+              </button>
+              <button type="button" class="admin-tab-btn ${ctx.activeTab === 'users' ? 'active' : ''}"
+                aria-label="User Management" data-admin-tab="users"${ctx.activeTab === 'users' ? ' aria-current="page"' : ''}${ctx.adminNavCollapsed ? ' title="User Management"' : ''}>
+                <span class="admin-tab-heading">
+                  <span class="admin-tab-icon" aria-hidden="true">${renderAdminNavIcon('users')}</span>
+                  <span class="admin-tab-label">User Management</span>
+                </span>
+                <span class="admin-tab-count">${(ctx.systemUsers || []).length}</span>
+              </button>
+              <button type="button" class="admin-tab-btn ${ctx.activeTab === 'reports' ? 'active' : ''}"
+                aria-label="Reports" data-admin-tab="reports"${ctx.activeTab === 'reports' ? ' aria-current="page"' : ''}${ctx.adminNavCollapsed ? ' title="Reports"' : ''}>
+                <span class="admin-tab-heading">
+                  <span class="admin-tab-icon" aria-hidden="true">${renderAdminNavIcon('reports')}</span>
+                  <span class="admin-tab-label">Reports</span>
+                </span>
+              </button>
+            </nav>
+          </aside>
+
+          <div class="admin-workspace">
+            ${ctx.activeTab === 'users' ? '' : `<div class="admin-meta-caption admin-workspace-caption">
+              Hierarchy: 1 Order &rarr; Multiple GRNs (0001, 0002...) &amp; Multiple REQs (0001, 0002... &rarr; M &amp; A)
+            </div>`}
+            ${tabBody}
+            <footer class="portal-footer">
+              <div class="footer-stats-left">
+                <span>Master Orders: <strong>${s.totalOrders}</strong></span>
+                <span class="stat-divider">|</span>
+                <span>Planned: <strong>${s.totalPlannedPairs.toLocaleString()} Prs</strong></span>
+                <span class="stat-divider">|</span>
+                <span>Received (GRNs): <strong style="color: var(--su-grn-deep);">${s.totalReceivedGrnPairs.toLocaleString()} Prs</strong></span>
+                <span class="stat-divider">|</span>
+                <span>Issued (REQs): <strong style="color: var(--su-req-primary);">${s.totalIssuedReqPairs.toLocaleString()} Prs</strong></span>
+                <span class="stat-divider">|</span>
+                <span>Packed (Stage 5): <strong style="color: var(--su-complete-dark);">${s.stage5PackedPairs.toLocaleString()} Prs</strong></span>
+              </div>
+            </footer>
           </div>
-          <span class="admin-meta-caption" style="padding-right: 8px;">
-            Hierarchy: 1 Order &rarr; Multiple GRNs (0001, 0002...) &amp; Multiple REQs (0001, 0002... &rarr; M &amp; A)
-          </span>
         </div>
-
-        ${tabBody}
-
-        <!-- Footer Statistics Bar -->
-        <footer class="portal-footer">
-          <div class="footer-stats-left">
-            <span>Master Orders: <strong>${s.totalOrders}</strong></span>
-            <span class="stat-divider">|</span>
-            <span>Planned: <strong>${s.totalPlannedPairs.toLocaleString()} Prs</strong></span>
-            <span class="stat-divider">|</span>
-            <span>Received (GRNs): <strong style="color: var(--su-grn-primary);">${s.totalReceivedGrnPairs.toLocaleString()} Prs</strong></span>
-            <span class="stat-divider">|</span>
-            <span>Issued (REQs): <strong style="color: var(--su-req-primary);">${s.totalIssuedReqPairs.toLocaleString()} Prs</strong></span>
-            <span class="stat-divider">|</span>
-            <span>Packed (Stage 5): <strong style="color: var(--su-complete-primary);">${s.stage5PackedPairs.toLocaleString()} Prs</strong></span>
-          </div>
-          <div class="footer-actions-right">
-            <button class="btn-outline" onclick="document.getElementById('btn-admin-refresh')?.click()">Refresh Ledger</button>
-            <button class="btn-primary" onclick="document.getElementById('btn-admin-lock')?.click()">Lock Admin Session</button>
-          </div>
-        </footer>
       </main>
     </div>
   `;

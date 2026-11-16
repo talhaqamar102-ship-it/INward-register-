@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PackingService } from '../services/packingService.js';
 import { AQLService } from '../services/aqlService.js';
+import { AuthService } from '../services/authService.js';
 
 export const apiRouter = Router();
 
@@ -15,9 +16,123 @@ const handle = (fn) => async (req, res) => {
   }
 };
 
-const getActorMeta = (req, defaultRole = 'SUPER_USER') => ({
-  actor: req.headers['x-mes-actor'] || req.body?.actor || 'System Operator',
-  role: req.headers['x-mes-role'] || req.body?.actorRole || defaultRole
+const SESSION_COOKIE = 'mes_session';
+const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
+
+function readSessionToken(req) {
+  const cookie = req.headers.cookie || '';
+  const entry = cookie.split(';').map(part => part.trim()).find(part => part.startsWith(`${SESSION_COOKIE}=`));
+  if (!entry) return '';
+  try {
+    return decodeURIComponent(entry.slice(SESSION_COOKIE.length + 1));
+  } catch {
+    return '';
+  }
+}
+
+function setSessionCookie(res, token) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.append('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MAX_AGE_SECONDS}${secure}`);
+}
+
+function clearSessionCookie(res) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.append('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`);
+}
+
+function authError(message, statusCode) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+function getAllowedRoles(req) {
+  const { method, path } = req;
+  if (path === '/admin/pending-orders' && method === 'GET') return ['SUPER_USER', 'INWARD_CLERK', 'PACKING_SUPERVISOR'];
+  if (path.startsWith('/admin/')) return ['SUPER_USER'];
+  if (path === '/store/dropdowns' || path.startsWith('/store/receivings')) {
+    if (path.endsWith('/void')) return ['SUPER_USER'];
+    return ['SUPER_USER', 'INWARD_CLERK'];
+  }
+  if (/^\/orders\/[^/]+\/requisitions$/.test(path) && method === 'POST') return ['SUPER_USER', 'PACKING_SUPERVISOR'];
+  if (/^\/orders\/[^/]+\/issue-req$/.test(path)) return ['SUPER_USER', 'INWARD_CLERK'];
+  if (path === '/requisitions' || /^\/requisitions\/[^/]+$/.test(path)) {
+    if (method === 'GET') return ['SUPER_USER', 'INWARD_CLERK', 'PACKING_SUPERVISOR'];
+    if (method === 'POST' && path === '/requisitions') return ['SUPER_USER', 'PACKING_SUPERVISOR'];
+    if (method === 'POST') return ['SUPER_USER', 'INWARD_CLERK'];
+  }
+  if (/^\/requisitions\/[^/]+\/void$/.test(path)) return ['SUPER_USER'];
+  if (/^\/wip\/[^/]+\/final-inspection$/.test(path) || /^\/qc\/[^/]+\/aql-audit$/.test(path)) {
+    return ['SUPER_USER', 'QC_INSPECTOR'];
+  }
+  if (/^\/wip\/[^/]+\/(step[1-5]-[^/]+|material-requisition)$/.test(path)) {
+    return ['SUPER_USER', 'PACKING_SUPERVISOR'];
+  }
+  if (/^\/material-requisitions\/[^/]+\/issue$/.test(path)) {
+    return ['SUPER_USER', 'PACKING_SUPERVISOR'];
+  }
+  if (path === '/material-requisitions' && method === 'GET') {
+    return ['SUPER_USER', 'PACKING_SUPERVISOR'];
+  }
+  if (path === '/alterations' || /^\/alterations\/[^/]+\/(return|repair)$/.test(path)) {
+    return ['SUPER_USER', 'ALTERATION_LEAD'];
+  }
+  if (path === '/materials/return' || /^\/bom\/[^/]+$/.test(path)) {
+    return ['SUPER_USER', 'PACKING_SUPERVISOR'];
+  }
+  if (path === '/qc/aql-calc' || /^\/export\/manifest\/[^/]+$/.test(path)) {
+    return ['SUPER_USER', 'PACKING_SUPERVISOR', 'QC_INSPECTOR'];
+  }
+  if (path === '/inventory/gloves' || path === '/inventory/materials' || path === '/customers' || path === '/products') {
+    return ['SUPER_USER', 'INWARD_CLERK', 'PACKING_SUPERVISOR', 'QC_INSPECTOR', 'ALTERATION_LEAD'];
+  }
+  return [];
+}
+
+const getActorMeta = req => ({
+  actor: req.authUser.name,
+  role: req.authUser.role
+});
+
+apiRouter.get('/auth/status', handle(req => ({
+  initialized: AuthService.hasUsers(),
+  user: AuthService.getSessionUser(readSessionToken(req))
+})));
+
+apiRouter.post('/auth/bootstrap', handle((req, res) => {
+  const user = AuthService.createInitialSuperUser(req.body || {});
+  const session = AuthService.createSession(user.userId);
+  setSessionCookie(res, session.token);
+  return { user };
+}));
+
+apiRouter.post('/auth/login', handle((req, res) => {
+  const user = AuthService.verifyCredentials(req.body?.username, req.body?.password);
+  if (!user) throw authError('Username or password is incorrect.', 401);
+  const session = AuthService.createSession(user.userId);
+  setSessionCookie(res, session.token);
+  return { user };
+}));
+
+apiRouter.post('/auth/logout', handle((req, res) => {
+  AuthService.destroySession(readSessionToken(req));
+  clearSessionCookie(res);
+  return { loggedOut: true };
+}));
+
+apiRouter.use((req, res, next) => {
+  const user = AuthService.getSessionUser(readSessionToken(req));
+  if (!user) {
+    res.status(401).json({ success: false, error: 'Please sign in to continue.' });
+    return;
+  }
+  req.authUser = user;
+  const allowedRoles = getAllowedRoles(req);
+  if (!allowedRoles.includes(user.role)) {
+    res.status(403).json({ success: false, error: 'Your account does not have access to this station action.' });
+    return;
+  }
+  next();
 });
 
 // --- INVENTORY & MASTERS ---
@@ -29,6 +144,10 @@ apiRouter.get('/products', handle((req) => PackingService.getProducts(req.query.
 // --- GLOVE REQUISITIONS ---
 apiRouter.get('/requisitions', handle(() => PackingService.getRequisitions()));
 apiRouter.get('/requisitions/:reqNo', handle((req) => PackingService.getRequisition(req.params.reqNo)));
+apiRouter.post('/orders/:orderId/requisitions', handle((req) => {
+  const { actor, role } = getActorMeta(req);
+  return PackingService.createOrderRequisition(req.params.orderId, req.body?.sizes, actor, role);
+}));
 apiRouter.post('/requisitions', handle((req) => {
   const { customerId, productId, requestedPairs, notes } = req.body;
   if (!customerId || !productId || !requestedPairs) {
@@ -207,6 +326,24 @@ apiRouter.get('/admin/overview', handle(() => {
   return PackingService.getAdminOverview();
 }));
 
+apiRouter.get('/admin/users', handle(() => AuthService.listUsers()));
+
+apiRouter.post('/admin/users', handle(req => {
+  try {
+    return AuthService.createUser(req.body || {});
+  } catch (error) {
+    if (String(error.message).includes('UNIQUE constraint failed')) {
+      throw authError('That username is already in use.', 409);
+    }
+    throw error;
+  }
+}));
+
+apiRouter.patch('/admin/users/:userId/password', handle(req => {
+  AuthService.updatePassword(req.params.userId, req.body?.password);
+  return { updated: true };
+}));
+
 apiRouter.get('/admin/audit-trail', handle((req) => {
   return PackingService.getAuditTrail(req.query.limit);
 }));
@@ -240,7 +377,8 @@ apiRouter.get('/admin/pending-orders', handle(() => {
 }));
 
 apiRouter.post('/admin/pending-orders', handle((req) => {
-  return PackingService.upsertPendingOrderAdmin(req.body);
+  const { actor, role } = getActorMeta(req);
+  return PackingService.createPendingOrderAdmin(req.body, actor, role);
 }));
 
 apiRouter.post('/admin/pending-orders/:orderId/short-close', handle((req) => {
@@ -249,7 +387,8 @@ apiRouter.post('/admin/pending-orders/:orderId/short-close', handle((req) => {
 }));
 
 apiRouter.delete('/admin/pending-orders/:orderId', handle((req) => {
-  return PackingService.deletePendingOrderAdmin(req.params.orderId);
+  const { actor, role } = getActorMeta(req);
+  return PackingService.deletePendingOrderAdmin(req.params.orderId, actor, role);
 }));
 
 apiRouter.post('/admin/db/backup', handle(() => {
@@ -259,5 +398,3 @@ apiRouter.post('/admin/db/backup', handle(() => {
 apiRouter.post('/admin/db/reset-seed', handle(() => {
   return PackingService.resetAndSeedDatabaseAdmin();
 }));
-
-

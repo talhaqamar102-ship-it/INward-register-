@@ -20,9 +20,20 @@ Packaging & cobalting execution system for safety-glove manufacturing.
 | Dev server (Vite + API, port 3000) | `npm run dev` |
 | Typecheck | `npm run lint` |
 | Frontend build | `npm run build` |
-| Unit tests (node:test) | `npm test` |
+| Frontend unit tests (tsx) | `npm run test:unit` |
+| Integration tests (node:test) | `npm test` |
+| Playwright E2E / visual QA | `npm run test:e2e` |
+| Full verification gate | `npm run verify:all` |
 | UI/UX Pro Max search | `npm run uupm -- "<query>" --domain <domain>` |
 | Docker run | `docker compose up -d --build` |
+
+## ECC & Playwright Verification Harness (Hard Rule)
+
+**Everything Claude Code (`affaan-m/ECC`)** is installed in `.agents/` alongside the Playwright E2E harness (`playwright.config.ts`, `e2e/`), enforced by `.agents/rules/ecc-harness.md`:
+
+- Consult and follow ECC rules/skills (`tdd-workflow`, `e2e-testing`, `browser-qa`, `click-path-audit`, `verification-loop`, `delivery-gate`) wherever applicable.
+- Never skip automated browser/UI verification or ask the user to manually check screens in a browser after UI, CSS, DOM, layout, nav, auth, form, or handler changes: add/update assertions in `e2e/` and run `npm run test:e2e` against the isolated `MES_DB_PATH` test server.
+- Run the full post-edit gate (`npm run lint`, `npm run test:unit`, `npm test`, `npm run build`, `npm run test:e2e`, `npm run graphify`, or `npm run verify:all`) before reporting completion.
 
 ## Development workflow
 

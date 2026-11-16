@@ -22,6 +22,17 @@ export function getActiveGloveSizes(includeExtended = false): readonly string[] 
   return includeExtended ? EXTENDED_GLOVE_SIZES : STANDARD_GLOVE_SIZES;
 }
 
+/** Escape arbitrary text before interpolating into HTML text or double-quoted attributes. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char] || char);
+}
+
 export const SIZE_LABELS: Array<{ key: '7' | '8' | '9' | '10' | '11'; label: string }> = [
   { key: '7', label: '7 / S' },
   { key: '8', label: '8 / M' },
@@ -45,6 +56,14 @@ export interface PendingOrder {
   /** Independent physical/bin count at Dock #1 (when recorded, used directly instead of sum of GRN unallocated bins) */
   physicalDockCountPairs?: number;
   isDemoScenario?: boolean;
+  receivedPairs?: number;
+  issuedPairs?: number;
+  requestedPairs?: number;
+  pendingReqPairs?: number;
+  availableDockPairs?: number;
+  unclaimedDockPairs?: number;
+  remainingOrderSizes?: SizeBreakdown;
+  receivedSizes?: SizeBreakdown;
 }
 
 export function createEmptySizes(): SizeBreakdown {
@@ -103,9 +122,9 @@ export function scaleSizeBreakdown(sizes: SizeBreakdown, targetTotal: number): S
 }
 
 /**
- * 1.2 — Legacy sub-tab normalizer: redirects any legacy tab ID to the 4 canonical views.
+ * 1.2 — Legacy sub-tab normalizer: redirects any legacy tab ID to a canonical view.
  */
-export type CanonicalSuperUserTab = 'dashboard' | 'tracking' | 'creation' | 'reports';
+export type CanonicalSuperUserTab = 'dashboard' | 'tracking' | 'creation' | 'users' | 'reports';
 
 export function normalizeSuperUserTab(tabId?: string | null): CanonicalSuperUserTab {
   const raw = (tabId || '').trim().toLowerCase();
@@ -114,6 +133,9 @@ export function normalizeSuperUserTab(tabId?: string | null): CanonicalSuperUser
   }
   if (raw === 'creation' || raw === 'orders' || raw === 'admin' || raw === 'registry' || raw === 'master') {
     return 'creation';
+  }
+  if (raw === 'users' || raw === 'user-management' || raw === 'accounts') {
+    return 'users';
   }
   if (raw === 'reports' || raw === 'analytics' || raw === 'print' || raw === 'export') {
     return 'reports';
@@ -166,6 +188,17 @@ export interface OrderWipState {
   isVoided?: boolean;
   voidReason?: string;
   isDemoScenario?: boolean;
+}
+
+export function getStartupRequisitionNumber(
+  currentReqNumber: string,
+  currentWip: Pick<OrderWipState, 'parentOrderId' | 'plannedQty'>,
+  persistedReqNumbers: string[]
+): string | null {
+  if (currentWip.parentOrderId || Number(currentWip.plannedQty) > 0) return null;
+  return persistedReqNumbers.includes(currentReqNumber)
+    ? currentReqNumber
+    : persistedReqNumbers[0] || null;
 }
 
 export function formatBatchSequence(prefix: 'GRN' | 'REQ', seqNumber: number): string {
@@ -237,6 +270,44 @@ export function determineOrderActiveStage(wip: Partial<OrderWipState>): WipStage
     return 'STEP_2';
   }
   return 'STEP_1';
+}
+
+export function isPackingAwaitingFinalQc(wip: Partial<OrderWipState>): boolean {
+  const s4In = Number(wip.stage4In || 0);
+  const s4Passed = Number(wip.stage4Passed || 0);
+  const s4Pending = wip.stage4Pending !== undefined ? Number(wip.stage4Pending || 0) : Math.max(0, s4In - s4Passed);
+  const outputPairs = Number(wip.outputPairs || 0);
+  return s4Passed > 0 && s4Pending === 0 && !wip.finalQcApproved && outputPairs < s4Passed;
+}
+
+export function isStage5ReadyForCartons(wip: Partial<OrderWipState>): boolean {
+  const s4Passed = Number(wip.stage4Passed || 0);
+  const outputPairs = Number(wip.outputPairs || 0);
+  return Boolean(wip.finalQcApproved && s4Passed > outputPairs);
+}
+
+/**
+ * Rolled Throughput Yield (RTY) across evaluated Stages 1-3:
+ * product of stage yields g / (g + d) for every stage with processed pairs > 0.
+ */
+export function computeWipRolledYieldPct(wip: Partial<OrderWipState>): string {
+  const stages: Array<[number, number]> = [
+    [Math.max(0, Number(wip.stage1Passed || 0)), Math.max(0, Number(wip.stage1Defects || 0))],
+    [Math.max(0, Number(wip.stage2Passed || 0)), Math.max(0, Number(wip.stage2Defects || 0))],
+    [Math.max(0, Number(wip.stage3Passed || 0)), Math.max(0, Number(wip.stage3Defects || 0))]
+  ];
+  let evaluatedStages = 0;
+  let rolled = 1;
+  for (const [good, defects] of stages) {
+    const processed = good + defects;
+    if (processed > 0) {
+      evaluatedStages += 1;
+      rolled *= good / processed;
+    }
+  }
+  if (evaluatedStages === 0) return '0.0%';
+  const pct = Math.min(100, Math.max(0, rolled * 100));
+  return `${pct.toFixed(1)}%`;
 }
 
 /**
@@ -436,8 +507,10 @@ export function computeActualStageWipPairs(params: {
   stage1Passed?: number;
   stage2In?: number;
   stage2Passed?: number;
+  stage2Defects?: number;
   stage3In?: number;
   stage3Passed?: number;
+  stage3Defects?: number;
   stage4In?: number;
   stage4Passed?: number;
   packedStage5Pairs: number;
@@ -475,8 +548,10 @@ export function computeActualStageWipPairs(params: {
   const s1Pass = Number(params.stage1Passed || 0);
   const s2In = Number(params.stage2In || 0);
   const s2Pass = Number(params.stage2Passed || 0);
+  const s2Defects = Number(params.stage2Defects || 0);
   const s3In = Number(params.stage3In || 0);
   const s3Pass = Number(params.stage3Passed || 0);
+  const s3Defects = Number(params.stage3Defects || 0);
   const s4In = Number(params.stage4In || 0);
   const s4Pass = Number(params.stage4Passed || 0);
 
@@ -484,9 +559,9 @@ export function computeActualStageWipPairs(params: {
   // Stage 4 waiting for Stage 5:
   const stage4Bucket = Math.max(0, Math.max(s4In, s4Pass) - params.packedStage5Pairs);
   // Stage 3 waiting for Stage 4:
-  const stage3Bucket = Math.max(0, Math.max(s3In, s3Pass) - Math.max(s4In, s4Pass));
+  const stage3Bucket = Math.max(0, Math.max(s3In, s3Pass) - Math.max(s4In, s4Pass) - s3Defects);
   // Stage 2 waiting for Stage 3:
-  const stage2Bucket = Math.max(0, Math.max(s2In, s2Pass) - Math.max(s3In, s3Pass));
+  const stage2Bucket = Math.max(0, Math.max(s2In, s2Pass) - Math.max(s3In, s3Pass) - s2Defects);
   // Stage 1 remaining on floor:
   const accountedDownstream =
     stage2Bucket +
@@ -1184,8 +1259,10 @@ export function buildSuperUserOrderRollups(params: {
         stage1Passed: r.stage1Passed,
         stage2In: r.stage2In,
         stage2Passed: r.stage2Passed,
+        stage2Defects: r.stage2Defects,
         stage3In: r.stage3In,
         stage3Passed: r.stage3Passed,
+        stage3Defects: r.stage3Defects,
         stage4In: r.stage4In,
         stage4Passed: r.stage4Passed,
         packedStage5Pairs,
@@ -1530,8 +1607,10 @@ export function executeAtomicWipTransition(
     stage1Passed: next.stage1Passed,
     stage2In: next.stage2In,
     stage2Passed: next.stage2Passed,
+    stage2Defects: next.stage2Defects,
     stage3In: next.stage3In,
     stage3Passed: next.stage3Passed,
+    stage3Defects: next.stage3Defects,
     stage4In: next.stage4In,
     stage4Passed: next.stage4Passed,
     packedStage5Pairs,
@@ -1878,6 +1957,7 @@ export type MesUserRole =
 export type MesActionType =
   | 'ORDER_CREATE'
   | 'ORDER_ADJUST'
+  | 'ORDER_DELETE'
   | 'ORDER_SHORT_CLOSE'
   | 'GRN_RECEIVE'
   | 'GRN_VOID'
@@ -1895,6 +1975,7 @@ export const ROLE_PERMISSIONS: Record<MesUserRole, MesActionType[]> = {
   SUPER_USER: [
     'ORDER_CREATE',
     'ORDER_ADJUST',
+    'ORDER_DELETE',
     'ORDER_SHORT_CLOSE',
     'GRN_RECEIVE',
     'GRN_VOID',
@@ -2839,7 +2920,8 @@ export interface RequisitionAnalyticsPoint {
 
 export function buildRequisitionAnalyticsSeries(
   summary: SuperUserDashboardSummary,
-  selectedReqNumber?: string
+  selectedReqNumber?: string,
+  allowEmpty: boolean = false
 ): RequisitionAnalyticsPoint[] {
   const normSelected = selectedReqNumber ? normalizeBaseReqNumber(selectedReqNumber) : '';
   const allReqs: SuperUserReqBatchItem[] = [];
@@ -2855,6 +2937,7 @@ export function buildRequisitionAnalyticsSeries(
   }
 
   if (allReqs.length === 0) {
+    if (allowEmpty) return [];
     const fallbackReq = normSelected || 'REQ-0001';
     return [
       {
@@ -3000,6 +3083,29 @@ export function renderRequisitionWipAnalyticsChart(params: {
   } = params;
   const isSu = mode === 'super-user';
 
+  if (series.length === 0) {
+    return `
+      <section class="panel-card" data-testid="wip-analytics-dashboard" style="margin-bottom: 14px; border: 1px solid ${isSu ? 'var(--su-border)' : 'var(--border-strong)'};">
+        <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <h2 class="panel-card-title" style="margin: 0; font-size: 12.5px;">
+            Real-Time WIP Analytics &mdash; Planned Demand vs. Actual Packed Pairs (Per Active Requisition)
+          </h2>
+          <span style="font-size: 12px; color: ${isSu ? 'var(--su-text-muted)' : 'var(--ink-600)'}; font-family: var(--font-mono);">
+            0 Active REQs
+          </span>
+        </div>
+        <div${isSu ? ' class="su-empty-cta-box"' : ''} style="margin: 14px 16px;${isSu ? '' : ' padding: 24px 16px; border: 1px dashed var(--border-strong); border-radius: 6px; text-align: center;'}">
+          <div style="font-size: 13px; font-weight: 800; color: ${isSu ? 'var(--su-text-primary)' : 'var(--ink-950)'};">
+            No active Packing Hall requisitions yet
+          </div>
+          <div style="font-size: 12px; color: ${isSu ? 'var(--su-text-muted)' : 'var(--ink-600)'};">
+            Issue a Packing Hall Requisition against a received GRN batch to populate per-REQ Planned vs. Packed analytics.
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
   const totalDemand = series.reduce((acc, p) => acc + p.plannedDemandPairs, 0);
   const totalIssued = series.reduce((acc, p) => acc + p.issuedFloorPairs, 0);
   const totalStage4 = series.reduce((acc, p) => acc + p.stage4FirstPackedPairs, 0);
@@ -3052,20 +3158,25 @@ export function renderRequisitionWipAnalyticsChart(params: {
     ? 'repeating-linear-gradient(45deg, var(--su-areq-fill-soft), var(--su-areq-fill-soft) 2px, var(--su-areq-primary) 2px, var(--su-areq-primary) 4px)'
     : 'repeating-linear-gradient(45deg, var(--ink-200), var(--ink-200) 2px, var(--ink-700) 2px, var(--ink-700) 4px)';
   const altBorder = isSu ? 'var(--su-areq-dark)' : 'var(--ink-900)';
+  const PLOT_HEIGHT_PX = 140;
+  const calcBarHeight = (value: number, minNonZeroPx: number = 4, zeroHeightPx: number = 2): number => {
+    if (value <= 0) return zeroHeightPx;
+    return Math.max(minNonZeroPx, Math.min(PLOT_HEIGHT_PX, Math.round((value / maxChartVal) * PLOT_HEIGHT_PX)));
+  };
 
   return `
     <section class="panel-card" data-testid="wip-analytics-dashboard" style="margin-bottom: 14px; border: 1px solid ${isSu ? 'var(--su-border)' : 'var(--border-strong)'};">
       <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-          <span class="panel-card-title">
+          <h2 class="panel-card-title" style="margin: 0; font-size: 12.5px;">
             Real-Time WIP Analytics &mdash; Planned Demand vs. Actual Packed Pairs (Per Active Requisition)
-          </span>
-          <span style="font-size: 11px; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-600)'}; font-family: var(--font-mono);">
-            ${series.length} Active REQ${series.length === 1 ? '' : 's'} &bull; Demand: <strong>${totalDemand.toLocaleString()} Prs</strong> &bull; Packed S5: <strong style="color: ${isSu ? 'var(--su-complete-primary)' : 'inherit'};">${totalActualPacked.toLocaleString()} Prs (${overallCompletionPct}%)</strong>
+          </h2>
+          <span style="font-size: ${isSu ? '12px' : '11px'}; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-600)'}; font-family: var(--font-mono);">
+            ${series.length} Active REQ${series.length === 1 ? '' : 's'} &bull; Demand: <strong>${totalDemand.toLocaleString()} Prs</strong> &bull; Packed S5: <strong style="color: ${isSu ? 'var(--su-complete-dark)' : 'inherit'};">${totalActualPacked.toLocaleString()} Prs (${overallCompletionPct}%)</strong>
           </span>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 12px; font-size: 11px; color: ${isSu ? 'var(--su-text-primary)' : 'var(--ink-800)'}; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 12px; font-size: ${isSu ? '12px' : '11px'}; color: ${isSu ? 'var(--su-text-primary)' : 'var(--ink-800)'}; flex-wrap: wrap;">
           <span style="display: inline-flex; align-items: center; gap: 5px;">
             <span style="width: 10px; height: 10px; background: ${planFill}; border: 1.5px solid ${planBorder}; display: inline-block;"></span>
             Planned Demand (REQ)
@@ -3090,42 +3201,42 @@ export function renderRequisitionWipAnalyticsChart(params: {
       </div>
 
       <div style="padding: 14px 16px; font-variant-numeric: tabular-nums;">
-        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; padding: 8px 12px; background: ${isSu ? 'var(--su-bg-primary)' : 'var(--ink-50)'}; border: 1px solid ${isSu ? 'var(--su-border)' : 'var(--border-default)'}; border-radius: 4px; font-size: 11.5px;">
+        <div class="wip-analytics-kpis" style="padding: 8px 12px; background: ${isSu ? 'var(--su-bg-primary)' : 'var(--ink-50)'}; border: 1px solid ${isSu ? 'var(--su-border)' : 'var(--border-subtle)'}; border-radius: 4px; font-size: ${isSu ? '12px' : '11.5px'};">
           <div>
-            <div style="font-size: 10px; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Planned Demand (All REQs)</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Planned Demand (All REQs)</div>
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-req-primary)' : 'var(--ink-950)'};">${totalDemand.toLocaleString()} Pairs</div>
           </div>
           <div>
-            <div style="font-size: 10px; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Issued from Dock</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Issued from Dock</div>
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-req-accent)' : 'var(--ink-900)'};">${totalIssued.toLocaleString()} Pairs</div>
           </div>
           <div>
-            <div style="font-size: 10px; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Stage 4 1st Packed (M-REQ)</div>
-            <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-mreq-primary)' : 'var(--ink-900)'};">${totalStage4.toLocaleString()} Pairs</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Stage 4 1st Packed (M-REQ)</div>
+            <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-mreq-dark)' : 'var(--ink-900)'};">${totalStage4.toLocaleString()} Pairs</div>
           </div>
           <div>
-            <div style="font-size: 10px; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Actual Packed (Stage 5)</div>
-            <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-complete-primary)' : 'var(--ink-950)'};">${totalActualPacked.toLocaleString()} Pairs (${overallCompletionPct}%)</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Actual Packed (Stage 5)</div>
+            <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-complete-dark)' : 'var(--ink-950)'};">${totalActualPacked.toLocaleString()} Pairs (${overallCompletionPct}%)</div>
           </div>
           <div>
-            <div style="font-size: 10px; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Alteration / Scrap (A-REQ)</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Alteration / Scrap (A-REQ)</div>
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-areq-primary)' : 'var(--ink-900)'};">${totalAlteration.toLocaleString()} Pairs</div>
           </div>
         </div>
 
-        <div class="${mode === 'packing-hall' ? 'two-column-grid' : ''}" style="${mode === 'packing-hall' ? 'grid-template-columns: 1.45fr 1fr; gap: 16px;' : ''}">
-          <div style="border: 1px solid ${isSu ? 'var(--su-border)' : 'var(--border-default)'}; border-radius: 4px; padding: 12px 14px; background: var(--white);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div class="${mode === 'packing-hall' ? 'wip-analytics-split' : ''}">
+          <div style="border: 1px solid ${isSu ? 'var(--su-border)' : 'var(--border-subtle)'}; border-radius: 4px; padding: 12px 14px; background: var(--white);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
               <span style="font-size: 11.5px; font-weight: 800; color: ${isSu ? 'var(--su-text-primary)' : 'var(--ink-950)'}; text-transform: uppercase;">
                 Grouped Bar Comparison by Requisition (REQ &rarr; M-REQ / A-REQ / S5)
               </span>
-              <span style="font-size: 10.5px; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'};">
+              <span style="font-size: 11px; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'};">
                 ${mode === 'packing-hall' ? 'Click any requisition bar group to switch active floor batch' : 'Click any requisition bar group to open in Packing Hall'}
               </span>
             </div>
 
-            <div style="display: grid; grid-template-columns: 46px 1fr; gap: 8px; align-items: stretch;">
-              <div style="display: flex; flex-direction: column; justify-content: space-between; height: 176px; padding-bottom: 2px; font-family: var(--font-mono); font-size: 10px; color: var(--ink-500); text-align: right;">
+            <div style="display: grid; grid-template-columns: 52px 1fr; gap: 8px; align-items: stretch;">
+              <div aria-hidden="true" style="display: flex; flex-direction: column; justify-content: space-between; height: ${PLOT_HEIGHT_PX}px; font-family: var(--font-mono); font-size: 10.5px; line-height: 1; color: var(--ink-500); text-align: right;">
                 <span>${tick100.toLocaleString()}</span>
                 <span>${tick75.toLocaleString()}</span>
                 <span>${tick50.toLocaleString()}</span>
@@ -3133,71 +3244,42 @@ export function renderRequisitionWipAnalyticsChart(params: {
                 <span>0</span>
               </div>
 
-              <div style="position: relative; height: 176px; border-left: 1.5px solid ${isSu ? 'var(--su-axis-border)' : 'var(--ink-900)'}; border-bottom: 2px solid ${isSu ? 'var(--su-axis-border)' : 'var(--ink-900)'}; background: linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px) 0 0 / 100% 25%; display: flex; align-items: flex-end; gap: 14px; padding: 10px 12px 0 12px; overflow-x: auto;">
+              <div data-testid="wip-chart-plot" style="position: relative; height: ${PLOT_HEIGHT_PX}px; border-left: 1.5px solid ${isSu ? 'var(--su-axis-border)' : 'var(--ink-900)'}; border-bottom: 2px solid ${isSu ? 'var(--su-axis-border)' : 'var(--ink-900)'}; background: linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px) 0 0 / 100% 25%; display: flex; align-items: flex-end; gap: 14px; padding: 0 12px; overflow-x: auto;">
                 ${series
                   .map(pt => {
-                    const hPlan =
-                      pt.plannedDemandPairs > 0
-                        ? Math.max(8, Math.round((pt.plannedDemandPairs / maxChartVal) * 116))
-                        : 3;
-                    const hIssued =
-                      pt.issuedFloorPairs > 0
-                        ? Math.max(8, Math.round((pt.issuedFloorPairs / maxChartVal) * 116))
-                        : 3;
-                    const hS4 =
-                      pt.stage4FirstPackedPairs > 0
-                        ? Math.max(8, Math.round((pt.stage4FirstPackedPairs / maxChartVal) * 116))
-                        : 3;
-                    const hActual =
-                      pt.actualPackedPairs > 0
-                        ? Math.max(8, Math.round((pt.actualPackedPairs / maxChartVal) * 116))
-                        : 3;
-                    const hAlt =
-                      pt.alterationAndScrapPairs > 0
-                        ? Math.max(6, Math.round((pt.alterationAndScrapPairs / maxChartVal) * 116))
-                        : 0;
+                    const hPlan = calcBarHeight(pt.plannedDemandPairs);
+                    const hIssued = calcBarHeight(pt.issuedFloorPairs);
+                    const hS4 = calcBarHeight(pt.stage4FirstPackedPairs);
+                    const hActual = calcBarHeight(pt.actualPackedPairs);
+                    const hAlt = pt.alterationAndScrapPairs > 0 ? calcBarHeight(pt.alterationAndScrapPairs, 4, 0) : 0;
 
-                    const clickHandler =
+                    const safeReq = escapeHtml(pt.reqNumber);
+                    const safeArticle = escapeHtml(pt.article);
+                    const safeMreq = escapeHtml(pt.mreqNo);
+                    const safeAltReq = escapeHtml(pt.altReqNo);
+                    const actionAttrs =
                       mode === 'packing-hall'
-                        ? `window.selectWipBatchFromChart && window.selectWipBatchFromChart('${pt.reqNumber.replace(/'/g, "\\'")}')`
-                        : `window.adminOpenReqInScreen && window.adminOpenReqInScreen('${pt.reqNumber.replace(/'/g, "\\'")}', 'screen-packing')`;
+                        ? `data-packing-action="select-wip-batch" data-req-number="${safeReq}"`
+                        : `data-su-action="open-req-screen" data-target-screen="screen-packing" data-req-number="${safeReq}"`;
 
                     return `
                     <button
                       type="button"
                       class="wip-chart-req-group"
-                      data-req-number="${pt.reqNumber}"
-                      onclick="${clickHandler}"
-                      title="${pt.reqNumber} (${pt.article}) | Planned Demand: ${pt.plannedDemandPairs.toLocaleString()} Prs | Issued: ${pt.issuedFloorPairs.toLocaleString()} Prs | 1st Packed (${pt.mreqNo}): ${pt.stage4FirstPackedPairs.toLocaleString()} Prs | Actual Stage 5 Packed: ${pt.actualPackedPairs.toLocaleString()} Prs (${pt.packedCompletionPct}%) | Alteration (${pt.altReqNo}): ${pt.alterationAndScrapPairs} Prs"
-                      style="flex: 1; min-width: 118px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; background: ${pt.isSelected ? (isSu ? 'var(--su-req-bg)' : 'rgba(15, 23, 42, 0.04)') : 'transparent'}; border: ${pt.isSelected ? (isSu ? '1px dashed var(--su-req-primary)' : '1px dashed var(--ink-900)') : '1px solid transparent'}; border-bottom: none; border-radius: 4px 4px 0 0; padding: 8px 6px 0; cursor: pointer;"
+                      ${actionAttrs}
+                      aria-label="${safeReq} (${safeArticle}): Planned ${pt.plannedDemandPairs.toLocaleString()} pairs, Issued ${pt.issuedFloorPairs.toLocaleString()}, 1st Packed ${pt.stage4FirstPackedPairs.toLocaleString()}, Stage 5 Packed ${pt.actualPackedPairs.toLocaleString()} (${pt.packedCompletionPct}%), Alteration ${pt.alterationAndScrapPairs.toLocaleString()}"
+                      title="${safeReq} (${safeArticle}) | Planned Demand: ${pt.plannedDemandPairs.toLocaleString()} Prs | Issued: ${pt.issuedFloorPairs.toLocaleString()} Prs | 1st Packed (${safeMreq}): ${pt.stage4FirstPackedPairs.toLocaleString()} Prs | Actual Stage 5 Packed: ${pt.actualPackedPairs.toLocaleString()} Prs (${pt.packedCompletionPct}%) | Alteration (${safeAltReq}): ${pt.alterationAndScrapPairs} Prs"
+                      style="flex: 1; min-width: 118px; height: ${PLOT_HEIGHT_PX}px; display: flex; align-items: flex-end; justify-content: center; background: ${pt.isSelected ? (isSu ? 'var(--su-req-bg)' : 'var(--ink-50)') : 'transparent'}; border: ${pt.isSelected ? (isSu ? '1px dashed var(--su-req-primary)' : '1px dashed var(--ink-900)') : '1px solid transparent'}; border-bottom: none; border-radius: 4px 4px 0 0; padding: 0 6px; cursor: pointer;"
                     >
-                      <div style="font-size: 9.5px; font-weight: 800; color: ${isSu ? 'var(--su-text-primary)' : 'var(--ink-900)'}; margin-bottom: 4px; font-family: var(--font-mono); white-space: nowrap;">
-                        ${pt.actualPackedPairs.toLocaleString()} / ${pt.plannedDemandPairs.toLocaleString()} (${pt.packedCompletionPct}%)
-                      </div>
-                      <div style="display: flex; align-items: flex-end; justify-content: center; gap: 4px; width: 100%; height: 132px;">
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
-                          <span style="font-size: 8.5px; color: ${isSu ? 'var(--su-req-primary)' : 'var(--ink-600)'}; font-family: var(--font-mono); margin-bottom: 1px;">${pt.plannedDemandPairs}</span>
-                          <div style="width: 16px; height: ${hPlan}px; background: ${planFill}; border: 1.5px solid ${planBorder}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
-                          <span style="font-size: 8.5px; color: ${isSu ? 'var(--su-req-accent)' : 'var(--ink-700)'}; font-family: var(--font-mono); margin-bottom: 1px;">${pt.issuedFloorPairs}</span>
-                          <div style="width: 16px; height: ${hIssued}px; background: ${issuedFill}; border: 1.5px solid ${issuedBorder}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
-                          <span style="font-size: 8.5px; color: ${isSu ? 'var(--su-mreq-primary)' : 'var(--ink-800)'}; font-family: var(--font-mono); margin-bottom: 1px;">${pt.stage4FirstPackedPairs}</span>
-                          <div style="width: 16px; height: ${hS4}px; background: ${s4Fill}; border: 1.5px solid ${s4Border}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
-                          <span style="font-size: 8.5px; font-weight: 800; color: ${isSu ? 'var(--su-complete-primary)' : 'var(--ink-950)'}; font-family: var(--font-mono); margin-bottom: 1px;">${pt.actualPackedPairs}</span>
-                          <div style="width: 16px; height: ${hActual}px; background: ${s5Fill}; border: 1.5px solid ${s5Border}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
-                        </div>
+                      <div style="display: flex; align-items: flex-end; justify-content: center; gap: 4px; width: 100%; height: ${PLOT_HEIGHT_PX}px;">
+                        <div role="img" data-series="planned" data-value="${pt.plannedDemandPairs}" aria-label="Planned Demand: ${pt.plannedDemandPairs.toLocaleString()} pairs" title="Planned Demand (${safeReq}): ${pt.plannedDemandPairs.toLocaleString()} pairs" style="width: 16px; height: ${hPlan}px; background: ${planFill}; border: 1.5px solid ${planBorder}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
+                        <div role="img" data-series="issued" data-value="${pt.issuedFloorPairs}" aria-label="Issued Floor WIP: ${pt.issuedFloorPairs.toLocaleString()} pairs" title="Issued Floor WIP: ${pt.issuedFloorPairs.toLocaleString()} pairs" style="width: 16px; height: ${hIssued}px; background: ${issuedFill}; border: 1.5px solid ${issuedBorder}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
+                        <div role="img" data-series="stage4" data-value="${pt.stage4FirstPackedPairs}" aria-label="Stage 4 1st Packed: ${pt.stage4FirstPackedPairs.toLocaleString()} pairs" title="Stage 4 1st Packed (${safeMreq}): ${pt.stage4FirstPackedPairs.toLocaleString()} pairs" style="width: 16px; height: ${hS4}px; background: ${s4Fill}; border: 1.5px solid ${s4Border}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
+                        <div role="img" data-series="stage5" data-value="${pt.actualPackedPairs}" aria-label="Actual Stage 5 Packed: ${pt.actualPackedPairs.toLocaleString()} pairs" title="Actual Stage 5 Packed: ${pt.actualPackedPairs.toLocaleString()} pairs" style="width: 16px; height: ${hActual}px; background: ${s5Fill}; border: 1.5px solid ${s5Border}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
                         ${
                           hAlt > 0
                             ? `
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
-                          <span style="font-size: 8.5px; color: ${isSu ? 'var(--su-areq-primary)' : 'var(--ink-700)'}; font-family: var(--font-mono); margin-bottom: 1px;">${pt.alterationAndScrapPairs}</span>
-                          <div style="width: 12px; height: ${hAlt}px; background: ${altFill}; border: 1px solid ${altBorder}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
-                        </div>
+                        <div role="img" data-series="alteration" data-value="${pt.alterationAndScrapPairs}" aria-label="Alteration and Scrap: ${pt.alterationAndScrapPairs.toLocaleString()} pairs" title="Alteration / Scrap (${safeAltReq}): ${pt.alterationAndScrapPairs.toLocaleString()} pairs" style="width: 12px; height: ${hAlt}px; background: ${altFill}; border: 1px solid ${altBorder}; border-bottom: none; border-radius: 2px 2px 0 0;"></div>
                         `
                             : ''
                         }
@@ -3209,7 +3291,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 46px 1fr; gap: 8px; margin-top: 6px;">
+            <div style="display: grid; grid-template-columns: 52px 1fr; gap: 8px; margin-top: 6px;">
               <div></div>
               <div style="display: flex; gap: 14px; padding: 0 12px; overflow-x: auto;">
                 ${series
@@ -3217,13 +3299,16 @@ export function renderRequisitionWipAnalyticsChart(params: {
                     pt => `
                   <div style="flex: 1; min-width: 118px; text-align: center;">
                     <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 800; color: ${isSu ? 'var(--su-req-primary)' : 'var(--ink-950)'};">
-                      ${pt.reqNumber} ${pt.isSelected ? '&#9679;' : ''}
+                      ${escapeHtml(pt.reqNumber)} ${pt.isSelected ? '&#9679;' : ''}
                     </div>
-                    <div style="font-size: 10px; color: var(--ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                      ${pt.article} (${pt.parentOrderId})
+                    <div style="font-family: var(--font-mono); font-size: ${isSu ? '12px' : '10.5px'}; font-weight: 700; color: ${isSu ? 'var(--su-text-primary)' : 'var(--ink-800)'}; white-space: nowrap;">
+                      ${pt.actualPackedPairs.toLocaleString()} / ${pt.plannedDemandPairs.toLocaleString()} (${pt.packedCompletionPct}%)
                     </div>
-                    <div style="font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-500);">
-                      <span style="color: ${isSu ? 'var(--su-mreq-primary)' : 'inherit'};">${pt.mreqNo}</span> &bull; <span style="color: ${isSu ? 'var(--su-areq-primary)' : 'inherit'};">${pt.altReqNo}</span>
+                    <div style="font-size: ${isSu ? '12px' : '10.5px'}; color: var(--ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                      ${escapeHtml(pt.article)} (${escapeHtml(pt.parentOrderId)})
+                    </div>
+                    <div style="font-family: var(--font-mono); font-size: ${isSu ? '12px' : '10.5px'}; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'};">
+                      <span style="color: ${isSu ? 'var(--su-mreq-dark)' : 'inherit'};">${escapeHtml(pt.mreqNo)}</span> &bull; <span style="color: ${isSu ? 'var(--su-areq-primary)' : 'inherit'};">${escapeHtml(pt.altReqNo)}</span>
                     </div>
                   </div>
                 `
@@ -3231,12 +3316,43 @@ export function renderRequisitionWipAnalyticsChart(params: {
                   .join('')}
               </div>
             </div>
+
+            <table class="sr-only">
+              <caption>WIP Requisition Comparison Summary</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Requisition</th>
+                  <th scope="col">Article</th>
+                  <th scope="col">Planned Demand</th>
+                  <th scope="col">Issued Floor WIP</th>
+                  <th scope="col">Stage 4 1st Packed</th>
+                  <th scope="col">Actual Stage 5 Packed</th>
+                  <th scope="col">Alteration or Scrap</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${series
+                  .map(
+                    pt => `
+                <tr>
+                  <th scope="row">${escapeHtml(pt.reqNumber)}</th>
+                  <td>${escapeHtml(pt.article)} (${escapeHtml(pt.parentOrderId)})</td>
+                  <td>${pt.plannedDemandPairs}</td>
+                  <td>${pt.issuedFloorPairs}</td>
+                  <td>${pt.stage4FirstPackedPairs}</td>
+                  <td>${pt.actualPackedPairs} (${pt.packedCompletionPct}%)</td>
+                  <td>${pt.alterationAndScrapPairs}</td>
+                </tr>`
+                  )
+                  .join('')}
+              </tbody>
+            </table>
           </div>
 
           ${
             mode === 'packing-hall'
               ? `
-          <div style="border: 1px solid var(--border-default); border-radius: 4px; padding: 12px 14px; background: var(--white); display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="border: 1px solid var(--border-subtle); border-radius: 4px; padding: 12px 14px; background: var(--white); display: flex; flex-direction: column; justify-content: space-between;">
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <span style="font-size: 11.5px; font-weight: 800; color: var(--ink-950); text-transform: uppercase;">
@@ -3288,4 +3404,201 @@ export function renderRequisitionWipAnalyticsChart(params: {
       </div>
     </section>
   `;
+}
+
+export interface ConfirmDialogHtmlOptions {
+  message: string;
+  detail?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: 'danger' | 'warning';
+}
+
+/** Builds escaped confirmation dialog body markup for #global-modal. */
+export function buildConfirmDialogHtml(options: ConfirmDialogHtmlOptions): string {
+  const confirmClass = options.tone === 'danger' ? 'btn-danger' : 'btn-primary';
+  const detailBlock = options.detail
+    ? `<p class="su-confirm-detail">${escapeHtml(options.detail)}</p>`
+    : '';
+  return `
+    <div class="su-confirm-dialog">
+      <p class="su-confirm-message">${escapeHtml(options.message)}</p>
+      ${detailBlock}
+      <div class="su-confirm-actions">
+        <button type="button" class="btn-outline" id="confirm-dialog-cancel" data-modal-cancel>${escapeHtml(options.cancelLabel || 'Cancel')}</button>
+        <button type="button" class="${confirmClass}" id="confirm-dialog-confirm">${escapeHtml(options.confirmLabel || 'Confirm')}</button>
+      </div>
+    </div>
+  `;
+}
+
+export function validatePendingOrderInputs(input: {
+  maker?: string;
+  article?: string;
+}): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!String(input.maker || '').trim()) {
+    errors.maker = 'Select a Contractor / Maker.';
+  }
+  if (!String(input.article || '').trim()) {
+    errors.article = 'Select an Article.';
+  }
+  return errors;
+}
+
+export function validateCustomerMasterInputs(input: {
+  name?: string;
+}): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!String(input.name || '').trim()) {
+    errors.name = 'Enter a customer / buyer name.';
+  }
+  return errors;
+}
+
+export function validateProductMasterInputs(input: {
+  name?: string;
+  stickersPerPair?: number;
+  pairsPerCarton?: number;
+}): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!String(input.name || '').trim()) {
+    errors.name = 'Enter an article name.';
+  }
+  if (!Number.isFinite(Number(input.stickersPerPair)) || Number(input.stickersPerPair) < 1) {
+    errors.stickersPerPair = 'Enter at least 1 sticker per pair.';
+  }
+  if (!Number.isFinite(Number(input.pairsPerCarton)) || Number(input.pairsPerCarton) < 1) {
+    errors.pairsPerCarton = 'Enter at least 1 pair per carton.';
+  }
+  return errors;
+}
+
+export function validateSystemUserInputs(input: {
+  name?: string;
+  username?: string;
+  password?: string;
+}): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!String(input.name || '').trim()) {
+    errors.name = 'Enter the operator name.';
+  }
+  if (!String(input.username || '').trim()) {
+    errors.username = 'Enter a sign-in username.';
+  }
+  const pwError = validatePasswordResetInput(input.password);
+  if (pwError) {
+    errors.password = pwError;
+  }
+  return errors;
+}
+
+export function validatePasswordResetInput(password?: string): string | null {
+  return String(password || '').length >= 8 ? null : 'Password must be at least 8 characters.';
+}
+
+export interface FocusSelectorTargetInput {
+  id?: string;
+  classList?: Iterable<string> | ArrayLike<string>;
+  dataset?: Record<string, string | undefined>;
+}
+
+const SU_ACTION_DISCRIMINATOR_KEYS: ReadonlyArray<readonly [keyof Record<string, string>, string]> = [
+  ['orderId', 'data-order-id'],
+  ['reqNumber', 'data-req-number'],
+  ['grnCode', 'data-grn-code'],
+  ['grnSr', 'data-grn-sr'],
+  ['slipType', 'data-slip-type'],
+  ['refCode', 'data-ref-code'],
+  ['targetScreen', 'data-target-screen'],
+  ['demoPhase', 'data-demo-phase'],
+  ['expanded', 'data-expanded'],
+  ['page', 'data-page'],
+  ['listKey', 'data-list-key'],
+  ['itemVal', 'data-item-val']
+];
+
+function escapeCssAttrValue(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\d ')
+    .replace(/\n/g, '\\a ');
+}
+
+function escapeCssIdSelector(id: string): string {
+  if (typeof globalThis.CSS !== 'undefined' && typeof globalThis.CSS.escape === 'function') {
+    return `#${globalThis.CSS.escape(id)}`;
+  }
+  return `#${id.replace(/([^a-zA-Z0-9_-])/g, '\\$1')}`;
+}
+
+/** Derives a stable selector for restoring keyboard focus across full-root re-renders. */
+export function buildFocusRestoreSelector(target: FocusSelectorTargetInput): string | null {
+  if (target.id) {
+    return escapeCssIdSelector(target.id);
+  }
+  const dataset = target.dataset || {};
+  const classes = target.classList ? Array.from(target.classList) : [];
+
+  if (dataset.suAction) {
+    let sel = `[data-su-action="${escapeCssAttrValue(dataset.suAction)}"]`;
+    for (const [dataKey, attrName] of SU_ACTION_DISCRIMINATOR_KEYS) {
+      const val = dataset[dataKey];
+      if (val !== undefined) {
+        sel += `[${attrName}="${escapeCssAttrValue(val)}"]`;
+      }
+    }
+    return sel;
+  }
+  if (dataset.adminTab) {
+    return `[data-admin-tab="${escapeCssAttrValue(dataset.adminTab)}"]`;
+  }
+  if (dataset.trackingFilter) {
+    const scopeClass = classes.includes('su-stage-bar-btn')
+      ? '.su-stage-bar-btn'
+      : classes.includes('admin-tracking-filter-btn')
+        ? '.admin-tracking-filter-btn'
+        : '';
+    return `${scopeClass}[data-tracking-filter="${escapeCssAttrValue(dataset.trackingFilter)}"]`;
+  }
+  if (dataset.reportId) {
+    return `[data-report-id="${escapeCssAttrValue(dataset.reportId)}"]`;
+  }
+  if (dataset.screen) {
+    return `.module-nav-btn[data-screen="${escapeCssAttrValue(dataset.screen)}"]`;
+  }
+  if (dataset.adminResetPassword) {
+    return `[data-admin-reset-password="${escapeCssAttrValue(dataset.adminResetPassword)}"]`;
+  }
+  if (dataset.adminUserPassword) {
+    return `[data-admin-user-password="${escapeCssAttrValue(dataset.adminUserPassword)}"]`;
+  }
+  if (dataset.packingAction) {
+    const reqSuffix = dataset.reqNumber ? `[data-req-number="${escapeCssAttrValue(dataset.reqNumber)}"]` : '';
+    return `[data-packing-action="${escapeCssAttrValue(dataset.packingAction)}"]${reqSuffix}`;
+  }
+  if (dataset.size && (classes.includes('admin-order-size-val') || classes.includes('grn-size-val'))) {
+    const sizeClass = classes.includes('admin-order-size-val') ? '.admin-order-size-val' : '.grn-size-val';
+    return `${sizeClass}[data-size="${escapeCssAttrValue(dataset.size)}"]`;
+  }
+  return null;
+}
+
+/** Suggests the default station assignment for a given MES role. */
+export function getDefaultStationForRole(role: string): string {
+  switch (role) {
+    case 'SUPER_USER':
+      return 'Super User';
+    case 'INWARD_CLERK':
+      return 'Dock #1';
+    case 'PACKING_SUPERVISOR':
+      return 'Packing Hall #1';
+    case 'QC_INSPECTOR':
+      return 'Final QC';
+    case 'ALTERATION_LEAD':
+      return 'Alteration Bay';
+    default:
+      return 'Packing Hall #1';
+  }
 }
