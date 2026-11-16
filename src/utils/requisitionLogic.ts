@@ -485,6 +485,32 @@ export function isStage5ReadyForCartons(wip: Partial<OrderWipState>): boolean {
 }
 
 /**
+ * Returns true only when Stage 3 (Pair Matching) has completed matched pairs (> 0)
+ * and no pairs remain pending in Stage 1, Stage 2, or Stage 3.
+ */
+export function isStage3ClearedForMaterialReq(wip: Partial<OrderWipState>): boolean {
+  const s1In = Math.max(0, Number(wip.stage1In || 0));
+  const s1Rem = Math.max(0, s1In - Math.max(0, Number(wip.stage1Passed || 0)) - Math.max(0, Number(wip.stage1Defects || 0)));
+  const s2In = Math.max(0, Number(wip.stage2In || 0));
+  const s2Rem = Math.max(0, s2In - Math.max(0, Number(wip.stage2Passed || 0)) - Math.max(0, Number(wip.stage2Defects || 0)));
+  const s3In = Math.max(0, Number(wip.stage3In || 0));
+  const s3Passed = Math.max(0, Number(wip.stage3Passed || 0));
+  const s3Defects = Math.max(0, Number(wip.stage3Defects || 0));
+  const s3Rem = Math.max(0, s3In - s3Passed - s3Defects);
+  return s3Passed > 0 && s1Rem === 0 && s2Rem === 0 && s3Rem === 0;
+}
+
+/**
+ * Returns true when Stage 3 is cleared and the Material Requisition has been generated/issued
+ * so Stage 4 (1st Packing) can proceed.
+ */
+export function isMaterialRequisitionIssuedForStage4(wip: Partial<OrderWipState>): boolean {
+  if (!isStage3ClearedForMaterialReq(wip)) return false;
+  const status = String(wip.mreqStatus || '').trim().toUpperCase();
+  return status === 'ISSUED' || status === 'PRINTED' || status === 'FULFILLED' || Number(wip.stage4Passed || 0) > 0;
+}
+
+/**
  * Rolled Throughput Yield (RTY) across evaluated Stages 1-3:
  * product of stage yields g / (g + d) for every stage with processed pairs > 0.
  */
@@ -3456,7 +3482,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
           </span>
           <span style="display: inline-flex; align-items: center; gap: 5px;">
             <span style="width: 10px; height: 10px; background: ${s4Fill}; border: 1.5px solid ${s4Border}; display: inline-block;"></span>
-            1st Packed (M-REQ / S4 QC)
+            ${isSu ? '1st Packed (M-REQ / S4 QC)' : '1st Packed (Stage 4)'}
           </span>
           <span style="display: inline-flex; align-items: center; gap: 5px;">
             <span style="width: 10px; height: 10px; background: ${s5Fill}; border: 1.5px solid ${s5Border}; display: inline-block;"></span>
@@ -3464,7 +3490,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
           </span>
           <span style="display: inline-flex; align-items: center; gap: 5px;">
             <span style="width: 10px; height: 10px; background: ${altFill}; border: 1px solid ${altBorder}; display: inline-block;"></span>
-            Alteration / Scrap (A-REQ)
+            ${isSu ? 'Alteration / Scrap (A-REQ)' : 'Alteration / Scrap'}
           </span>
         </div>
       </div>
@@ -3480,7 +3506,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-req-accent)' : 'var(--ink-900)'};">${totalIssued.toLocaleString()} Pairs</div>
           </div>
           <div>
-            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Stage 4 1st Packed (M-REQ)</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">${isSu ? 'Stage 4 1st Packed (M-REQ)' : 'Stage 4 1st Packed'}</div>
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-mreq-dark)' : 'var(--ink-900)'};">${totalStage4.toLocaleString()} Pairs</div>
           </div>
           <div>
@@ -3488,7 +3514,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-complete-dark)' : 'var(--ink-950)'};">${totalActualPacked.toLocaleString()} Pairs (${overallCompletionPct}%)</div>
           </div>
           <div>
-            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Alteration / Scrap (A-REQ)</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">${isSu ? 'Alteration / Scrap (A-REQ)' : 'Alteration / Scrap'}</div>
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-areq-primary)' : 'var(--ink-900)'};">${totalAlteration.toLocaleString()} Pairs</div>
           </div>
         </div>
@@ -3497,7 +3523,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
           <div style="border: 1px solid ${isSu ? 'var(--su-border)' : 'var(--border-subtle)'}; border-radius: 4px; padding: 12px 14px; background: var(--white);">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
               <span style="font-size: 11.5px; font-weight: 800; color: ${isSu ? 'var(--su-text-primary)' : 'var(--ink-950)'}; text-transform: uppercase;">
-                Grouped Bar Comparison by Requisition (REQ &rarr; M-REQ / A-REQ / S5)
+                ${isSu ? 'Grouped Bar Comparison by Requisition (REQ &rarr; M-REQ / A-REQ / S5)' : 'Grouped Bar Comparison by Requisition'}
               </span>
               <span style="font-size: 11px; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'};">
                 ${mode === 'packing-hall' ? 'Click any requisition bar group to switch active floor batch' : 'Click any requisition bar group to open in Packing Hall'}
@@ -3576,9 +3602,11 @@ export function renderRequisitionWipAnalyticsChart(params: {
                     <div style="font-size: ${isSu ? '12px' : '10.5px'}; color: var(--ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                       ${escapeHtml(pt.article)} (${escapeHtml(pt.parentOrderId)})
                     </div>
-                    <div style="font-family: var(--font-mono); font-size: ${isSu ? '12px' : '10.5px'}; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'};">
-                      <span style="color: ${isSu ? 'var(--su-mreq-dark)' : 'inherit'};">${escapeHtml(pt.mreqNo)}</span> &bull; <span style="color: ${isSu ? 'var(--su-areq-primary)' : 'inherit'};">${escapeHtml(pt.altReqNo)}</span>
+                    ${isSu ? `
+                    <div style="font-family: var(--font-mono); font-size: 12px; color: var(--su-text-secondary);">
+                      <span style="color: var(--su-mreq-dark);">${escapeHtml(pt.mreqNo)}</span> &bull; <span style="color: var(--su-areq-primary);">${escapeHtml(pt.altReqNo)}</span>
                     </div>
+                    ` : ''}
                   </div>
                 `
                   )

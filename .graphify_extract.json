@@ -4035,7 +4035,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 91
+      "degree": 90
     },
     {
       "id": "file:src/main.tsx",
@@ -4145,7 +4145,7 @@
       "source_location": "L1",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 87
+      "degree": 89
     },
     {
       "id": "file:test-results/.last-run.json",
@@ -5847,7 +5847,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L16",
+      "source_location": "L17",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -5858,7 +5858,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L24",
+      "source_location": "L25",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -5869,7 +5869,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L33",
+      "source_location": "L34",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
       "degree": 1
@@ -5880,10 +5880,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 14
+      "degree": 15
     },
     {
       "id": "iface:src/components/superUserView.ts:SystemUserRecord",
@@ -6155,7 +6155,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L60",
+      "source_location": "L62",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6166,7 +6166,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L77",
+      "source_location": "L79",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6177,7 +6177,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L91",
+      "source_location": "L93",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6188,7 +6188,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L104",
+      "source_location": "L106",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -6199,7 +6199,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1692",
+      "source_location": "L1694",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6210,7 +6210,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1753",
+      "source_location": "L1755",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6221,7 +6221,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1757",
+      "source_location": "L1759",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6232,7 +6232,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L113",
+      "source_location": "L115",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -6243,7 +6243,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L150",
+      "source_location": "L152",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6254,7 +6254,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L316",
+      "source_location": "L318",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -6265,7 +6265,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L359",
+      "source_location": "L361",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -6276,7 +6276,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L367",
+      "source_location": "L369",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -6287,7 +6287,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L446",
+      "source_location": "L448",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6298,7 +6298,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L457",
+      "source_location": "L459",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6309,7 +6309,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L479",
+      "source_location": "L481",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6320,7 +6320,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L492",
+      "source_location": "L494",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6331,7 +6331,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L496",
+      "source_location": "L498",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6342,7 +6342,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L507",
+      "source_location": "L509",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6353,7 +6353,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L528",
+      "source_location": "L530",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -6364,7 +6364,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L562",
+      "source_location": "L564",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6375,7 +6375,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L587",
+      "source_location": "L589",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6386,7 +6386,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L600",
+      "source_location": "L602",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6397,7 +6397,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L608",
+      "source_location": "L610",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6408,7 +6408,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L644",
+      "source_location": "L646",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6419,7 +6419,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L660",
+      "source_location": "L662",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6430,7 +6430,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L727",
+      "source_location": "L729",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6441,7 +6441,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L731",
+      "source_location": "L733",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -6452,7 +6452,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L756",
+      "source_location": "L758",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -6463,7 +6463,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L789",
+      "source_location": "L791",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -6474,7 +6474,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L803",
+      "source_location": "L805",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 10
@@ -6485,7 +6485,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L886",
+      "source_location": "L888",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6496,7 +6496,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L897",
+      "source_location": "L899",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6507,7 +6507,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L908",
+      "source_location": "L910",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6518,7 +6518,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L961",
+      "source_location": "L963",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -6529,7 +6529,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1005",
+      "source_location": "L1007",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 7
@@ -6540,7 +6540,7 @@
       "kind": "screen",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 16
@@ -6551,7 +6551,7 @@
       "kind": "screen",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1312",
+      "source_location": "L1314",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -6562,7 +6562,7 @@
       "kind": "screen",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1334",
+      "source_location": "L1336",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -6573,7 +6573,7 @@
       "kind": "screen",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1488",
+      "source_location": "L1490",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -6584,7 +6584,7 @@
       "kind": "screen",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1637",
+      "source_location": "L1639",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -6595,7 +6595,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1672",
+      "source_location": "L1674",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6606,7 +6606,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1699",
+      "source_location": "L1701",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6617,7 +6617,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1727",
+      "source_location": "L1729",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6628,7 +6628,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1762",
+      "source_location": "L1764",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6639,7 +6639,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1773",
+      "source_location": "L1775",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 1
@@ -6650,7 +6650,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1783",
+      "source_location": "L1785",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6661,7 +6661,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1829",
+      "source_location": "L1831",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -6672,7 +6672,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1856",
+      "source_location": "L1858",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 7
@@ -6683,7 +6683,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1894",
+      "source_location": "L1896",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -6694,7 +6694,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 19
@@ -6705,7 +6705,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 29
@@ -6716,7 +6716,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2048",
+      "source_location": "L2050",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 7
@@ -6727,7 +6727,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 13
@@ -6738,7 +6738,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 12
@@ -6749,7 +6749,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2794",
+      "source_location": "L2796",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -6760,7 +6760,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2798",
+      "source_location": "L2800",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6771,7 +6771,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2816",
+      "source_location": "L2818",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 7
@@ -6782,7 +6782,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2837",
+      "source_location": "L2839",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -6793,7 +6793,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2864",
+      "source_location": "L2866",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 10
@@ -6804,21 +6804,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
+      "source_location": "L2872",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 10
-    },
-    {
-      "id": "fn:src/main.ts:buildCurrentPackingRequisitionSlip",
-      "label": "buildCurrentPackingRequisitionSlip()",
-      "kind": "function",
-      "file_type": "code",
-      "source_file": "src/main.ts",
-      "source_location": "L2950",
-      "community": 0,
-      "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 4
     },
     {
       "id": "fn:src/main.ts:buildCurrentMaterialRequisitionSlip",
@@ -6826,10 +6815,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2963",
+      "source_location": "L2952",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 6
+      "degree": 5
     },
     {
       "id": "fn:src/main.ts:switchActiveOrder",
@@ -6837,7 +6826,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2979",
+      "source_location": "L2968",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 9
@@ -6848,10 +6837,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 35
+      "degree": 36
     },
     {
       "id": "fn:src/main.ts:openNewRequisitionModal",
@@ -6859,7 +6848,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 16
@@ -6870,7 +6859,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3596",
+      "source_location": "L3595",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -6881,7 +6870,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3702",
+      "source_location": "L3701",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6892,7 +6881,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3742",
+      "source_location": "L3741",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -6903,7 +6892,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3763",
+      "source_location": "L3762",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6914,7 +6903,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 14
@@ -6925,7 +6914,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3860",
+      "source_location": "L3859",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 8
@@ -6936,7 +6925,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3978",
+      "source_location": "L3977",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -6947,7 +6936,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 11
@@ -6958,7 +6947,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4060",
+      "source_location": "L4059",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 2
@@ -6969,7 +6958,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 32
@@ -6980,7 +6969,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4438",
+      "source_location": "L4437",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 4
@@ -6991,7 +6980,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4454",
+      "source_location": "L4453",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 6
@@ -7002,7 +6991,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4480",
+      "source_location": "L4479",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -7013,7 +7002,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5539",
+      "source_location": "L5538",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 3
@@ -7024,7 +7013,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L5577",
+      "source_location": "L5576",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 5
@@ -8388,10 +8377,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 20
+      "degree": 22
     },
     {
       "id": "iface:src/utils/requisitionLogic.ts:SizeBreakdown",
@@ -8454,7 +8443,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L514",
+      "source_location": "L540",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8465,7 +8454,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L530",
+      "source_location": "L556",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8476,7 +8465,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L539",
+      "source_location": "L565",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8487,7 +8476,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L567",
+      "source_location": "L593",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8498,7 +8487,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L618",
+      "source_location": "L644",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8509,7 +8498,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L670",
+      "source_location": "L696",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8520,7 +8509,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1983",
+      "source_location": "L2009",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8531,7 +8520,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2257",
+      "source_location": "L2283",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 4
@@ -8542,7 +8531,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2714",
+      "source_location": "L2740",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8553,7 +8542,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2829",
+      "source_location": "L2855",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8564,7 +8553,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3091",
+      "source_location": "L3117",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8575,7 +8564,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3170",
+      "source_location": "L3196",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8586,7 +8575,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3678",
+      "source_location": "L3706",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8597,7 +8586,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3685",
+      "source_location": "L3713",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8608,7 +8597,7 @@
       "kind": "interface",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3795",
+      "source_location": "L3823",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8688,7 +8677,7 @@
       "source_location": "L271",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 23
+      "degree": 22
     },
     {
       "id": "fn:src/utils/requisitionLogic.ts:getMaterialReqNumber",
@@ -8699,7 +8688,7 @@
       "source_location": "L276",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 11
+      "degree": 10
     },
     {
       "id": "fn:src/utils/requisitionLogic.ts:getAlterationReqNumber",
@@ -8721,7 +8710,7 @@
       "source_location": "L284",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 18
+      "degree": 17
     },
     {
       "id": "fn:src/utils/requisitionLogic.ts:scaleSizeBreakdown",
@@ -8823,12 +8812,34 @@
       "degree": 2
     },
     {
+      "id": "fn:src/utils/requisitionLogic.ts:isStage3ClearedForMaterialReq",
+      "label": "isStage3ClearedForMaterialReq()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": "src/utils/requisitionLogic.ts",
+      "source_location": "L491",
+      "community": 1,
+      "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
+      "degree": 5
+    },
+    {
+      "id": "fn:src/utils/requisitionLogic.ts:isMaterialRequisitionIssuedForStage4",
+      "label": "isMaterialRequisitionIssuedForStage4()",
+      "kind": "function",
+      "file_type": "code",
+      "source_file": "src/utils/requisitionLogic.ts",
+      "source_location": "L507",
+      "community": 1,
+      "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
+      "degree": 5
+    },
+    {
       "id": "fn:src/utils/requisitionLogic.ts:computeWipRolledYieldPct",
       "label": "computeWipRolledYieldPct()",
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L491",
+      "source_location": "L517",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -8839,7 +8850,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L705",
+      "source_location": "L731",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8850,7 +8861,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L804",
+      "source_location": "L830",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8861,7 +8872,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L870",
+      "source_location": "L896",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -8872,7 +8883,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L966",
+      "source_location": "L992",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8883,7 +8894,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1109",
+      "source_location": "L1135",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8894,7 +8905,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1234",
+      "source_location": "L1260",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -8905,7 +8916,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1761",
+      "source_location": "L1787",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -8916,7 +8927,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1781",
+      "source_location": "L1807",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8927,7 +8938,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1907",
+      "source_location": "L1933",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8938,7 +8949,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1912",
+      "source_location": "L1938",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8949,7 +8960,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1923",
+      "source_location": "L1949",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8960,7 +8971,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2013",
+      "source_location": "L2039",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -8971,7 +8982,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2167",
+      "source_location": "L2193",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -8982,7 +8993,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2180",
+      "source_location": "L2206",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -8993,7 +9004,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2253",
+      "source_location": "L2279",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -9004,7 +9015,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2270",
+      "source_location": "L2296",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 4
@@ -9015,7 +9026,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2303",
+      "source_location": "L2329",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -9026,7 +9037,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2616",
+      "source_location": "L2642",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -9037,7 +9048,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2758",
+      "source_location": "L2784",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -9048,7 +9059,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2803",
+      "source_location": "L2829",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -9059,10 +9070,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2839",
+      "source_location": "L2865",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 9
+      "degree": 8
     },
     {
       "id": "fn:src/utils/requisitionLogic.ts:buildMaterialRequisitionSlipHtml",
@@ -9070,7 +9081,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2948",
+      "source_location": "L2974",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -9081,7 +9092,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3029",
+      "source_location": "L3055",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -9092,7 +9103,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3103",
+      "source_location": "L3129",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 6
@@ -9103,7 +9114,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3190",
+      "source_location": "L3216",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 6
@@ -9114,7 +9125,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3283",
+      "source_location": "L3309",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -9125,7 +9136,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3335",
+      "source_location": "L3361",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -9136,7 +9147,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3695",
+      "source_location": "L3723",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -9147,7 +9158,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3730",
+      "source_location": "L3758",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -9158,7 +9169,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3744",
+      "source_location": "L3772",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -9169,7 +9180,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3754",
+      "source_location": "L3782",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 3
@@ -9180,7 +9191,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3772",
+      "source_location": "L3800",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -9191,7 +9202,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3791",
+      "source_location": "L3819",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -9202,7 +9213,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3816",
+      "source_location": "L3844",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -9213,7 +9224,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3824",
+      "source_location": "L3852",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -9224,7 +9235,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3832",
+      "source_location": "L3860",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 5
@@ -9235,7 +9246,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3884",
+      "source_location": "L3912",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 2
@@ -9246,7 +9257,7 @@
       "kind": "class",
       "file_type": "code",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2091",
+      "source_location": "L2117",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 1
@@ -10856,7 +10867,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L16",
+      "source_location": "L17",
       "weight": 1
     },
     {
@@ -10865,7 +10876,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L24",
+      "source_location": "L25",
       "weight": 1
     },
     {
@@ -10874,7 +10885,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L33",
+      "source_location": "L34",
       "weight": 1
     },
     {
@@ -10883,7 +10894,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -11135,7 +11146,7 @@
       "relation": "imports",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L51",
+      "source_location": "L53",
       "weight": 1
     },
     {
@@ -11144,7 +11155,7 @@
       "relation": "imports",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L58",
+      "source_location": "L60",
       "weight": 1
     },
     {
@@ -11153,7 +11164,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L60",
+      "source_location": "L62",
       "weight": 1
     },
     {
@@ -11162,7 +11173,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L77",
+      "source_location": "L79",
       "weight": 1
     },
     {
@@ -11171,7 +11182,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L91",
+      "source_location": "L93",
       "weight": 1
     },
     {
@@ -11180,7 +11191,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L104",
+      "source_location": "L106",
       "weight": 1
     },
     {
@@ -11189,7 +11200,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1692",
+      "source_location": "L1694",
       "weight": 1
     },
     {
@@ -11198,7 +11209,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1753",
+      "source_location": "L1755",
       "weight": 1
     },
     {
@@ -11207,7 +11218,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1757",
+      "source_location": "L1759",
       "weight": 1
     },
     {
@@ -11216,7 +11227,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L113",
+      "source_location": "L115",
       "weight": 1
     },
     {
@@ -11225,7 +11236,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L150",
+      "source_location": "L152",
       "weight": 1
     },
     {
@@ -11234,7 +11245,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L316",
+      "source_location": "L318",
       "weight": 1
     },
     {
@@ -11243,7 +11254,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L359",
+      "source_location": "L361",
       "weight": 1
     },
     {
@@ -11252,7 +11263,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L367",
+      "source_location": "L369",
       "weight": 1
     },
     {
@@ -11261,7 +11272,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L446",
+      "source_location": "L448",
       "weight": 1
     },
     {
@@ -11270,7 +11281,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L457",
+      "source_location": "L459",
       "weight": 1
     },
     {
@@ -11279,7 +11290,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L479",
+      "source_location": "L481",
       "weight": 1
     },
     {
@@ -11288,7 +11299,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L492",
+      "source_location": "L494",
       "weight": 1
     },
     {
@@ -11297,7 +11308,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L496",
+      "source_location": "L498",
       "weight": 1
     },
     {
@@ -11306,7 +11317,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L507",
+      "source_location": "L509",
       "weight": 1
     },
     {
@@ -11315,7 +11326,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L528",
+      "source_location": "L530",
       "weight": 1
     },
     {
@@ -11324,7 +11335,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L562",
+      "source_location": "L564",
       "weight": 1
     },
     {
@@ -11333,7 +11344,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L587",
+      "source_location": "L589",
       "weight": 1
     },
     {
@@ -11342,7 +11353,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L600",
+      "source_location": "L602",
       "weight": 1
     },
     {
@@ -11351,7 +11362,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L608",
+      "source_location": "L610",
       "weight": 1
     },
     {
@@ -11360,7 +11371,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L644",
+      "source_location": "L646",
       "weight": 1
     },
     {
@@ -11369,7 +11380,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L660",
+      "source_location": "L662",
       "weight": 1
     },
     {
@@ -11378,7 +11389,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L727",
+      "source_location": "L729",
       "weight": 1
     },
     {
@@ -11387,7 +11398,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L731",
+      "source_location": "L733",
       "weight": 1
     },
     {
@@ -11396,7 +11407,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L756",
+      "source_location": "L758",
       "weight": 1
     },
     {
@@ -11405,7 +11416,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L789",
+      "source_location": "L791",
       "weight": 1
     },
     {
@@ -11414,7 +11425,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L803",
+      "source_location": "L805",
       "weight": 1
     },
     {
@@ -11423,7 +11434,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L886",
+      "source_location": "L888",
       "weight": 1
     },
     {
@@ -11432,7 +11443,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L897",
+      "source_location": "L899",
       "weight": 1
     },
     {
@@ -11441,7 +11452,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L908",
+      "source_location": "L910",
       "weight": 1
     },
     {
@@ -11450,7 +11461,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L961",
+      "source_location": "L963",
       "weight": 1
     },
     {
@@ -11459,7 +11470,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1005",
+      "source_location": "L1007",
       "weight": 1
     },
     {
@@ -11468,7 +11479,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -11477,7 +11488,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1312",
+      "source_location": "L1314",
       "weight": 1
     },
     {
@@ -11486,7 +11497,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1334",
+      "source_location": "L1336",
       "weight": 1
     },
     {
@@ -11495,7 +11506,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1488",
+      "source_location": "L1490",
       "weight": 1
     },
     {
@@ -11504,7 +11515,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1637",
+      "source_location": "L1639",
       "weight": 1
     },
     {
@@ -11513,7 +11524,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1672",
+      "source_location": "L1674",
       "weight": 1
     },
     {
@@ -11522,7 +11533,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1699",
+      "source_location": "L1701",
       "weight": 1
     },
     {
@@ -11531,7 +11542,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1727",
+      "source_location": "L1729",
       "weight": 1
     },
     {
@@ -11540,7 +11551,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1762",
+      "source_location": "L1764",
       "weight": 1
     },
     {
@@ -11549,7 +11560,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1773",
+      "source_location": "L1775",
       "weight": 1
     },
     {
@@ -11558,7 +11569,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1783",
+      "source_location": "L1785",
       "weight": 1
     },
     {
@@ -11567,7 +11578,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1829",
+      "source_location": "L1831",
       "weight": 1
     },
     {
@@ -11576,7 +11587,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1856",
+      "source_location": "L1858",
       "weight": 1
     },
     {
@@ -11585,7 +11596,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1894",
+      "source_location": "L1896",
       "weight": 1
     },
     {
@@ -11594,7 +11605,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -11603,7 +11614,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -11612,7 +11623,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2048",
+      "source_location": "L2050",
       "weight": 1
     },
     {
@@ -11621,7 +11632,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -11630,7 +11641,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -11639,7 +11650,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2794",
+      "source_location": "L2796",
       "weight": 1
     },
     {
@@ -11648,7 +11659,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2798",
+      "source_location": "L2800",
       "weight": 1
     },
     {
@@ -11657,7 +11668,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2816",
+      "source_location": "L2818",
       "weight": 1
     },
     {
@@ -11666,7 +11677,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2837",
+      "source_location": "L2839",
       "weight": 1
     },
     {
@@ -11675,7 +11686,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2864",
+      "source_location": "L2866",
       "weight": 1
     },
     {
@@ -11684,16 +11695,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
-      "weight": 1
-    },
-    {
-      "source": "file:src/main.ts",
-      "target": "fn:src/main.ts:buildCurrentPackingRequisitionSlip",
-      "relation": "implements",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L2950",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -11702,7 +11704,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2963",
+      "source_location": "L2952",
       "weight": 1
     },
     {
@@ -11711,7 +11713,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2979",
+      "source_location": "L2968",
       "weight": 1
     },
     {
@@ -11720,7 +11722,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -11729,7 +11731,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -11738,7 +11740,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3596",
+      "source_location": "L3595",
       "weight": 1
     },
     {
@@ -11747,7 +11749,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3702",
+      "source_location": "L3701",
       "weight": 1
     },
     {
@@ -11756,7 +11758,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3742",
+      "source_location": "L3741",
       "weight": 1
     },
     {
@@ -11765,7 +11767,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3763",
+      "source_location": "L3762",
       "weight": 1
     },
     {
@@ -11774,7 +11776,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -11783,7 +11785,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3860",
+      "source_location": "L3859",
       "weight": 1
     },
     {
@@ -11792,7 +11794,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3978",
+      "source_location": "L3977",
       "weight": 1
     },
     {
@@ -11801,7 +11803,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -11810,7 +11812,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4060",
+      "source_location": "L4059",
       "weight": 1
     },
     {
@@ -11819,7 +11821,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -11828,7 +11830,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4438",
+      "source_location": "L4437",
       "weight": 1
     },
     {
@@ -11837,7 +11839,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4454",
+      "source_location": "L4453",
       "weight": 1
     },
     {
@@ -11846,7 +11848,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4480",
+      "source_location": "L4479",
       "weight": 1
     },
     {
@@ -11855,7 +11857,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5539",
+      "source_location": "L5538",
       "weight": 1
     },
     {
@@ -11864,7 +11866,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5577",
+      "source_location": "L5576",
       "weight": 1
     },
     {
@@ -13088,7 +13090,7 @@
       "relation": "imports",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L70",
+      "source_location": "L72",
       "weight": 1
     },
     {
@@ -13097,7 +13099,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -13151,7 +13153,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L514",
+      "source_location": "L540",
       "weight": 1
     },
     {
@@ -13160,7 +13162,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L530",
+      "source_location": "L556",
       "weight": 1
     },
     {
@@ -13169,7 +13171,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L539",
+      "source_location": "L565",
       "weight": 1
     },
     {
@@ -13178,7 +13180,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L567",
+      "source_location": "L593",
       "weight": 1
     },
     {
@@ -13187,7 +13189,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L618",
+      "source_location": "L644",
       "weight": 1
     },
     {
@@ -13196,7 +13198,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L670",
+      "source_location": "L696",
       "weight": 1
     },
     {
@@ -13205,7 +13207,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1983",
+      "source_location": "L2009",
       "weight": 1
     },
     {
@@ -13214,7 +13216,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2257",
+      "source_location": "L2283",
       "weight": 1
     },
     {
@@ -13223,7 +13225,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2714",
+      "source_location": "L2740",
       "weight": 1
     },
     {
@@ -13232,7 +13234,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2829",
+      "source_location": "L2855",
       "weight": 1
     },
     {
@@ -13241,7 +13243,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3091",
+      "source_location": "L3117",
       "weight": 1
     },
     {
@@ -13250,7 +13252,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3170",
+      "source_location": "L3196",
       "weight": 1
     },
     {
@@ -13259,7 +13261,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3678",
+      "source_location": "L3706",
       "weight": 1
     },
     {
@@ -13268,7 +13270,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3685",
+      "source_location": "L3713",
       "weight": 1
     },
     {
@@ -13277,7 +13279,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3795",
+      "source_location": "L3823",
       "weight": 1
     },
     {
@@ -13453,7 +13455,7 @@
     },
     {
       "source": "file:src/utils/requisitionLogic.ts",
-      "target": "fn:src/utils/requisitionLogic.ts:computeWipRolledYieldPct",
+      "target": "fn:src/utils/requisitionLogic.ts:isStage3ClearedForMaterialReq",
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
@@ -13462,11 +13464,29 @@
     },
     {
       "source": "file:src/utils/requisitionLogic.ts",
+      "target": "fn:src/utils/requisitionLogic.ts:isMaterialRequisitionIssuedForStage4",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/requisitionLogic.ts",
+      "source_location": "L507",
+      "weight": 1
+    },
+    {
+      "source": "file:src/utils/requisitionLogic.ts",
+      "target": "fn:src/utils/requisitionLogic.ts:computeWipRolledYieldPct",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/requisitionLogic.ts",
+      "source_location": "L517",
+      "weight": 1
+    },
+    {
+      "source": "file:src/utils/requisitionLogic.ts",
       "target": "fn:src/utils/requisitionLogic.ts:computeActualStageWipPairs",
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L705",
+      "source_location": "L731",
       "weight": 1
     },
     {
@@ -13475,7 +13495,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L804",
+      "source_location": "L830",
       "weight": 1
     },
     {
@@ -13484,7 +13504,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L870",
+      "source_location": "L896",
       "weight": 1
     },
     {
@@ -13493,7 +13513,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L966",
+      "source_location": "L992",
       "weight": 1
     },
     {
@@ -13502,7 +13522,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1109",
+      "source_location": "L1135",
       "weight": 1
     },
     {
@@ -13511,7 +13531,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1234",
+      "source_location": "L1260",
       "weight": 1
     },
     {
@@ -13520,7 +13540,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1761",
+      "source_location": "L1787",
       "weight": 1
     },
     {
@@ -13529,7 +13549,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1781",
+      "source_location": "L1807",
       "weight": 1
     },
     {
@@ -13538,7 +13558,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1907",
+      "source_location": "L1933",
       "weight": 1
     },
     {
@@ -13547,7 +13567,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1912",
+      "source_location": "L1938",
       "weight": 1
     },
     {
@@ -13556,7 +13576,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1923",
+      "source_location": "L1949",
       "weight": 1
     },
     {
@@ -13565,7 +13585,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2013",
+      "source_location": "L2039",
       "weight": 1
     },
     {
@@ -13574,7 +13594,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2167",
+      "source_location": "L2193",
       "weight": 1
     },
     {
@@ -13583,7 +13603,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2180",
+      "source_location": "L2206",
       "weight": 1
     },
     {
@@ -13592,7 +13612,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2253",
+      "source_location": "L2279",
       "weight": 1
     },
     {
@@ -13601,7 +13621,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2270",
+      "source_location": "L2296",
       "weight": 1
     },
     {
@@ -13610,7 +13630,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2303",
+      "source_location": "L2329",
       "weight": 1
     },
     {
@@ -13619,7 +13639,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2616",
+      "source_location": "L2642",
       "weight": 1
     },
     {
@@ -13628,7 +13648,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2758",
+      "source_location": "L2784",
       "weight": 1
     },
     {
@@ -13637,7 +13657,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2803",
+      "source_location": "L2829",
       "weight": 1
     },
     {
@@ -13646,7 +13666,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2839",
+      "source_location": "L2865",
       "weight": 1
     },
     {
@@ -13655,7 +13675,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2948",
+      "source_location": "L2974",
       "weight": 1
     },
     {
@@ -13664,7 +13684,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3029",
+      "source_location": "L3055",
       "weight": 1
     },
     {
@@ -13673,7 +13693,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3103",
+      "source_location": "L3129",
       "weight": 1
     },
     {
@@ -13682,7 +13702,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3190",
+      "source_location": "L3216",
       "weight": 1
     },
     {
@@ -13691,7 +13711,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3283",
+      "source_location": "L3309",
       "weight": 1
     },
     {
@@ -13700,7 +13720,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3335",
+      "source_location": "L3361",
       "weight": 1
     },
     {
@@ -13709,7 +13729,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3695",
+      "source_location": "L3723",
       "weight": 1
     },
     {
@@ -13718,7 +13738,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3730",
+      "source_location": "L3758",
       "weight": 1
     },
     {
@@ -13727,7 +13747,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3744",
+      "source_location": "L3772",
       "weight": 1
     },
     {
@@ -13736,7 +13756,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3754",
+      "source_location": "L3782",
       "weight": 1
     },
     {
@@ -13745,7 +13765,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3772",
+      "source_location": "L3800",
       "weight": 1
     },
     {
@@ -13754,7 +13774,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3791",
+      "source_location": "L3819",
       "weight": 1
     },
     {
@@ -13763,7 +13783,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3816",
+      "source_location": "L3844",
       "weight": 1
     },
     {
@@ -13772,7 +13792,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3824",
+      "source_location": "L3852",
       "weight": 1
     },
     {
@@ -13781,7 +13801,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3832",
+      "source_location": "L3860",
       "weight": 1
     },
     {
@@ -13790,7 +13810,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3884",
+      "source_location": "L3912",
       "weight": 1
     },
     {
@@ -13799,7 +13819,7 @@
       "relation": "implements",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2091",
+      "source_location": "L2117",
       "weight": 1
     },
     {
@@ -15572,7 +15592,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15581,7 +15601,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15590,7 +15610,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15599,7 +15619,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15608,16 +15628,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
-      "weight": 1
-    },
-    {
-      "source": "fn:src/components/packingHallView.ts:renderPackingHallScreen",
-      "target": "fn:src/utils/requisitionLogic.ts:getMaterialReqNumber",
-      "relation": "renders",
-      "confidence": "EXTRACTED",
-      "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15626,7 +15637,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15635,7 +15646,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15644,7 +15655,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15653,7 +15664,25 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
+      "weight": 1
+    },
+    {
+      "source": "fn:src/components/packingHallView.ts:renderPackingHallScreen",
+      "target": "fn:src/utils/requisitionLogic.ts:isStage3ClearedForMaterialReq",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/packingHallView.ts",
+      "source_location": "L59",
+      "weight": 1
+    },
+    {
+      "source": "fn:src/components/packingHallView.ts:renderPackingHallScreen",
+      "target": "fn:src/utils/requisitionLogic.ts:isMaterialRequisitionIssuedForStage4",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/packingHallView.ts",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15662,7 +15691,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -15671,7 +15700,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/components/packingHallView.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1
     },
     {
@@ -16463,7 +16492,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L113",
+      "source_location": "L115",
       "weight": 1
     },
     {
@@ -16472,7 +16501,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L113",
+      "source_location": "L115",
       "weight": 1
     },
     {
@@ -16481,7 +16510,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L113",
+      "source_location": "L115",
       "weight": 1
     },
     {
@@ -16490,7 +16519,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L113",
+      "source_location": "L115",
       "weight": 1
     },
     {
@@ -16499,7 +16528,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L316",
+      "source_location": "L318",
       "weight": 1
     },
     {
@@ -16508,7 +16537,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L316",
+      "source_location": "L318",
       "weight": 1
     },
     {
@@ -16517,7 +16546,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L359",
+      "source_location": "L361",
       "weight": 1
     },
     {
@@ -16526,7 +16555,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L359",
+      "source_location": "L361",
       "weight": 1
     },
     {
@@ -16535,7 +16564,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L507",
+      "source_location": "L509",
       "weight": 1
     },
     {
@@ -16544,7 +16573,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L528",
+      "source_location": "L530",
       "weight": 1
     },
     {
@@ -16553,7 +16582,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L528",
+      "source_location": "L530",
       "weight": 1
     },
     {
@@ -16562,7 +16591,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L562",
+      "source_location": "L564",
       "weight": 1
     },
     {
@@ -16571,7 +16600,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L608",
+      "source_location": "L610",
       "weight": 1
     },
     {
@@ -16580,7 +16609,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L644",
+      "source_location": "L646",
       "weight": 1
     },
     {
@@ -16589,7 +16618,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L644",
+      "source_location": "L646",
       "weight": 1
     },
     {
@@ -16598,7 +16627,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L731",
+      "source_location": "L733",
       "weight": 1
     },
     {
@@ -16607,7 +16636,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L756",
+      "source_location": "L758",
       "weight": 1
     },
     {
@@ -16616,7 +16645,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L756",
+      "source_location": "L758",
       "weight": 1
     },
     {
@@ -16625,7 +16654,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L789",
+      "source_location": "L791",
       "weight": 1
     },
     {
@@ -16634,7 +16663,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L789",
+      "source_location": "L791",
       "weight": 1
     },
     {
@@ -16643,7 +16672,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L803",
+      "source_location": "L805",
       "weight": 1
     },
     {
@@ -16652,7 +16681,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L803",
+      "source_location": "L805",
       "weight": 1
     },
     {
@@ -16661,7 +16690,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L908",
+      "source_location": "L910",
       "weight": 1
     },
     {
@@ -16670,7 +16699,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L961",
+      "source_location": "L963",
       "weight": 1
     },
     {
@@ -16679,7 +16708,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L961",
+      "source_location": "L963",
       "weight": 1
     },
     {
@@ -16688,7 +16717,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L961",
+      "source_location": "L963",
       "weight": 1
     },
     {
@@ -16697,7 +16726,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L961",
+      "source_location": "L963",
       "weight": 1
     },
     {
@@ -16706,7 +16735,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1005",
+      "source_location": "L1007",
       "weight": 1
     },
     {
@@ -16715,7 +16744,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1005",
+      "source_location": "L1007",
       "weight": 1
     },
     {
@@ -16724,7 +16753,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16733,7 +16762,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16742,7 +16771,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16751,7 +16780,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16760,7 +16789,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16769,7 +16798,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16778,7 +16807,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16787,7 +16816,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16796,7 +16825,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16805,7 +16834,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16814,7 +16843,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16823,7 +16852,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16832,7 +16861,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16841,7 +16870,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16850,7 +16879,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1038",
+      "source_location": "L1040",
       "weight": 1
     },
     {
@@ -16859,7 +16888,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1312",
+      "source_location": "L1314",
       "weight": 1
     },
     {
@@ -16868,7 +16897,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1312",
+      "source_location": "L1314",
       "weight": 1
     },
     {
@@ -16877,7 +16906,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1312",
+      "source_location": "L1314",
       "weight": 1
     },
     {
@@ -16886,7 +16915,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1312",
+      "source_location": "L1314",
       "weight": 1
     },
     {
@@ -16895,7 +16924,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1334",
+      "source_location": "L1336",
       "weight": 1
     },
     {
@@ -16904,7 +16933,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1334",
+      "source_location": "L1336",
       "weight": 1
     },
     {
@@ -16913,7 +16942,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1334",
+      "source_location": "L1336",
       "weight": 1
     },
     {
@@ -16922,7 +16951,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1488",
+      "source_location": "L1490",
       "weight": 1
     },
     {
@@ -16931,7 +16960,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1488",
+      "source_location": "L1490",
       "weight": 1
     },
     {
@@ -16940,7 +16969,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1488",
+      "source_location": "L1490",
       "weight": 1
     },
     {
@@ -16949,7 +16978,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1488",
+      "source_location": "L1490",
       "weight": 1
     },
     {
@@ -16958,7 +16987,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1637",
+      "source_location": "L1639",
       "weight": 1
     },
     {
@@ -16967,7 +16996,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1637",
+      "source_location": "L1639",
       "weight": 1
     },
     {
@@ -16976,7 +17005,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1637",
+      "source_location": "L1639",
       "weight": 1
     },
     {
@@ -16985,7 +17014,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1672",
+      "source_location": "L1674",
       "weight": 1
     },
     {
@@ -16994,7 +17023,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1699",
+      "source_location": "L1701",
       "weight": 1
     },
     {
@@ -17003,7 +17032,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1783",
+      "source_location": "L1785",
       "weight": 1
     },
     {
@@ -17012,7 +17041,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1829",
+      "source_location": "L1831",
       "weight": 1
     },
     {
@@ -17021,7 +17050,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1829",
+      "source_location": "L1831",
       "weight": 1
     },
     {
@@ -17030,7 +17059,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1829",
+      "source_location": "L1831",
       "weight": 1
     },
     {
@@ -17039,7 +17068,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L1829",
+      "source_location": "L1831",
       "weight": 1
     },
     {
@@ -17048,7 +17077,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1856",
+      "source_location": "L1858",
       "weight": 1
     },
     {
@@ -17057,7 +17086,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1856",
+      "source_location": "L1858",
       "weight": 1
     },
     {
@@ -17066,7 +17095,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1856",
+      "source_location": "L1858",
       "weight": 1
     },
     {
@@ -17075,7 +17104,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1856",
+      "source_location": "L1858",
       "weight": 1
     },
     {
@@ -17084,7 +17113,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1856",
+      "source_location": "L1858",
       "weight": 1
     },
     {
@@ -17093,7 +17122,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1894",
+      "source_location": "L1896",
       "weight": 1
     },
     {
@@ -17102,7 +17131,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1894",
+      "source_location": "L1896",
       "weight": 1
     },
     {
@@ -17111,7 +17140,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L1894",
+      "source_location": "L1896",
       "weight": 1
     },
     {
@@ -17120,7 +17149,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17129,7 +17158,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17138,7 +17167,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17147,7 +17176,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17156,7 +17185,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17165,7 +17194,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17174,7 +17203,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17183,7 +17212,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17192,7 +17221,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17201,7 +17230,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17210,7 +17239,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17219,7 +17248,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17228,7 +17257,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17237,7 +17266,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17246,7 +17275,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17255,7 +17284,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17264,7 +17293,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17273,7 +17302,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L1917",
+      "source_location": "L1919",
       "weight": 1
     },
     {
@@ -17282,7 +17311,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17291,7 +17320,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17300,7 +17329,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17309,7 +17338,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17318,7 +17347,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17327,7 +17356,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17336,7 +17365,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17345,7 +17374,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17354,7 +17383,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17363,7 +17392,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17372,7 +17401,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17381,7 +17410,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17390,7 +17419,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17399,7 +17428,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17408,7 +17437,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17417,7 +17446,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17426,7 +17455,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17435,7 +17464,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17444,7 +17473,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17453,7 +17482,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17462,7 +17491,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17471,7 +17500,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17480,7 +17509,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17489,7 +17518,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17498,7 +17527,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17507,7 +17536,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17516,7 +17545,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17525,7 +17554,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L2038",
+      "source_location": "L2040",
       "weight": 1
     },
     {
@@ -17534,7 +17563,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2048",
+      "source_location": "L2050",
       "weight": 1
     },
     {
@@ -17543,7 +17572,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2048",
+      "source_location": "L2050",
       "weight": 1
     },
     {
@@ -17552,7 +17581,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2048",
+      "source_location": "L2050",
       "weight": 1
     },
     {
@@ -17561,7 +17590,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2048",
+      "source_location": "L2050",
       "weight": 1
     },
     {
@@ -17570,7 +17599,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2048",
+      "source_location": "L2050",
       "weight": 1
     },
     {
@@ -17579,7 +17608,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17588,7 +17617,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17597,7 +17626,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17606,7 +17635,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17615,7 +17644,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17624,7 +17653,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17633,7 +17662,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17642,7 +17671,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17651,7 +17680,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17660,7 +17689,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17669,7 +17698,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17678,7 +17707,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2515",
+      "source_location": "L2517",
       "weight": 1
     },
     {
@@ -17687,7 +17716,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17696,7 +17725,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17705,7 +17734,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17714,7 +17743,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17723,7 +17752,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17732,7 +17761,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17741,7 +17770,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17750,7 +17779,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17759,7 +17788,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17768,7 +17797,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17777,7 +17806,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2730",
+      "source_location": "L2732",
       "weight": 1
     },
     {
@@ -17786,7 +17815,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2794",
+      "source_location": "L2796",
       "weight": 1
     },
     {
@@ -17795,7 +17824,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2816",
+      "source_location": "L2818",
       "weight": 1
     },
     {
@@ -17804,7 +17833,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2816",
+      "source_location": "L2818",
       "weight": 1
     },
     {
@@ -17813,7 +17842,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2816",
+      "source_location": "L2818",
       "weight": 1
     },
     {
@@ -17822,7 +17851,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2837",
+      "source_location": "L2839",
       "weight": 1
     },
     {
@@ -17831,7 +17860,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2837",
+      "source_location": "L2839",
       "weight": 1
     },
     {
@@ -17840,7 +17869,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2864",
+      "source_location": "L2866",
       "weight": 1
     },
     {
@@ -17849,7 +17878,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2864",
+      "source_location": "L2866",
       "weight": 1
     },
     {
@@ -17858,7 +17887,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2864",
+      "source_location": "L2866",
       "weight": 1
     },
     {
@@ -17867,7 +17896,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -17876,7 +17905,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -17885,7 +17914,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -17894,7 +17923,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -17903,7 +17932,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -17912,7 +17941,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -17921,7 +17950,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -17930,25 +17959,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2870",
-      "weight": 1
-    },
-    {
-      "source": "fn:src/main.ts:buildCurrentPackingRequisitionSlip",
-      "target": "fn:src/utils/requisitionLogic.ts:normalizeBaseReqNumber",
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L2950",
-      "weight": 1
-    },
-    {
-      "source": "fn:src/main.ts:buildCurrentPackingRequisitionSlip",
-      "target": "fn:src/utils/requisitionLogic.ts:buildPackingRequisitionSlipHtml",
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L2950",
+      "source_location": "L2872",
       "weight": 1
     },
     {
@@ -17957,7 +17968,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2963",
+      "source_location": "L2952",
       "weight": 1
     },
     {
@@ -17966,16 +17977,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2963",
-      "weight": 1
-    },
-    {
-      "source": "fn:src/main.ts:buildCurrentMaterialRequisitionSlip",
-      "target": "fn:src/utils/requisitionLogic.ts:calculateSizeTotal",
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L2963",
+      "source_location": "L2952",
       "weight": 1
     },
     {
@@ -17984,7 +17986,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2963",
+      "source_location": "L2952",
       "weight": 1
     },
     {
@@ -17993,7 +17995,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2979",
+      "source_location": "L2968",
       "weight": 1
     },
     {
@@ -18002,7 +18004,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2979",
+      "source_location": "L2968",
       "weight": 1
     },
     {
@@ -18011,7 +18013,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2979",
+      "source_location": "L2968",
       "weight": 1
     },
     {
@@ -18020,7 +18022,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2979",
+      "source_location": "L2968",
       "weight": 1
     },
     {
@@ -18029,7 +18031,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2979",
+      "source_location": "L2968",
       "weight": 1
     },
     {
@@ -18038,7 +18040,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L2979",
+      "source_location": "L2968",
       "weight": 1
     },
     {
@@ -18047,7 +18049,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18056,7 +18058,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18065,7 +18067,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18074,7 +18076,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18083,7 +18085,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18092,7 +18094,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18101,7 +18103,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18110,7 +18112,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18119,7 +18121,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18128,7 +18130,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18137,7 +18139,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18146,7 +18148,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18155,7 +18157,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18164,16 +18166,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
-      "weight": 1
-    },
-    {
-      "source": "fn:src/main.ts:attachPackingHandlers",
-      "target": "fn:src/main.ts:buildCurrentPackingRequisitionSlip",
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18182,7 +18175,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18191,7 +18184,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18200,7 +18193,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18209,7 +18202,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18218,7 +18211,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18227,7 +18220,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18236,7 +18229,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18245,7 +18238,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18254,7 +18247,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18263,7 +18256,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18272,7 +18265,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18281,7 +18274,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18290,7 +18283,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18299,7 +18292,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18308,7 +18301,25 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
+      "weight": 1
+    },
+    {
+      "source": "fn:src/main.ts:attachPackingHandlers",
+      "target": "fn:src/utils/requisitionLogic.ts:isStage3ClearedForMaterialReq",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L2989",
+      "weight": 1
+    },
+    {
+      "source": "fn:src/main.ts:attachPackingHandlers",
+      "target": "fn:src/utils/requisitionLogic.ts:isMaterialRequisitionIssuedForStage4",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.ts",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18317,7 +18328,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18326,7 +18337,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18335,7 +18346,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "weight": 1
     },
     {
@@ -18344,7 +18355,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18353,7 +18364,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18362,7 +18373,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18371,7 +18382,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18380,7 +18391,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18389,7 +18400,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18398,7 +18409,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18407,7 +18418,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18416,7 +18427,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18425,7 +18436,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18434,7 +18445,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18443,7 +18454,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18452,7 +18463,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18461,7 +18472,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L3595",
+      "source_location": "L3594",
       "weight": 1
     },
     {
@@ -18470,7 +18481,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3596",
+      "source_location": "L3595",
       "weight": 1
     },
     {
@@ -18479,7 +18490,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3596",
+      "source_location": "L3595",
       "weight": 1
     },
     {
@@ -18488,7 +18499,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3596",
+      "source_location": "L3595",
       "weight": 1
     },
     {
@@ -18497,7 +18508,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3742",
+      "source_location": "L3741",
       "weight": 1
     },
     {
@@ -18506,7 +18517,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3742",
+      "source_location": "L3741",
       "weight": 1
     },
     {
@@ -18515,7 +18526,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3742",
+      "source_location": "L3741",
       "weight": 1
     },
     {
@@ -18524,7 +18535,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3763",
+      "source_location": "L3762",
       "weight": 1
     },
     {
@@ -18533,7 +18544,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18542,7 +18553,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18551,7 +18562,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18560,7 +18571,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18569,7 +18580,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18578,7 +18589,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18587,7 +18598,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18596,7 +18607,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18605,7 +18616,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18614,7 +18625,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18623,7 +18634,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3855",
+      "source_location": "L3854",
       "weight": 1
     },
     {
@@ -18632,7 +18643,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3860",
+      "source_location": "L3859",
       "weight": 1
     },
     {
@@ -18641,7 +18652,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3860",
+      "source_location": "L3859",
       "weight": 1
     },
     {
@@ -18650,7 +18661,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3860",
+      "source_location": "L3859",
       "weight": 1
     },
     {
@@ -18659,7 +18670,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3860",
+      "source_location": "L3859",
       "weight": 1
     },
     {
@@ -18668,7 +18679,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3860",
+      "source_location": "L3859",
       "weight": 1
     },
     {
@@ -18677,7 +18688,7 @@
       "relation": "renders",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L3978",
+      "source_location": "L3977",
       "weight": 1
     },
     {
@@ -18686,7 +18697,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18695,7 +18706,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18704,7 +18715,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18713,7 +18724,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18722,7 +18733,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18731,7 +18742,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18740,7 +18751,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18749,7 +18760,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18758,7 +18769,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18767,7 +18778,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L4022",
+      "source_location": "L4021",
       "weight": 1
     },
     {
@@ -18776,7 +18787,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18785,7 +18796,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18794,7 +18805,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18803,7 +18814,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18812,7 +18823,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18821,7 +18832,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18830,7 +18841,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18839,7 +18850,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18848,7 +18859,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18857,7 +18868,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18866,7 +18877,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18875,7 +18886,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18884,7 +18895,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18893,7 +18904,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18902,7 +18913,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18911,7 +18922,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18920,7 +18931,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18929,7 +18940,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18938,7 +18949,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18947,7 +18958,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18956,7 +18967,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18965,7 +18976,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18974,7 +18985,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18983,7 +18994,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -18992,7 +19003,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -19001,7 +19012,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -19010,7 +19021,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -19019,7 +19030,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -19028,7 +19039,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -19037,7 +19048,7 @@
       "relation": "routes_to",
       "confidence": "INFERRED",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "weight": 1
     },
     {
@@ -19046,7 +19057,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4438",
+      "source_location": "L4437",
       "weight": 1
     },
     {
@@ -19055,7 +19066,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4454",
+      "source_location": "L4453",
       "weight": 1
     },
     {
@@ -19064,7 +19075,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4454",
+      "source_location": "L4453",
       "weight": 1
     },
     {
@@ -19073,7 +19084,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4454",
+      "source_location": "L4453",
       "weight": 1
     },
     {
@@ -19082,7 +19093,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4480",
+      "source_location": "L4479",
       "weight": 1
     },
     {
@@ -19091,7 +19102,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4480",
+      "source_location": "L4479",
       "weight": 1
     },
     {
@@ -19100,7 +19111,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L4480",
+      "source_location": "L4479",
       "weight": 1
     },
     {
@@ -19109,7 +19120,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5539",
+      "source_location": "L5538",
       "weight": 1
     },
     {
@@ -19118,7 +19129,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/main.ts",
-      "source_location": "L5539",
+      "source_location": "L5538",
       "weight": 1
     },
     {
@@ -21908,7 +21919,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21917,7 +21928,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21926,7 +21937,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21935,7 +21946,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21944,7 +21955,7 @@
       "relation": "queries_table",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21953,7 +21964,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21962,7 +21973,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21971,7 +21982,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21980,7 +21991,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21989,7 +22000,25 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
+      "weight": 1
+    },
+    {
+      "source": "fn:src/utils/requisitionLogic.test.ts:extractBlocks",
+      "target": "fn:src/utils/requisitionLogic.ts:isStage3ClearedForMaterialReq",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/requisitionLogic.test.ts",
+      "source_location": "L1308",
+      "weight": 1
+    },
+    {
+      "source": "fn:src/utils/requisitionLogic.test.ts:extractBlocks",
+      "target": "fn:src/utils/requisitionLogic.ts:isMaterialRequisitionIssuedForStage4",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/requisitionLogic.test.ts",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -21998,7 +22027,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22007,7 +22036,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22016,7 +22045,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22025,7 +22054,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22034,7 +22063,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22043,7 +22072,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22052,7 +22081,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22061,7 +22090,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22070,7 +22099,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.test.ts",
-      "source_location": "L1306",
+      "source_location": "L1308",
       "weight": 1
     },
     {
@@ -22119,12 +22148,21 @@
       "weight": 1
     },
     {
+      "source": "fn:src/utils/requisitionLogic.ts:isMaterialRequisitionIssuedForStage4",
+      "target": "fn:src/utils/requisitionLogic.ts:isStage3ClearedForMaterialReq",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/requisitionLogic.ts",
+      "source_location": "L507",
+      "weight": 1
+    },
+    {
       "source": "fn:src/utils/requisitionLogic.ts:computeOrderReconciliationMetrics",
       "target": "fn:src/utils/requisitionLogic.ts:evaluateOrderReconciliation",
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L1761",
+      "source_location": "L1787",
       "weight": 1
     },
     {
@@ -22133,7 +22171,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2270",
+      "source_location": "L2296",
       "weight": 1
     },
     {
@@ -22142,7 +22180,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2839",
+      "source_location": "L2865",
       "weight": 1
     },
     {
@@ -22151,7 +22189,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2839",
+      "source_location": "L2865",
       "weight": 1
     },
     {
@@ -22160,7 +22198,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2839",
+      "source_location": "L2865",
       "weight": 1
     },
     {
@@ -22169,7 +22207,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L2839",
+      "source_location": "L2865",
       "weight": 1
     },
     {
@@ -22178,7 +22216,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3103",
+      "source_location": "L3129",
       "weight": 1
     },
     {
@@ -22187,7 +22225,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3103",
+      "source_location": "L3129",
       "weight": 1
     },
     {
@@ -22196,7 +22234,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3190",
+      "source_location": "L3216",
       "weight": 1
     },
     {
@@ -22205,7 +22243,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3190",
+      "source_location": "L3216",
       "weight": 1
     },
     {
@@ -22214,7 +22252,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3190",
+      "source_location": "L3216",
       "weight": 1
     },
     {
@@ -22223,7 +22261,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3695",
+      "source_location": "L3723",
       "weight": 1
     },
     {
@@ -22232,7 +22270,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3832",
+      "source_location": "L3860",
       "weight": 1
     },
     {
@@ -22241,7 +22279,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/requisitionLogic.ts",
-      "source_location": "L3832",
+      "source_location": "L3860",
       "weight": 1
     },
     {

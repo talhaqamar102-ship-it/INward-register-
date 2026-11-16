@@ -4,8 +4,9 @@ import {
   buildRequisitionAnalyticsSeries,
   determineOrderActiveStage,
   getAlterationReqNumber,
-  getMaterialReqNumber,
+  isMaterialRequisitionIssuedForStage4,
   isPackingAwaitingFinalQc,
+  isStage3ClearedForMaterialReq,
   isStage5ReadyForCartons,
   normalizeBaseReqNumber,
   renderRequisitionWipAnalyticsChart
@@ -74,13 +75,14 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
   } = params;
 
   const baseReq = normalizeBaseReqNumber(wip.selectedBatch);
-  const mReq = getMaterialReqNumber(baseReq);
   const aReq = getAlterationReqNumber(baseReq);
-  const scopedDefects = defectList.filter(d => d.id === aReq);
+  const scopedDefects = defectList.filter(d => d.id === aReq || d.id === baseReq);
   const activeAlts = scopedDefects.filter(d => d.status === 'In Rework' || d.status === 'In Washing' || d.status === 'In Sorting');
   const awaitingFinalQc = isPackingAwaitingFinalQc(wip);
   const stage5Ready = isStage5ReadyForCartons(wip);
   const awaitingInwardIssue = wip.issueStatus !== 'Issued by Inward Register' && wip.stage1In <= 0;
+  const stage3Cleared = isStage3ClearedForMaterialReq(wip);
+  const mreqIssuedForStage4 = isMaterialRequisitionIssuedForStage4(wip);
   const parentRollup = wip.parentOrderId
     ? rollupSummary.orderRollups.find(o => o.orderId === wip.parentOrderId)
     : undefined;
@@ -149,18 +151,6 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
               })()}
             </select>
           </div>
-          <div class="form-group" style="flex: 0.9; min-width: 125px;">
-            <span class="field-label" style="font-size: 11px; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; display: block;">Material Req (M-Prefix)</span>
-            <div style="padding: 5px 0;">
-              <span class="status-pill" id="wip-disp-mreq">${mReq}</span>
-            </div>
-          </div>
-          <div class="form-group" style="flex: 0.9; min-width: 125px;">
-            <span class="field-label" style="font-size: 11px; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; display: block;">Alteration Bay (A-Prefix)</span>
-            <div style="padding: 5px 0;">
-              <span class="status-pill" id="wip-disp-areq">${aReq}</span>
-            </div>
-          </div>
           <div class="form-group" style="flex: 1; min-width: 110px;">
             <span class="field-label" style="font-size: 11px; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; display: block;">Article</span>
             <div id="wip-disp-article" style="font-weight: 700; color: var(--ink-950); padding: 7px 0; font-size: 13px;">${wip.article || '---'}</div>
@@ -185,7 +175,6 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
           ` : ''}
           <div class="packing-toolbar-actions">
             <button type="button" class="btn-primary" id="btn-wip-new-req" ${pendingOrders.length === 0 ? 'disabled title="A pending master order is needed first."' : ''}>+ Generate Requisition</button>
-            <button type="button" class="btn-outline" id="btn-wip-print-req" ${persistedReqNumbers.includes(baseReq) ? '' : 'disabled'}>Print Requisition</button>
           </div>
         </div>
       </section>
@@ -196,7 +185,7 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
           <h2 style="font-size: 12.5px; font-weight: 700; color: var(--ink-950); text-transform: uppercase; letter-spacing: 0.04em; margin: 0;">
             5-Stage WIP Floor Process Pipeline
           </h2>
-          <span style="font-size: 11.5px; color: var(--ink-500);">Unified Req: <strong>${baseReq}</strong> &bull; Material: <strong>${mReq}</strong> &bull; Alteration: <strong>${aReq}</strong></span>
+          <span style="font-size: 11.5px; color: var(--ink-500);">Active Requisition: <strong>${baseReq}</strong></span>
         </div>
 
         ${awaitingInwardIssue ? `
@@ -231,7 +220,7 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
               </div>
               <div class="pipeline-stage-metric"><span>Available In:</span> <strong id="wip-stg1-in">${stage1Rem.toLocaleString()}</strong></div>
               <div class="pipeline-stage-metric"><span>Passed:</span> <strong id="wip-stg1-passed">${wip.stage1Passed.toLocaleString()}</strong></div>
-              <div class="pipeline-stage-metric"><span>Defects (${aReq}):</span> <strong id="wip-stg1-defects">${wip.stage1Defects.toLocaleString()}</strong></div>
+              <div class="pipeline-stage-metric"><span>Defects:</span> <strong id="wip-stg1-defects">${wip.stage1Defects.toLocaleString()}</strong></div>
             </div>
             <button type="button" class="${activeStage === 'STEP_1' ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step1" ${awaitingInwardIssue || stage1Rem <= 0 ? 'disabled' : ''}>
               ${stage1Rem <= 0 && wip.stage1Passed > 0 ? 'Stage 1 Complete' : 'Process Stage 1'}
@@ -247,7 +236,7 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
               </div>
               <div class="pipeline-stage-metric"><span>Available In:</span> <strong id="wip-stg2-in">${stage2Rem.toLocaleString()}</strong></div>
               <div class="pipeline-stage-metric"><span>Passed:</span> <strong id="wip-stg2-passed">${wip.stage2Passed.toLocaleString()}</strong></div>
-              <div class="pipeline-stage-metric"><span>Defects (${aReq}):</span> <strong id="wip-stg2-defects">${wip.stage2Defects.toLocaleString()}</strong></div>
+              <div class="pipeline-stage-metric"><span>Defects:</span> <strong id="wip-stg2-defects">${wip.stage2Defects.toLocaleString()}</strong></div>
             </div>
             <button type="button" class="${activeStage === 'STEP_2' ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step2" ${stage2Rem <= 0 ? 'disabled' : ''}>
               ${stage2Rem <= 0 && wip.stage2Passed > 0 ? 'Stage 2 Complete' : 'Process Stage 2'}
@@ -263,43 +252,48 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
               </div>
               <div class="pipeline-stage-metric"><span>Available In:</span> <strong id="wip-stg3-in">${stage3Rem.toLocaleString()}</strong></div>
               <div class="pipeline-stage-metric"><span>Matched:</span> <strong id="wip-stg3-passed">${wip.stage3Passed.toLocaleString()} Prs</strong></div>
-              <div class="pipeline-stage-metric"><span>Defects (${aReq}):</span> <strong id="wip-stg3-defects">${wip.stage3Defects.toLocaleString()}</strong></div>
+              <div class="pipeline-stage-metric"><span>Defects:</span> <strong id="wip-stg3-defects">${wip.stage3Defects.toLocaleString()}</strong></div>
             </div>
             <button type="button" class="${activeStage === 'STEP_3' ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step3" ${stage3Rem <= 0 ? 'disabled' : ''}>
               ${stage3Rem <= 0 && wip.stage3Passed > 0 ? 'Stage 3 Complete' : 'Process Stage 3'}
             </button>
           </div>
 
-          <!-- REQUISITION SLIP GENERATOR (M-PREFIX) -->
-          <div class="pipeline-stage-card" style="background: var(--ink-50); border-style: dashed;">
+          <!-- MATERIAL REQUISITION SLIP GENERATOR (STAGE-3 GATED) -->
+          <div class="pipeline-stage-card ${stage3Cleared && !mreqIssuedForStage4 ? 'stage-active' : ''}" style="background: var(--ink-50); border-style: dashed;">
             <div>
               <div class="pipeline-stage-header">
-                <span>Material Req (M)</span>
+                <span>Material Requisition</span>
+                ${!stage3Cleared
+                  ? '<span class="status-pill" style="font-size: 10.5px;">Clear Stage 3</span>'
+                  : (mreqIssuedForStage4 ? '<span class="status-pill" style="font-size: 10.5px;">Issued</span>' : '<span class="stage-active-badge">Ready</span>')}
               </div>
-              <div class="pipeline-stage-metric"><span>Slip No:</span> <strong id="wip-mreq-no">${mReq}</strong></div>
-              <div class="pipeline-stage-metric"><span>Sets:</span> <strong id="wip-mreq-qty">${wip.mreqQty}</strong></div>
+              <div class="pipeline-stage-metric"><span>Requisition:</span> <strong id="wip-mreq-no">${baseReq}</strong></div>
+              <div class="pipeline-stage-metric"><span>Sets:</span> <strong id="wip-mreq-qty">${wip.stage3Passed.toLocaleString()} Sets</strong></div>
               <div class="pipeline-stage-metric"><span>Article:</span> <strong>${wip.article || '---'}</strong></div>
             </div>
             <div style="display: flex; gap: 8px; margin-top: 10px;">
-              <button type="button" class="btn-outline" style="flex: 1; justify-content: center;" id="btn-wip-generate-mreq-slip" ${persistedReqNumbers.includes(baseReq) ? '' : 'disabled'}>Generate Slip</button>
-              <button type="button" class="btn-primary" style="flex: 1; justify-content: center;" id="btn-wip-print-mreq-slip" ${persistedReqNumbers.includes(baseReq) ? '' : 'disabled'}>Print Slip</button>
+              <button type="button" class="btn-outline" style="flex: 1; justify-content: center;" id="btn-wip-generate-mreq-slip" ${stage3Cleared ? '' : 'disabled title="Complete Stage 3 (Pair Matching) first."'}>Generate Slip</button>
+              <button type="button" class="btn-primary" style="flex: 1; justify-content: center;" id="btn-wip-print-mreq-slip" ${stage3Cleared ? '' : 'disabled title="Complete Stage 3 (Pair Matching) first."'}>Print Slip</button>
             </div>
           </div>
 
           <!-- STAGE 4: 1st Packing -->
-          <div class="pipeline-stage-card ${activeStage === 'STEP_4' ? 'stage-active' : ''}">
+          <div class="pipeline-stage-card ${activeStage === 'STEP_4' && mreqIssuedForStage4 ? 'stage-active' : ''}">
             <div>
               <div class="pipeline-stage-header">
                 <span>Stage 4: 1st Packing</span>
                 ${awaitingFinalQc
                   ? '<span class="stage-active-badge">Awaiting QC</span>'
-                  : (activeStage === 'STEP_4' ? '<span class="stage-active-badge">Active</span>' : '')}
+                  : (!mreqIssuedForStage4
+                    ? '<span class="status-pill" style="font-size: 10.5px;">Await Mat. Req</span>'
+                    : (activeStage === 'STEP_4' ? '<span class="stage-active-badge">Active</span>' : ''))}
               </div>
               <div class="pipeline-stage-metric"><span>Polybag In:</span> <strong id="wip-stg4-in">${wip.stage4In.toLocaleString()} prs</strong></div>
               <div class="pipeline-stage-metric"><span>Packaged:</span> <strong id="wip-stg4-passed">${wip.stage4Passed.toLocaleString()} Prs</strong></div>
               <div class="pipeline-stage-metric"><span>Pending:</span> <strong id="wip-stg4-pending">${wip.stage4Pending}</strong></div>
             </div>
-            <button type="button" class="${activeStage === 'STEP_4' && !awaitingFinalQc ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step4" ${awaitingFinalQc || wip.stage4Pending <= 0 ? 'disabled' : ''}>
+            <button type="button" class="${activeStage === 'STEP_4' && mreqIssuedForStage4 && !awaitingFinalQc ? 'btn-primary' : 'btn-outline'}" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 6px; justify-content: center;" id="btn-wip-step4" ${!mreqIssuedForStage4 || awaitingFinalQc || wip.stage4Pending <= 0 ? 'disabled' : ''}>
               ${awaitingFinalQc || stage5Ready || (wip.stage4Passed > 0 && wip.stage4Pending === 0) ? '1st Packing Complete' : 'Record 1st Packing'}
             </button>
           </div>
@@ -345,14 +339,14 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
         <!-- LEFT: Active Alteration / Rework Loop -->
         <div class="panel-card">
           <div class="panel-card-header">
-            <h2 class="panel-card-title" style="margin: 0;">Active Alteration / Repair Loop (${aReq})</h2>
+            <h2 class="panel-card-title" style="margin: 0;">Active Alteration / Repair Loop</h2>
             <span class="panel-counter-badge">${activeAlts.length} Active</span>
           </div>
           <div class="table-responsive">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th scope="col">Alteration Req #</th>
+                  <th scope="col">Requisition #</th>
                   <th scope="col">Source Stage</th>
                   <th scope="col">Defect Class</th>
                   <th scope="col" class="text-right">Qty</th>
@@ -363,7 +357,7 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
               <tbody>
                 ${scopedDefects.length === 0 ? `
                   <tr>
-                    <td colspan="6" class="table-empty-cell">No active alterations in queue for ${aReq}.</td>
+                    <td colspan="6" class="table-empty-cell">No active alterations in queue for ${baseReq}.</td>
                   </tr>
                 ` : scopedDefects.slice(0, 5).map(d => `
                   <tr>
@@ -438,7 +432,7 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
           <span class="stat-divider">&bull;</span>
           <span>Output: <strong>${wip.outputPairs} Pairs / ${wip.outputCartons} Cartons</strong></span>
           <span class="stat-divider">&bull;</span>
-          <span>In Alteration (${aReq}): <strong>${wip.inAlteration} Pairs</strong></span>
+          <span>In Alteration: <strong>${wip.inAlteration} Pairs</strong></span>
         </div>
         <div class="footer-actions-right">
           <button class="btn-outline" id="btn-wip-export-shift">Export Shift Log</button>

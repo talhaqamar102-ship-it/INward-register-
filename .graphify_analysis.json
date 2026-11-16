@@ -72,7 +72,6 @@
       "fn:src/main.ts:postWipStageUpdate",
       "fn:src/main.ts:saveCurrentOrderWipState",
       "fn:src/main.ts:mapServerRequisitionToWip",
-      "fn:src/main.ts:buildCurrentPackingRequisitionSlip",
       "fn:src/main.ts:buildCurrentMaterialRequisitionSlip",
       "fn:src/main.ts:switchActiveOrder",
       "fn:src/main.ts:attachPackingHandlers",
@@ -136,6 +135,8 @@
       "fn:src/utils/requisitionLogic.ts:determineOrderActiveStage",
       "fn:src/utils/requisitionLogic.ts:isPackingAwaitingFinalQc",
       "fn:src/utils/requisitionLogic.ts:isStage5ReadyForCartons",
+      "fn:src/utils/requisitionLogic.ts:isStage3ClearedForMaterialReq",
+      "fn:src/utils/requisitionLogic.ts:isMaterialRequisitionIssuedForStage4",
       "fn:src/utils/requisitionLogic.ts:computeWipRolledYieldPct",
       "fn:src/utils/requisitionLogic.ts:computeActualStageWipPairs",
       "fn:src/utils/requisitionLogic.ts:evaluateReqReconciliation",
@@ -898,7 +899,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 91
+      "degree": 90
     },
     {
       "id": "file:src/utils/requisitionLogic.ts",
@@ -909,7 +910,7 @@
       "source_location": "L1",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 87
+      "degree": 89
     },
     {
       "id": "file:src/routes/api.js",
@@ -972,10 +973,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3000",
+      "source_location": "L2989",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 35
+      "degree": 36
     },
     {
       "id": "method:src/services/packingService.js:PackingService.getAdminOverview",
@@ -1005,7 +1006,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4164",
+      "source_location": "L4163",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 32

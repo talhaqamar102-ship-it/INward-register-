@@ -2,8 +2,8 @@
 
 Navigate community articles below instead of grepping raw source files:
 
-- **[C0: Frontend MES Screens & UI State (src/main.ts)](community_0.md)** (91 nodes, cohesion `0.67`)
-- **[C1: Requisition & Multi-Order Pure Logic (src/utils)](community_1.md)** (81 nodes, cohesion `0.65`)
+- **[C0: Frontend MES Screens & UI State (src/main.ts)](community_0.md)** (90 nodes, cohesion `0.67`)
+- **[C1: Requisition & Multi-Order Pure Logic (src/utils)](community_1.md)** (83 nodes, cohesion `0.65`)
 - **[C2: Express API & HTTP Server Layer (server.ts, api.js)](community_2.md)** (63 nodes, cohesion `0.6`)
 - **[C3: Packing Hall 5-Stage & AQL Domain Services (src/services)](community_3.md)** (68 nodes, cohesion `0.61`)
 - **[C4: SQLite WAL Database & 17-Table Schema (src/db.js)](community_4.md)** (31 nodes, cohesion `0.58`)

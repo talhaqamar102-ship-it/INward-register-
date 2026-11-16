@@ -21,7 +21,9 @@ import {
   determineOrderActiveStage,
   canExecuteStage5CartonPacking,
   computeWipRolledYieldPct,
+  isMaterialRequisitionIssuedForStage4,
   isPackingAwaitingFinalQc,
+  isStage3ClearedForMaterialReq,
   formatBatchSequence,
   isReqAwaitingFinalQc,
   buildSuperUserOrderRollups,
@@ -132,7 +134,7 @@ function createEmptyPackingWipState() {
     mreqNo: getMaterialReqNumber(DEFAULT_REQ_NUMBER),
     altReqNo: getAlterationReqNumber(DEFAULT_REQ_NUMBER),
     mreqQty: '0 Sets',
-    mreqStatus: 'Ready',
+    mreqStatus: 'Pending Stage 3',
     stage4In: 0,
     stage4Passed: 0,
     stage4Pending: 0,
@@ -2403,7 +2405,7 @@ function attachGRNHandlers(): void {
         } else {
           state.packingWip.issueStatus = 'Issued by Inward Register';
           state.packingWip.stage1In = evalIssue.askingPairs;
-          state.packingWip.mreqQty = `${evalIssue.askingPairs} Sets`;
+          state.packingWip.mreqQty = '0 Sets';
           if (!state.packingWip.parentOrderId && targetOrderId) {
             state.packingWip.parentOrderId = targetOrderId;
           }
@@ -2431,7 +2433,7 @@ function attachGRNHandlers(): void {
       state.issuedPairsTotal += evalIssue.askingPairs;
       state.packingWip.issueStatus = 'Issued by Inward Register';
       state.packingWip.stage1In = evalIssue.askingPairs;
-      state.packingWip.mreqQty = `${evalIssue.askingPairs} Sets`;
+      state.packingWip.mreqQty = '0 Sets';
       saveCurrentOrderWipState();
     }
 
@@ -2923,8 +2925,8 @@ function mapServerRequisitionToWip(requisition: any): typeof state.packingWip & 
     mreqNo: getMaterialReqNumber(reqNumber),
     matReqNumber: requisition.materialReq?.mat_req_number || '',
     altReqNo: getAlterationReqNumber(reqNumber),
-    mreqQty: `${stage3Passed || plannedQty} Sets`,
-    mreqStatus: requisition.materialReq?.status || (Number(wip.step4_materials_issued || 0) === 1 ? 'ISSUED' : 'Ready'),
+    mreqQty: `${stage3Passed} Sets`,
+    mreqStatus: requisition.materialReq?.status || (Number(wip.step4_materials_issued || 0) === 1 ? 'ISSUED' : (stage3Passed > 0 ? 'Ready' : 'Pending Stage 3')),
     stage4In,
     stage4Passed,
     stage4Pending: Math.max(0, stage4In - stage4Passed),
@@ -2947,23 +2949,10 @@ function mapServerRequisitionToWip(requisition: any): typeof state.packingWip & 
   } as any;
 }
 
-function buildCurrentPackingRequisitionSlip(): string {
-  const wip = state.packingWip;
-  const reqNumber = normalizeBaseReqNumber(wip.selectedBatch);
-  return buildPackingRequisitionSlipHtml({
-    reqNo: reqNumber,
-    date: '31-10-2026',
-    article: wip.article || '---',
-    sizes: wip.sizes,
-    totalPairs: wip.plannedQty,
-    issueStatus: wip.issueStatus
-  });
-}
-
 function buildCurrentMaterialRequisitionSlip(): string {
   const wip = state.packingWip;
   const reqNumber = normalizeBaseReqNumber(wip.selectedBatch);
-  const pairs = wip.stage3Passed || wip.plannedQty || calculateSizeTotal(wip.sizes);
+  const pairs = Math.max(0, Number(wip.stage3Passed || 0));
   return buildMaterialRequisitionSlipHtml({
     mreqNo: getMaterialReqNumber(reqNumber),
     reqNo: reqNumber,
@@ -3272,11 +3261,14 @@ function attachPackingHandlers(): void {
           recordStageDefects('Stage 3 (Matching)', defects, 'Mismatch / Unpaired Gloves');
           state.packingWip.mreqNo = getMaterialReqNumber(state.packingWip.selectedBatch);
           state.packingWip.altReqNo = getAlterationReqNumber(state.packingWip.selectedBatch);
-          state.packingWip.mreqQty = `${good} Sets`;
+          state.packingWip.mreqQty = `${state.packingWip.stage3Passed} Sets`;
+          if (state.packingWip.mreqStatus !== 'ISSUED') {
+            state.packingWip.mreqStatus = 'Ready';
+          }
           saveCurrentOrderWipState();
         }
         closeModal();
-        showToast(`${good} pairs matched. Material Requisition ${state.packingWip.mreqNo} updated.`);
+        showToast(`${good} pairs matched in Stage 3. Material Requisition is now unlocked.`);
         renderApp();
       } finally {
         step3InFlight = false;
@@ -3287,6 +3279,10 @@ function attachPackingHandlers(): void {
 
   let mreqInFlight = false;
   document.getElementById('btn-wip-generate-mreq-slip')?.addEventListener('click', async (event) => {
+    if (!isStage3ClearedForMaterialReq(state.packingWip)) {
+      showToast('Material Requisition is locked until Stage 3 (Pair Matching) is cleared.');
+      return;
+    }
     if (mreqInFlight) return;
     const btn = event.currentTarget as HTMLButtonElement | null;
     mreqInFlight = true;
@@ -3337,6 +3333,10 @@ function attachPackingHandlers(): void {
           showToast('Failed to save or issue Material Requisition.');
           return;
         }
+      } else {
+        state.packingWip.mreqStatus = 'ISSUED';
+        saveCurrentOrderWipState();
+        renderApp();
       }
 
       openModal(`Material Requisition Slip — ${mreqId}`, buildCurrentMaterialRequisitionSlip(), true);
@@ -3347,12 +3347,20 @@ function attachPackingHandlers(): void {
   });
 
   document.getElementById('btn-wip-print-mreq-slip')?.addEventListener('click', () => {
+    if (!isStage3ClearedForMaterialReq(state.packingWip)) {
+      showToast('Material Requisition can only be printed after Stage 3 (Pair Matching) is cleared.');
+      return;
+    }
     const mreqId = getMaterialReqNumber(state.packingWip.selectedBatch);
     printDocument(`Material Requisition Slip — ${mreqId}`, buildCurrentMaterialRequisitionSlip());
   });
 
   // Stage 4 Modal
   document.getElementById('btn-wip-step4')?.addEventListener('click', () => {
+    if (!isMaterialRequisitionIssuedForStage4(state.packingWip)) {
+      showToast('Stage 4 locked: Clear Stage 3 and generate the Material Requisition slip first.');
+      return;
+    }
     const available = Math.max(0, state.packingWip.stage4In - state.packingWip.stage4Passed);
     if (available <= 0) {
       if (isPackingAwaitingFinalQc(state.packingWip)) {
@@ -3537,15 +3545,6 @@ function attachPackingHandlers(): void {
   // Packing Hall Generates Requisition Asking (Inward Register Person Issues Given Available Stock)
   document.getElementById('btn-wip-new-req')?.addEventListener('click', () => {
     openNewRequisitionModal();
-  });
-
-  document.getElementById('btn-wip-print-req')?.addEventListener('click', () => {
-    const reqNumber = normalizeBaseReqNumber(state.packingWip.selectedBatch);
-    if (!state.persistedReqNumbers.includes(reqNumber)) {
-      showToast('Save this requisition before printing it.');
-      return;
-    }
-    printDocument(`Packing Hall Requisition Slip — ${reqNumber}`, buildCurrentPackingRequisitionSlip());
   });
 
   // Shift log export

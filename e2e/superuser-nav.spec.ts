@@ -825,4 +825,127 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
 
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('Packing Hall: hides Print Requisition and M-/A-prefix fields, and locks Material Requisition until Stage 3 is cleared', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await page.addInitScript(() => {
+      window.print = () => {};
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const makerOption = await page.locator('#admin-pending-order-maker option').nth(1).getAttribute('value');
+    await page.selectOption('#admin-pending-order-buyer', 'Globex Supply Co.');
+    await page.selectOption('#admin-pending-order-maker', makerOption!);
+    await page.selectOption('#admin-pending-order-article', 'Model A1');
+    await page.fill('#admin-pending-order-po', 'PO-PH-GATE');
+    await page.fill('#admin-pending-order-color', 'Slate Black');
+    await page.fill('.admin-order-size-val[data-size="7"]', '100');
+    await page.click('#btn-admin-add-pending-order');
+
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    // Receive 100 pairs at Inward Register
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await page.fill('#grn-received-from', 'Tariq Carrier');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+    await page.click('#btn-return-admin');
+
+    // Create Packing Hall Requisition for the order
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-create-req"][data-order-id="${orderId}"]`);
+    await expect(page.locator('#btn-confirm-lot-draw')).toBeVisible();
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes(`/api/orders/${encodeURIComponent(orderId)}/requisitions`) && res.status() === 200),
+      page.click('#btn-confirm-lot-draw')
+    ]);
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+    await expect(page.locator('#wip-batch-select')).toBeVisible();
+
+    // 1 & 2: Print Requisition button & M-/A-prefix fields must be removed in Packing Hall
+    await expect(page.locator('#btn-wip-print-req')).toHaveCount(0);
+    await expect(page.locator('#wip-disp-mreq')).toHaveCount(0);
+    await expect(page.locator('#wip-disp-areq')).toHaveCount(0);
+    await expect(page.locator('#btn-wip-new-req')).toBeVisible();
+    await expect(page.locator('[data-testid="wip-analytics-dashboard"]')).not.toContainText('M-REQ');
+    await expect(page.locator('[data-testid="wip-analytics-dashboard"]')).not.toContainText('A-REQ');
+
+    // 3a: Before inward issue & Stage 3, Material Requisition & Stage 4 are locked and Sets = 0
+    await expect(page.locator('#wip-mreq-qty')).toHaveText('0 Sets');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-step4')).toBeDisabled();
+
+    // Issue requisition at Inward Register
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await expect(page.locator('#btn-issue-req-to-packing')).toBeEnabled();
+    await page.click('#btn-issue-req-to-packing');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    // Open active requisition in Packing Hall via Super User tracking
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    const openPackingBtn = page.locator(`#tracking-order-card-${orderId} button[data-su-action="open-req-screen"][data-target-screen="screen-packing"]`).first();
+    await expect(openPackingBtn).toBeVisible();
+    await openPackingBtn.click();
+
+    // After Inward Issue -> Stage 1 active, Material Requisition STILL locked until Stage 3 clears
+    await expect(page.locator('#wip-stg1-in')).toHaveText('100');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-step4')).toBeDisabled();
+
+    // Clear Stage 1 -> still locked during Stage 2
+    await page.click('#btn-wip-step1');
+    await page.click('#btn-submit-step1-action');
+    await expect(page.locator('#wip-stg2-in')).toHaveText('100');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeDisabled();
+
+    // Clear Stage 2 -> still locked during Stage 3
+    await page.click('#btn-wip-step2');
+    await page.click('#btn-submit-step2-action');
+    await expect(page.locator('#wip-stg3-in')).toHaveText('100');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-step4')).toBeDisabled();
+
+    // Clear Stage 3 (Pair Matching) -> Material Requisition unlocks (100 Sets), Stage 4 waits for slip generation
+    await page.click('#btn-wip-step3');
+    await page.click('#btn-submit-step3-action');
+    await expect(page.locator('#wip-mreq-qty')).toHaveText('100 Sets');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeEnabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeEnabled();
+    await expect(page.locator('#btn-wip-step4')).toBeDisabled();
+
+    // Generate & Issue Material Requisition -> opens slip modal and unlocks Stage 4
+    await page.click('#btn-wip-generate-mreq-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await expect(page.locator('#modal-body')).toContainText('100');
+    await page.click('#modal-btn-close');
+    await expect(page.locator('#btn-wip-step4')).toBeEnabled();
+
+    expect(runtimeErrors).toEqual([]);
+  });
 });

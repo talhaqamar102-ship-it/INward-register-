@@ -18,7 +18,9 @@ import {
   applyPendingOrderSelection,
   evaluateRequisitionIssuance,
   determineOrderActiveStage,
+  isMaterialRequisitionIssuedForStage4,
   isPackingAwaitingFinalQc,
+  isStage3ClearedForMaterialReq,
   isStage5ReadyForCartons,
   computeWipRolledYieldPct,
   canExecuteStage5CartonPacking,
@@ -1778,4 +1780,46 @@ test('Delivery countdown handles NO_DATE, OVERDUE, Due Today, DUE_SOON, ON_TRACK
   assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-30', createdAt: '2026-11-01', nowIso: '2026-11-16' }).status, 'ON_TRACK');
   assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-30', createdAt: '2026-11-01', nowIso: '2026-11-16' }).badgeText, '14d left');
   assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-10', isCompleted: true, nowIso: '2026-11-16' }).status, 'DELIVERED');
+});
+
+test('Material Requisition and Stage 4 unlock only stage-by-stage after Stage 3 Pair Matching is cleared', () => {
+  // Pending / Stage 1 in progress: Material Requisition locked
+  assert.equal(
+    isStage3ClearedForMaterialReq({ stage1In: 100, stage1Passed: 0, stage2In: 0, stage2Passed: 0, stage3In: 0, stage3Passed: 0 }),
+    false
+  );
+  // Stage 1 done, Stage 2 still has pending pairs: Material Requisition locked
+  assert.equal(
+    isStage3ClearedForMaterialReq({ stage1In: 100, stage1Passed: 100, stage2In: 100, stage2Passed: 60, stage3In: 60, stage3Passed: 60 }),
+    false
+  );
+  // Partial Stage 3 matching (remaining in Stage 3): Material Requisition locked
+  assert.equal(
+    isStage3ClearedForMaterialReq({ stage1In: 100, stage1Passed: 100, stage2In: 100, stage2Passed: 100, stage3In: 100, stage3Passed: 80, stage3Defects: 0 }),
+    false
+  );
+  // Stage 1, Stage 2, and Stage 3 all cleared with matched pairs > 0: Material Requisition unlocks, Stage 4 stays locked until issued
+  const unlockedForMatReq = {
+    stage1In: 100,
+    stage1Passed: 100,
+    stage2In: 100,
+    stage2Passed: 95,
+    stage2Defects: 5,
+    stage3In: 95,
+    stage3Passed: 95,
+    stage3Defects: 0,
+    mreqStatus: 'Ready'
+  };
+  assert.equal(isStage3ClearedForMaterialReq(unlockedForMatReq), true);
+  assert.equal(isMaterialRequisitionIssuedForStage4(unlockedForMatReq), false);
+
+  // Once Material Requisition is issued/printed, Stage 4 unlocks
+  assert.equal(
+    isMaterialRequisitionIssuedForStage4({ ...unlockedForMatReq, mreqStatus: 'ISSUED' }),
+    true
+  );
+  assert.equal(
+    isMaterialRequisitionIssuedForStage4({ ...unlockedForMatReq, mreqStatus: 'Printed' }),
+    true
+  );
 });
