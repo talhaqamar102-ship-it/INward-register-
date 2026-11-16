@@ -598,4 +598,65 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
 
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('Inward Register locks article & colour from order and requires Received From', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const makerSelect = page.locator('#admin-pending-order-maker');
+    const articleSelect = page.locator('#admin-pending-order-article');
+    const makerOption = await makerSelect.locator('option').nth(1).getAttribute('value');
+    const articleOption = await articleSelect.locator('option').nth(1).getAttribute('value');
+    await makerSelect.selectOption(makerOption!);
+    await articleSelect.selectOption(articleOption!);
+    await page.fill('#admin-pending-order-po', 'PO-INWARD-LOCK');
+    await page.fill('#admin-pending-order-color', 'Safety Orange');
+    await page.fill('.admin-order-size-val[data-size="7"]', '60');
+    await page.click('#btn-admin-add-pending-order');
+
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    // Jump to Inward Register via Quick Receive
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+
+    await expect(page.locator('#grn-article')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#grn-article')).toHaveValue(articleOption!);
+    await expect(page.locator('#grn-color')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#grn-color')).toHaveValue('Safety Orange');
+
+    // Clearing Received From blocks save and marks field invalid
+    await page.fill('#grn-received-from', '');
+    await page.fill('.grn-size-val[data-size="7"]', '30');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#grn-received-from')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+
+    // Entering Received From succeeds and shows on GRN table & printable slip
+    await page.fill('#grn-received-from', 'Imran Carrier');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await expect(page.locator('#modal-body')).toContainText('Imran Carrier');
+    await expect(page.locator('#modal-body')).toContainText('Safety Orange');
+    await page.click('#modal-btn-close');
+
+    // Clean up order via voiding the GRN first or return to admin
+    await page.click('#btn-return-admin');
+    expect(runtimeErrors).toEqual([]);
+  });
 });

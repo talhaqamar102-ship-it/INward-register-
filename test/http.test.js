@@ -824,4 +824,78 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
       if (orderId) db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
     }
   });
+
+  test('API: POST /api/store/receivings locks article & colour from linked order and requires receivedFrom', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    let orderId;
+    let rcvNumber;
+
+    try {
+      const orderResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'Hall A',
+          po: `PO-LOCK-${randomUUID().slice(0, 6)}`,
+          article: master.article,
+          color: 'Hi-Vis Neon',
+          sizes: { '7': 40, '8': 40, '9': 40, '10': 40, '11': 40 },
+          totalQty: 200
+        })
+      });
+      assert.equal(orderResp.status, 200);
+      orderId = (await orderResp.json()).data.orderId;
+
+      // Missing / empty receivedFrom must fail 400
+      const missingReceiver = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rcvDate: '31-10-2026',
+          orderId,
+          makerContractor: 'Hall A',
+          articleName: 'TAMPERED-ARTICLE',
+          colorShade: 'TAMPERED-COLOR',
+          receivedFrom: '   ',
+          strictInwardEntry: true,
+          rcvdPairs: 50
+        })
+      }, inwardCookie);
+      assert.equal(missingReceiver.status, 400);
+
+      // Valid receivedFrom saves receiving, ignoring tampered article & color from client
+      const validGrn = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rcvDate: '31-10-2026',
+          orderId,
+          makerContractor: 'Hall A',
+          customerName: 'TAMPERED-BUYER',
+          articleName: 'TAMPERED-ARTICLE',
+          colorShade: 'TAMPERED-COLOR',
+          receivedFrom: 'Bilal Driver',
+          strictInwardEntry: true,
+          rcvdPairs: 50
+        })
+      }, inwardCookie);
+      assert.equal(validGrn.status, 200);
+      const validData = (await validGrn.json()).data;
+      rcvNumber = validData.rcv_number;
+      assert.equal(validData.article_name, master.article);
+      assert.equal(validData.color_shade, 'Hi-Vis Neon');
+      assert.equal(validData.customer_name, master.buyer);
+      assert.equal(validData.received_from, 'Bilal Driver');
+    } finally {
+      if (rcvNumber) db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
+      if (orderId) db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+    }
+  });
 });

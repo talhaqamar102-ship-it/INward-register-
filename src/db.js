@@ -191,6 +191,8 @@ export function initDatabase() {
       challan_no TEXT DEFAULT '',
       gate_pass_no TEXT DEFAULT '',
       vehicle_no TEXT DEFAULT '',
+      received_from TEXT NOT NULL DEFAULT '',
+      color_shade TEXT NOT NULL DEFAULT 'Standard',
       overage_allowed_pct REAL DEFAULT 2.0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -405,6 +407,13 @@ function migrateDatabase() {
     }
     if (!rcvCols.includes('void_reason')) {
       db.exec(`ALTER TABLE store_receivings ADD COLUMN void_reason TEXT DEFAULT ''`);
+    }
+    if (!rcvCols.includes('received_from')) {
+      db.exec(`ALTER TABLE store_receivings ADD COLUMN received_from TEXT NOT NULL DEFAULT ''`);
+      db.exec(`UPDATE store_receivings SET received_from = maker_contractor WHERE received_from = '' OR received_from IS NULL`);
+    }
+    if (!rcvCols.includes('color_shade')) {
+      db.exec(`ALTER TABLE store_receivings ADD COLUMN color_shade TEXT NOT NULL DEFAULT 'Standard'`);
     }
   }
 

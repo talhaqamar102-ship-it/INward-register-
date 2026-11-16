@@ -721,6 +721,11 @@ export class PackingService {
       customerName,
       poNumber,
       articleName,
+      colorShade,
+      color,
+      receivedFrom,
+      received_from,
+      strictInwardEntry,
       orderQty,
       rcvdPairs,
       challanNo,
@@ -730,11 +735,29 @@ export class PackingService {
       sizes
     } = data;
 
-    const effectiveCustomer = customerName || 'Standard';
-    const effectivePo = poNumber || data.pendingOrderId || 'ORD-INWARD';
+    const orderIdVal = String(data.orderId || data.order_id || data.pendingOrderId || '').trim();
+    const linkedOrder = orderIdVal
+      ? db.prepare(`SELECT * FROM pending_orders WHERE order_id = ?`).get(orderIdVal)
+      : null;
 
-    if (!makerContractor || !articleName) {
+    // When tied to an order, article, model, colour, PO, and buyer are locked server-side from the order.
+    const effectiveArticle = linkedOrder ? linkedOrder.article_name : String(articleName || '').trim();
+    const effectiveColor = linkedOrder
+      ? (linkedOrder.color_shade || 'Standard')
+      : (String(colorShade || color || 'Standard').trim() || 'Standard');
+    const effectiveCustomer = (linkedOrder ? linkedOrder.buyer_name : customerName) || customerName || 'Standard';
+    const effectivePo = (linkedOrder ? linkedOrder.po_number : poNumber) || data.pendingOrderId || 'ORD-INWARD';
+
+    if (!makerContractor || !effectiveArticle) {
       throw new Error('Maker/Contractor and Article are required');
+    }
+
+    const hasExplicitReceivedFrom = receivedFrom !== undefined || received_from !== undefined || Boolean(strictInwardEntry);
+    const receivedFromVal = String(
+      receivedFrom ?? received_from ?? (hasExplicitReceivedFrom ? '' : makerContractor || 'Contractor Carrier')
+    ).trim();
+    if (!receivedFromVal) {
+      throw new Error('Received From (person name) is required');
     }
 
     const rcvdNum = Number(rcvdPairs || 0);
@@ -762,15 +785,14 @@ export class PackingService {
       nextSequence += 1;
     } while (usedNumbers.has(generatedNumber));
     const rcvNumber = data.rcvNumber || data.rcv_no || generatedNumber;
-    const orderIdVal = data.orderId || data.order_id || data.pendingOrderId || '';
 
     const dateVal = rcvDate || data.rcv_date || new Date().toISOString().slice(0, 10);
     const status = balanceNum === 0 ? 'COMPLETE' : 'PARTIAL';
 
     db.prepare(`
       INSERT INTO store_receivings 
-      (rcv_number, rcv_date, order_id, maker_contractor, customer_name, po_number, article_name, order_qty, rcvd_pairs, allocated_pairs, unallocated_pairs, allocation_status, balance_qty, status, challan_no, gate_pass_no, vehicle_no, overage_allowed_pct)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'UNALLOCATED', ?, ?, ?, ?, ?, ?)
+      (rcv_number, rcv_date, order_id, maker_contractor, customer_name, po_number, article_name, color_shade, received_from, order_qty, rcvd_pairs, allocated_pairs, unallocated_pairs, allocation_status, balance_qty, status, challan_no, gate_pass_no, vehicle_no, overage_allowed_pct)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'UNALLOCATED', ?, ?, ?, ?, ?, ?)
     `).run(
       rcvNumber,
       dateVal,
@@ -778,7 +800,9 @@ export class PackingService {
       makerContractor,
       effectiveCustomer,
       effectivePo,
-      articleName,
+      effectiveArticle,
+      effectiveColor,
+      receivedFromVal,
       orderNum,
       rcvdNum,
       rcvdNum,
@@ -805,7 +829,7 @@ export class PackingService {
     }
 
     // Update raw gloves store inventory automatically
-    let product = db.prepare(`SELECT * FROM products WHERE name = ? COLLATE NOCASE`).get(articleName);
+    let product = db.prepare(`SELECT * FROM products WHERE name = ? COLLATE NOCASE`).get(effectiveArticle);
     let customer = db.prepare(`SELECT * FROM customers WHERE name LIKE ?`).get(`%${effectiveCustomer}%`);
 
     if (!customer) {
@@ -816,10 +840,10 @@ export class PackingService {
     }
 
     if (!product) {
-      const prodId = `GLV-${articleName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)}`;
+      const prodId = `GLV-${effectiveArticle.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)}`;
       db.prepare(`INSERT OR IGNORE INTO products (id, name, customer_id, polybag_per_pair, silica_gel_per_pair, stickers_per_pair, pairs_per_carton) VALUES (?, ?, ?, 1, 1, 2, 50)`)
-        .run(prodId, articleName, customer.id);
-      product = { id: prodId, name: articleName };
+        .run(prodId, effectiveArticle, customer.id);
+      product = { id: prodId, name: effectiveArticle };
     }
 
     // Increment raw gloves inventory for this product

@@ -2831,6 +2831,8 @@ export interface GrnSlipParams {
   date: string;
   maker: string;
   article: string;
+  color?: string;
+  receivedFrom?: string;
   rcvdPairs: number;
   sizes: SizeBreakdown;
 }
@@ -2838,7 +2840,9 @@ export interface GrnSlipParams {
 export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
   const pendingOrderId = params.pendingOrderId || '---';
   const article = params.article || '---';
+  const color = params.color || 'Standard';
   const maker = params.maker || '---';
+  const receivedFrom = params.receivedFrom || maker || '---';
   const dateStr = params.date || '31-10-2026';
   const grnRef = params.grnRef || 'GRN-2026-0001';
   const sizeTotal = calculateSizeTotal(params.sizes);
@@ -2853,11 +2857,13 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
         </p>
       </div>
       <div class="printable-meta-grid">
-        <div><span>GRN Reference:</span> <strong>${grnRef}</strong></div>
-        <div><span>Receiving Date:</span> <strong>${dateStr}</strong></div>
-        <div><span>Pending Order #:</span> <strong>${pendingOrderId}</strong></div>
-        <div><span>Maker / Contractor:</span> <strong>${maker}</strong></div>
-        <div><span>Article / Product:</span> <strong>${article}</strong></div>
+        <div><span>GRN Reference:</span> <strong>${escapeHtml(grnRef)}</strong></div>
+        <div><span>Receiving Date:</span> <strong>${escapeHtml(dateStr)}</strong></div>
+        <div><span>Pending Order #:</span> <strong>${escapeHtml(pendingOrderId)}</strong></div>
+        <div><span>Maker / Contractor:</span> <strong>${escapeHtml(maker)}</strong></div>
+        <div><span>Article / Model:</span> <strong>${escapeHtml(article)}</strong></div>
+        <div><span>Colour / Shade:</span> <strong>${escapeHtml(color)}</strong></div>
+        <div><span>Received From:</span> <strong>${escapeHtml(receivedFrom)}</strong></div>
         <div><span>Total Received:</span> <strong>${rcvd.toLocaleString()} Pairs</strong></div>
       </div>
 
@@ -2867,7 +2873,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
       <table class="size-matrix-table" style="width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 12px;">
         <thead>
           <tr style="background: var(--ink-100); color: var(--ink-950);">
-            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: left;">Article</th>
+            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: left;">Article / Colour</th>
             <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">7 / S</th>
             <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">8 / M</th>
             <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">9 / L</th>
@@ -2878,7 +2884,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
         </thead>
         <tbody>
           <tr>
-            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: left; font-weight: 700;">${article}</td>
+            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: left; font-weight: 700;">${escapeHtml(article)} (${escapeHtml(color)})</td>
             <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['7'] || 0).toLocaleString()} Prs</td>
             <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['8'] || 0).toLocaleString()} Prs</td>
             <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['9'] || 0).toLocaleString()} Prs</td>
@@ -2890,7 +2896,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
       </table>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 11px; margin-top: 24px; border-top: 1px dashed var(--ink-500); padding-top: 8px; white-space: nowrap;">
-        <span>Contractor Agent Sign: _____________</span>
+        <span>Received From: <strong>${escapeHtml(receivedFrom)}</strong></span>
         <span>Dock Receiver: _____________</span>
         <span>Store Head Sign: _____________</span>
       </div>

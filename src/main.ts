@@ -62,6 +62,8 @@ interface GRNRecord {
   pendingOrderId: string;
   maker: string;
   article: string;
+  color?: string;
+  receivedFrom?: string;
   rcvdPairs: number;
   sizes: SizeBreakdown;
   status: string;
@@ -191,11 +193,13 @@ const state = {
     { id: 'chk-5', title: 'Master Carton 5-Drop Impact Test', details: 'ISTA drop standard compliance verification', passed: false }
   ],
 
-  // Form input clean states (Front person only enters received pairs + selects Pending Order)
+  // Form input clean states (Front person only enters received pairs + Received From + selects Pending Order)
   grnForm: {
     pendingOrderId: '',
     maker: '',
     article: '',
+    color: '',
+    receivedFrom: '',
     rcvdPairs: '',
     sizes: createEmptySizes()
   },
@@ -1058,19 +1062,24 @@ function renderScreenGRN(): string {
             <label for="grn-maker">Maker / Contractor</label>
             <select id="grn-maker" class="form-select">
               <option value="">-- Select Maker / Contractor --</option>
-              ${state.dropdownOptions.makers.map(m => `<option value="${m}" ${state.grnForm.maker === m ? 'selected' : ''}>${m}</option>`).join('')}
+              ${state.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${state.grnForm.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
             </select>
           </div>
-          <div class="form-group" style="flex: 1.4;">
-            <label for="grn-article">Article</label>
-            <select id="grn-article" class="form-select">
-              <option value="">-- Select Article --</option>
-              ${state.dropdownOptions.articles.map(a => `<option value="${a}" ${state.grnForm.article === a ? 'selected' : ''}>${a}</option>`).join('')}
-            </select>
+          <div class="form-group" style="flex: 1.2;">
+            <label for="grn-article">Article / Model ${state.grnForm.pendingOrderId ? '(Locked)' : ''}</label>
+            <input type="text" id="grn-article" class="form-input" placeholder="Auto-locked from order" value="${escapeHtml(state.grnForm.article)}" readonly aria-readonly="true" />
           </div>
           <div class="form-group" style="flex: 1;">
+            <label for="grn-color">Colour / Shade ${state.grnForm.pendingOrderId ? '(Locked)' : ''}</label>
+            <input type="text" id="grn-color" class="form-input" placeholder="Locked from order" value="${escapeHtml(state.grnForm.color)}" readonly aria-readonly="true" />
+          </div>
+          <div class="form-group" style="flex: 1.3;">
+            <label for="grn-received-from">Received From (Name) <span class="su-required-mark" aria-hidden="true">*</span></label>
+            <input type="text" id="grn-received-from" class="form-input" placeholder="Person name who delivered goods" value="${escapeHtml(state.grnForm.receivedFrom)}" required aria-required="true" />
+          </div>
+          <div class="form-group" style="flex: 0.9;">
             <label for="grn-rcvd-pairs">Received Pairs</label>
-            <input type="number" id="grn-rcvd-pairs" class="form-input" placeholder="0" value="${state.grnForm.rcvdPairs}" readonly />
+            <input type="number" id="grn-rcvd-pairs" class="form-input" placeholder="0" value="${escapeHtml(state.grnForm.rcvdPairs)}" readonly aria-readonly="true" />
           </div>
         </div>
 
@@ -1181,7 +1190,8 @@ function renderScreenGRN(): string {
                 <th>Date</th>
                 <th>Parent Order #</th>
                 <th>Maker / Contractor</th>
-                <th>Article</th>
+                <th>Received From</th>
+                <th>Article / Colour</th>
                 <th class="text-center">7/S</th>
                 <th class="text-center">8/M</th>
                 <th class="text-center">9/L</th>
@@ -1195,17 +1205,18 @@ function renderScreenGRN(): string {
             <tbody>
               ${state.grnList.length === 0 ? `
                 <tr>
-                  <td colspan="13" class="text-center" style="padding: 32px 16px; color: var(--ink-500); font-size: 13px;">
-                    No records found in Inward Register. Select a Pending Order (or Maker &amp; Article) and enter Received Size Breakdown Allocation above, then click <strong>Print Receiving Slip</strong>.
+                  <td colspan="14" class="text-center" style="padding: 32px 16px; color: var(--ink-500); font-size: 13px;">
+                    No records found in Inward Register. Select a Pending Order, enter Received From (person name) and size quantities above, then click <strong>Print Receiving Slip</strong>.
                   </td>
                 </tr>
               ` : state.grnList.map(row => `
                 <tr>
                   <td class="text-center font-bold" style="font-family: var(--font-mono);">${row.grnCode || formatBatchSequence('GRN', row.sr)}</td>
-                  <td>${row.date}</td>
-                  <td class="font-bold">${row.pendingOrderId || '---'}</td>
-                  <td>${row.maker}</td>
-                  <td class="font-bold">${row.article}</td>
+                  <td>${escapeHtml(row.date)}</td>
+                  <td class="font-bold">${escapeHtml(row.pendingOrderId || '---')}</td>
+                  <td>${escapeHtml(row.maker)}</td>
+                  <td>${escapeHtml(row.receivedFrom || row.maker || '---')}</td>
+                  <td class="font-bold">${escapeHtml(row.article)}${row.color ? ` <span style="font-weight: 500; color: var(--ink-600);">(${escapeHtml(row.color)})</span>` : ''}</td>
                   <td class="text-center">${(row.sizes?.['7'] ?? 0).toLocaleString()}</td>
                   <td class="text-center">${(row.sizes?.['8'] ?? 0).toLocaleString()}</td>
                   <td class="text-center">${(row.sizes?.['9'] ?? 0).toLocaleString()}</td>
@@ -1214,7 +1225,7 @@ function renderScreenGRN(): string {
                   <td class="text-right font-bold">${row.rcvdPairs.toLocaleString()}</td>
                   <td class="text-center">
                     <span class="status-pill status-pill-neutral">
-                      ${row.status}
+                      ${escapeHtml(row.status)}
                     </span>
                   </td>
                   <td class="text-center">
@@ -1881,6 +1892,8 @@ function attachEventHandlers(): void {
       pendingOrderId: '',
       maker: '',
       article: '',
+      color: '',
+      receivedFrom: '',
       rcvdPairs: '',
       sizes: createEmptySizes()
     };
@@ -1975,7 +1988,9 @@ function attachEventHandlers(): void {
 function attachGRNHandlers(): void {
   const pendingOrderSelect = document.getElementById('grn-pending-order') as HTMLSelectElement;
   const makerSelect = document.getElementById('grn-maker') as HTMLSelectElement;
-  const articleSelect = document.getElementById('grn-article') as HTMLSelectElement;
+  const articleInput = document.getElementById('grn-article') as HTMLInputElement;
+  const colorInput = document.getElementById('grn-color') as HTMLInputElement;
+  const receivedFromInput = document.getElementById('grn-received-from') as HTMLInputElement;
   const rcvdPairsInput = document.getElementById('grn-rcvd-pairs') as HTMLInputElement;
   const totalDisplay = document.getElementById('grn-size-total-display');
   const capsDisplay = document.getElementById('grn-size-caps');
@@ -2053,6 +2068,14 @@ function attachGRNHandlers(): void {
     const val = pendingOrderSelect.value;
     state.grnForm.pendingOrderId = val;
     if (!val) {
+      state.grnForm.maker = '';
+      state.grnForm.article = '';
+      state.grnForm.color = '';
+      state.grnForm.receivedFrom = '';
+      if (makerSelect) makerSelect.value = '';
+      if (articleInput) articleInput.value = '';
+      if (colorInput) colorInput.value = '';
+      if (receivedFromInput) receivedFromInput.value = '';
       syncSizesAndReceived();
       return;
     }
@@ -2065,18 +2088,25 @@ function attachGRNHandlers(): void {
     state.grnForm.pendingOrderId = filled.pendingOrderId;
     state.grnForm.maker = filled.maker;
     state.grnForm.article = filled.article;
+    state.grnForm.color = filled.color || 'Standard';
+    if (!state.grnForm.receivedFrom?.trim()) {
+      state.grnForm.receivedFrom = filled.maker ? `${filled.maker} Representative` : '';
+    }
     if (makerSelect) makerSelect.value = filled.maker;
-    if (articleSelect) articleSelect.value = filled.article;
+    if (articleInput) articleInput.value = filled.article;
+    if (colorInput) colorInput.value = state.grnForm.color;
+    if (receivedFromInput) receivedFromInput.value = state.grnForm.receivedFrom;
 
     syncSizesAndReceived();
-    showToast(`Pending Order ${filled.pendingOrderId} selected: Auto-filled Maker (${filled.maker}) and Article (${filled.article}).`);
+    showToast(`Order ${filled.pendingOrderId} selected: Locked Article (${filled.article}) & Colour (${state.grnForm.color}).`);
   });
 
   makerSelect?.addEventListener('change', () => {
     state.grnForm.maker = makerSelect.value;
   });
-  articleSelect?.addEventListener('change', () => {
-    state.grnForm.article = articleSelect.value;
+  receivedFromInput?.addEventListener('input', () => {
+    state.grnForm.receivedFrom = receivedFromInput.value;
+    applyFieldValidationErrors([[receivedFromInput, receivedFromInput.value.trim() ? '' : 'Enter who goods were received from.']]);
   });
 
   document.querySelectorAll('.grn-size-val').forEach(inp => {
@@ -2089,6 +2119,8 @@ function attachGRNHandlers(): void {
       pendingOrderId: '',
       maker: '',
       article: '',
+      color: '',
+      receivedFrom: '',
       rcvdPairs: '',
       sizes: createEmptySizes()
     };
@@ -2096,12 +2128,14 @@ function attachGRNHandlers(): void {
     showToast('Inward form and size breakdown cleared.');
   });
 
-  // Inward Register Person records & prints the received goods slip (No PO, No Order Qty)
+  // Inward Register Person records & prints the received goods slip (Order-locked Article/Colour + Received From + Quantities)
   document.getElementById('btn-print-grn-slip')?.addEventListener('click', async () => {
     syncSizesAndReceived();
     const formPendingOrder = pendingOrderSelect?.value || state.grnForm.pendingOrderId;
     const formMaker = makerSelect?.value || state.grnForm.maker;
-    const formArt = articleSelect?.value || state.grnForm.article;
+    const formArt = articleInput?.value || state.grnForm.article;
+    const formColor = colorInput?.value || state.grnForm.color || 'Standard';
+    const formReceivedFrom = (receivedFromInput?.value ?? state.grnForm.receivedFrom ?? '').trim();
     const sizeTotal = calculateSizeTotal(state.grnForm.sizes);
     const rcvdPairs = Math.max(0, parseInt(rcvdPairsInput?.value || '0', 10) || sizeTotal);
     const caps = getGrnRemainingCaps(formPendingOrder);
@@ -2114,10 +2148,16 @@ function attachGRNHandlers(): void {
     }
 
     if (formPendingOrder || formMaker || formArt || rcvdPairs > 0) {
+      if (!formReceivedFrom) {
+        applyFieldValidationErrors([[receivedFromInput, 'Enter the person name goods were received from.']]);
+        showToast('Enter the person name in Received From.');
+        return;
+      }
       const entryPendingOrder = formPendingOrder || 'ORD-INWARD';
       const selectedOrder = state.pendingOrders.find(order => order.orderId === entryPendingOrder);
       const entryMaker = formMaker || '---';
-      const entryArticle = formArt || '---';
+      const entryArticle = selectedOrder?.article || formArt || '---';
+      const entryColor = selectedOrder?.color || formColor || 'Standard';
       const entrySizes = { ...state.grnForm.sizes };
       const newSr = state.grnList.length + 1;
       const newGrnCode = formatBatchSequence('GRN', newSr);
@@ -2133,6 +2173,9 @@ function attachGRNHandlers(): void {
             customerName: selectedOrder?.buyer || 'Standard',
             makerContractor: entryMaker,
             articleName: entryArticle,
+            colorShade: entryColor,
+            receivedFrom: formReceivedFrom,
+            strictInwardEntry: true,
             orderQty: selectedOrder
               ? STANDARD_GLOVE_SIZES.reduce((sum, sizeCode) => sum + Number(selectedOrder.sizes?.[sizeCode] || 0), 0)
               : rcvdPairs,
@@ -2168,6 +2211,8 @@ function attachGRNHandlers(): void {
         pendingOrderId: persistedOrderId,
         maker: savedReceiving?.maker_contractor || entryMaker,
         article: savedReceiving?.article_name || entryArticle,
+        color: savedReceiving?.color_shade || entryColor,
+        receivedFrom: savedReceiving?.received_from || formReceivedFrom,
         rcvdPairs: Number(savedReceiving?.rcvd_pairs || rcvdPairs),
         sizes: entrySizes,
         status: 'Received'
@@ -2189,8 +2234,8 @@ function attachGRNHandlers(): void {
         }
       }
 
-      if (!state.packingWip.article && formArt) {
-        state.packingWip.article = formArt;
+      if (!state.packingWip.article && entryArticle) {
+        state.packingWip.article = entryArticle;
       }
       if (!state.packingWip.parentOrderId && persistedOrderId) {
         state.packingWip.parentOrderId = persistedOrderId;
@@ -2200,7 +2245,9 @@ function attachGRNHandlers(): void {
     const latest = state.grnList[0];
     const pendingOrderId = formPendingOrder || latest?.pendingOrderId || '---';
     const maker = formMaker || latest?.maker || '---';
-    const article = formArt || latest?.article || '---';
+    const article = latest?.article || formArt || '---';
+    const color = latest?.color || formColor || 'Standard';
+    const receivedFrom = formReceivedFrom || latest?.receivedFrom || maker || '---';
     const sizes = calculateSizeTotal(state.grnForm.sizes) > 0
       ? state.grnForm.sizes
       : (latest?.sizes || createEmptySizes());
@@ -2213,6 +2260,8 @@ function attachGRNHandlers(): void {
       pendingOrderId,
       maker,
       article,
+      color,
+      receivedFrom,
       rcvdPairs: finalRcvd,
       sizes
     });
@@ -4988,6 +5037,8 @@ window.adminQuickReceiveGrnForOrder = function(orderId: string) {
       pendingOrderId: order.orderId,
       maker: order.maker,
       article: order.article,
+      color: order.color || 'Standard',
+      receivedFrom: order.maker ? `${order.maker} Representative` : '',
       rcvdPairs: String(order.totalQty || ''),
       sizes: { ...(order.sizes || createEmptySizes()) }
     };
@@ -5118,6 +5169,8 @@ window.viewGrnRecord = function(sr: number) {
       pendingOrderId: item.pendingOrderId,
       maker: item.maker,
       article: item.article,
+      color: item.color,
+      receivedFrom: item.receivedFrom,
       rcvdPairs: item.rcvdPairs,
       sizes: item.sizes
     });
@@ -5132,6 +5185,8 @@ window.editGrnRecord = function(sr: number) {
       pendingOrderId: item.pendingOrderId,
       maker: item.maker,
       article: item.article,
+      color: item.color || 'Standard',
+      receivedFrom: item.receivedFrom || item.maker || '',
       rcvdPairs: String(item.rcvdPairs),
       sizes: { ...item.sizes }
     };
@@ -5249,6 +5304,8 @@ async function syncBackendData(options: { manual?: boolean } = {}): Promise<void
                 pendingOrderId: r.order_id || r.po_number || 'ORD-INWARD',
                 maker: r.maker_contractor,
                 article: r.article_name,
+                color: r.color_shade || 'Standard',
+                receivedFrom: r.received_from || r.maker_contractor || '',
                 rcvdPairs: Number(r.rcvd_pairs) || 0,
                 sizes,
                 status: isVoided ? 'VOIDED' : 'Received',
