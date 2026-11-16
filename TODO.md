@@ -28,3 +28,13 @@
   - Replaced `176px` vs `116px` mismatched track scaling with shared `PLOT_HEIGHT_PX = 140`, eliminated `--border-default` fallback mismatch, removed small-bar label overlap, and added `role="img"` labels plus an `.sr-only` data summary table.
 - [x] **3. Responsive Layout, Modal Focus/Footer Cleanup, Scoped Tables & Atomic Double-Submit Prevention (`src/style.css`, `src/main.ts`, `src/services/packingService.js`)**
   - Added `.packing-toolbar-grid`, `.packing-pipeline-grid`, `.skip-to-content`, single `<h1>` + `<main id="main-content">` across all screens, `.hide-global-footer` reset in `closeModal()`, delegated `data-modal-cancel`, `<label for>` associations, `scope="col"` headers, `A-REQ`-scoped Alteration rows, requisition-scoped Print Carton Labels guard, initial/manual sync banners with Retry, and synchronous SQLite transactions (`runAtomicWipStep`) + `inFlight` UI locks.
+
+## Multi-Contractor Order Split, Delivery Countdown Timeline & Locked Inward Entry (Completed)
+- [x] **1. Lock Inward Register Order Fields & Require "Received From" (`src/db.js`, `src/services/packingService.js`, `src/main.ts`, `src/utils/requisitionLogic.ts`)**
+  - Locked Article/Model and Colour/Shade as read-only fields sourced from the selected order both on screen (`#grn-article`, `#grn-color`) and server-side in `PackingService.createReceiving` (ignoring tampered client values).
+  - Added required `received_from` column and `#grn-received-from` field surfaced in the GRN register table and monochrome receiving slip.
+- [x] **2. Multi-Contractor Order Split & Per-Contractor Caps (`src/db.js`, `src/services/orderService.js`, `src/services/packingService.js`, `src/components/superUserView.ts`, `src/utils/requisitionLogic.ts`, `src/main.ts`)**
+  - Added `order_contractor_allocations` table + backfill migration and `validateContractorAllocations` (strict per-size equality and duplicate-contractor check).
+  - Added Super User Order Split editor (`+ Split Across Contractors`), Live Tracking per-contractor chips, and Inward Register contractor filtering/balance caps rejecting unallocated contractors and over-receipts.
+- [x] **3. Delivery Countdown Timeline (`src/utils/requisitionLogic.ts`, `src/components/superUserView.ts`, `src/components/packingHallView.ts`, `src/main.ts`, `src/style.css`)**
+  - Added `due_date` persistence, `computeDeliveryCountdown`, Super User dashboard/tracking urgency sorting + timeline progress bar, Inward Register target delivery line, and monochrome Packing Hall countdown pill.

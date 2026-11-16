@@ -81,6 +81,10 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
   const awaitingFinalQc = isPackingAwaitingFinalQc(wip);
   const stage5Ready = isStage5ReadyForCartons(wip);
   const awaitingInwardIssue = wip.issueStatus !== 'Issued by Inward Register' && wip.stage1In <= 0;
+  const parentRollup = wip.parentOrderId
+    ? rollupSummary.orderRollups.find(o => o.orderId === wip.parentOrderId)
+    : undefined;
+  const countdown = parentRollup?.deliveryCountdown;
 
   return `
     <div class="sub-header-bar">
@@ -171,6 +175,14 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
               <span class="status-pill ${wip.issueStatus === 'Issued by Inward Register' ? 'status-pill-green' : 'status-pill-amber'}" id="wip-disp-issue-status">${wip.issueStatus}</span>
             </div>
           </div>
+          ${countdown?.hasDueDate ? `
+          <div class="form-group" style="flex: 0.9; min-width: 120px;">
+            <span class="field-label" style="font-size: 11px; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; display: block;">Delivery Timeline</span>
+            <div style="padding: 5px 0;">
+              <span class="status-pill" id="wip-disp-countdown" title="Due Date: ${escapeHtml(countdown.dueDate)}">${escapeHtml(countdown.badgeText)}</span>
+            </div>
+          </div>
+          ` : ''}
           <div class="packing-toolbar-actions">
             <button type="button" class="btn-primary" id="btn-wip-new-req" ${pendingOrders.length === 0 ? 'disabled title="A pending master order is needed first."' : ''}>+ Generate Requisition</button>
             <button type="button" class="btn-outline" id="btn-wip-print-req" ${persistedReqNumbers.includes(baseReq) ? '' : 'disabled'}>Print Requisition</button>

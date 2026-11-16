@@ -40,6 +40,7 @@ import {
   buildConfirmDialogHtml,
   validatePendingOrderInputs,
   validateContractorAllocations,
+  computeDeliveryCountdown,
   validateCustomerMasterInputs,
   validateProductMasterInputs,
   validateSystemUserInputs,
@@ -1157,6 +1158,15 @@ function renderScreenGRN(): string {
               ? formatGrnRemainingCaps(grnCaps, state.grnForm.sizes)
               : 'No matching pending-order size cap available; received quantities are unrestricted.'}
           </div>
+          ${selectedGrnOrder?.dueDate ? (() => {
+            const allocForDue = orderAllocations.find(a => a.maker.trim().toLowerCase() === state.grnForm.maker.trim().toLowerCase());
+            const effectiveDue = allocForDue?.dueDate || selectedGrnOrder.dueDate;
+            const cd = computeDeliveryCountdown({ dueDate: effectiveDue, createdAt: selectedGrnOrder.createdAt });
+            return `
+            <div id="grn-delivery-timeline" style="font-size: 11.5px; color: var(--ink-800); margin-top: 4px; font-weight: 600;">
+              Target Delivery: <strong>${escapeHtml(cd.dueDate)}</strong> (${escapeHtml(cd.badgeText)})
+            </div>`;
+          })() : ''}
         </div>
 
         <div class="form-action-row" style="justify-content: flex-end;">

@@ -55,6 +55,7 @@ import {
   buildConfirmDialogHtml,
   validatePendingOrderInputs,
   validateContractorAllocations,
+  computeDeliveryCountdown,
   validateCustomerMasterInputs,
   validateProductMasterInputs,
   validateSystemUserInputs,
@@ -1745,4 +1746,16 @@ test('Multi-contractor order split validation & per-contractor rollup tracking',
   assert.equal(ord.contractorAllocations?.[0].remainingPairs, 30);
   assert.equal(ord.contractorAllocations?.[1].receivedPairs, 80);
   assert.equal(ord.contractorAllocations?.[1].remainingPairs, 0);
+});
+
+test('Delivery countdown handles NO_DATE, OVERDUE, Due Today, DUE_SOON, ON_TRACK, and DELIVERED', () => {
+  assert.equal(computeDeliveryCountdown({ dueDate: '', nowIso: '2026-11-16' }).status, 'NO_DATE');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-12', nowIso: '2026-11-16' }).badgeText, 'Overdue by 4d');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-12', nowIso: '2026-11-16' }).status, 'OVERDUE');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-16', nowIso: '2026-11-16' }).badgeText, 'Due Today');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-20', nowIso: '2026-11-16' }).status, 'DUE_SOON');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-20', nowIso: '2026-11-16' }).badgeText, '4d left');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-30', createdAt: '2026-11-01', nowIso: '2026-11-16' }).status, 'ON_TRACK');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-30', createdAt: '2026-11-01', nowIso: '2026-11-16' }).badgeText, '14d left');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-10', isCompleted: true, nowIso: '2026-11-16' }).status, 'DELIVERED');
 });

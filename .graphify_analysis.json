@@ -87,6 +87,8 @@
       "fn:src/main.ts:openAqlCalculatorModal",
       "fn:src/main.ts:updateAqlCalculation",
       "fn:src/main.ts:attachAdminHandlers",
+      "fn:src/main.ts:syncAdminOrderDraftFromDom",
+      "fn:src/main.ts:updateAdminSplitBalanceDom",
       "fn:src/main.ts:recalcAdminOrderSizes",
       "fn:src/main.ts:exportTableToCSV",
       "fn:src/main.ts:syncBackendData"
@@ -96,6 +98,8 @@
       "file:src/utils/requisitionLogic.ts",
       "fn:src/utils/requisitionLogic.test.ts:extractBlocks",
       "iface:src/utils/requisitionLogic.ts:SizeBreakdown",
+      "iface:src/utils/requisitionLogic.ts:DeliveryCountdownInfo",
+      "iface:src/utils/requisitionLogic.ts:ContractorOrderAllocation",
       "iface:src/utils/requisitionLogic.ts:PendingOrder",
       "iface:src/utils/requisitionLogic.ts:OrderWipState",
       "iface:src/utils/requisitionLogic.ts:GrnToReqAllocation",
@@ -114,6 +118,9 @@
       "iface:src/utils/requisitionLogic.ts:FocusSelectorTargetInput",
       "fn:src/utils/requisitionLogic.ts:getActiveGloveSizes",
       "fn:src/utils/requisitionLogic.ts:escapeHtml",
+      "fn:src/utils/requisitionLogic.ts:parseUtcDateMidnightMs",
+      "fn:src/utils/requisitionLogic.ts:computeDeliveryCountdown",
+      "fn:src/utils/requisitionLogic.ts:validateContractorAllocations",
       "fn:src/utils/requisitionLogic.ts:createEmptySizes",
       "fn:src/utils/requisitionLogic.ts:normalizeBaseReqNumber",
       "fn:src/utils/requisitionLogic.ts:getMaterialReqNumber",
@@ -247,6 +254,7 @@
       "fn:src/services/authService.js:hashToken",
       "fn:src/services/orderService.js:setStatus",
       "fn:src/services/orderService.js:backfillOrderSequence",
+      "fn:src/services/orderService.js:getOrderSchemaSupport",
       "fn:src/services/orderService.js:createPendingOrder",
       "fn:src/services/orderService.js:deletePendingOrder",
       "fn:src/services/packingService.js:parseRequisitionSizes",
@@ -320,6 +328,7 @@
       "table:export_shipments",
       "table:material_return_vouchers",
       "table:pending_orders",
+      "table:order_contractor_allocations",
       "table:order_seq",
       "table:grn_req_allocations",
       "table:audit_trail",
@@ -851,6 +860,7 @@
       "iface:src/components/superUserView.ts:SystemUserRecord",
       "iface:src/components/superUserView.ts:SuperUserRenderContext",
       "fn:src/components/superUserView.ts:renderReconciliationBadge",
+      "fn:src/components/superUserView.ts:renderDeliveryCountdownChip",
       "fn:src/components/superUserView.ts:renderStageMiniTrack",
       "fn:src/components/superUserView.ts:renderDashboardVisualGraphs",
       "fn:src/components/superUserView.ts:renderOrderGrnChipsWithOverflow",
@@ -886,7 +896,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 89
+      "degree": 91
     },
     {
       "id": "file:src/utils/requisitionLogic.ts",
@@ -897,7 +907,7 @@
       "source_location": "L1",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 81
+      "degree": 86
     },
     {
       "id": "file:src/routes/api.js",
@@ -930,7 +940,7 @@
       "source_location": "L1",
       "community": 4,
       "community_label": "SQLite WAL Database & 17-Table Schema (src/db.js)",
-      "degree": 41
+      "degree": 43
     },
     {
       "id": "fn:vanilla/app.js:showToast",
@@ -960,7 +970,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2928",
+      "source_location": "L2999",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 35
@@ -971,7 +981,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/services/packingService.js",
-      "source_location": "L1094",
+      "source_location": "L1126",
       "community": 3,
       "community_label": "Packing Hall 5-Stage & AQL Domain Services (src/services)",
       "degree": 33
@@ -988,15 +998,15 @@
       "degree": 32
     },
     {
-      "id": "file:.agents/skills/ck/commands/shared.mjs",
-      "label": ".agents/skills/ck/commands/shared.mjs",
-      "kind": "file",
+      "id": "fn:src/main.ts:attachAdminHandlers",
+      "label": "attachAdminHandlers()",
+      "kind": "function",
       "file_type": "code",
-      "source_file": ".agents/skills/ck/commands/shared.mjs",
-      "source_location": "L1",
-      "community": 7,
-      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 29
+      "source_file": "src/main.ts",
+      "source_location": "L4163",
+      "community": 0,
+      "community_label": "Frontend MES Screens & UI State (src/main.ts)",
+      "degree": 32
     },
     {
       "id": "fn:src/db.js:initDatabase",
@@ -1007,7 +1017,7 @@
       "source_location": "L20",
       "community": 4,
       "community_label": "SQLite WAL Database & 17-Table Schema (src/db.js)",
-      "degree": 29
+      "degree": 30
     }
   ],
   "surprises": [

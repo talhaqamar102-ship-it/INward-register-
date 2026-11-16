@@ -41,6 +41,109 @@ export const SIZE_LABELS: Array<{ key: '7' | '8' | '9' | '10' | '11'; label: str
   { key: '11', label: '11 / XXL' }
 ];
 
+export interface DeliveryCountdownInfo {
+  dueDate: string;
+  hasDueDate: boolean;
+  daysRemaining: number | null;
+  status: 'NO_DATE' | 'DELIVERED' | 'OVERDUE' | 'DUE_SOON' | 'ON_TRACK';
+  badgeText: string;
+  progressPct: number;
+}
+
+function parseUtcDateMidnightMs(dateInput?: string | null): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateInput || '').trim());
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const ms = Date.UTC(year, month, day);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+export function computeDeliveryCountdown(params: {
+  dueDate?: string;
+  createdAt?: string;
+  isCompleted?: boolean;
+  nowIso?: string;
+}): DeliveryCountdownInfo {
+  const rawDue = String(params.dueDate || '').trim();
+  const dueMs = parseUtcDateMidnightMs(rawDue);
+  if (dueMs === null) {
+    return {
+      dueDate: '',
+      hasDueDate: false,
+      daysRemaining: null,
+      status: params.isCompleted ? 'DELIVERED' : 'NO_DATE',
+      badgeText: params.isCompleted ? 'Delivered ✓' : 'No Due Date',
+      progressPct: params.isCompleted ? 100 : 0
+    };
+  }
+  const normalizedDue = rawDue.slice(0, 10);
+  if (params.isCompleted) {
+    return {
+      dueDate: normalizedDue,
+      hasDueDate: true,
+      daysRemaining: 0,
+      status: 'DELIVERED',
+      badgeText: 'Delivered ✓',
+      progressPct: 100
+    };
+  }
+
+  const nowStr = params.nowIso || new Date().toISOString().slice(0, 10);
+  const todayMs = parseUtcDateMidnightMs(nowStr) ?? Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
+  const daysRemaining = Math.round((dueMs - todayMs) / 86400000);
+
+  let progressPct = 50;
+  const createdMs = parseUtcDateMidnightMs(params.createdAt);
+  if (createdMs !== null && dueMs > createdMs) {
+    const rawPct = Math.round(((todayMs - createdMs) / (dueMs - createdMs)) * 100);
+    progressPct = Math.max(8, Math.min(95, rawPct));
+  } else {
+    const fallbackPct = Math.round(((14 - Math.max(0, Math.min(14, daysRemaining))) / 14) * 100);
+    progressPct = Math.max(8, Math.min(95, fallbackPct));
+  }
+
+  if (daysRemaining < 0) {
+    return {
+      dueDate: normalizedDue,
+      hasDueDate: true,
+      daysRemaining,
+      status: 'OVERDUE',
+      badgeText: `Overdue by ${Math.abs(daysRemaining)}d`,
+      progressPct: 100
+    };
+  }
+  if (daysRemaining === 0) {
+    return {
+      dueDate: normalizedDue,
+      hasDueDate: true,
+      daysRemaining: 0,
+      status: 'DUE_SOON',
+      badgeText: 'Due Today',
+      progressPct: 95
+    };
+  }
+  if (daysRemaining <= 7) {
+    return {
+      dueDate: normalizedDue,
+      hasDueDate: true,
+      daysRemaining,
+      status: 'DUE_SOON',
+      badgeText: `${daysRemaining}d left`,
+      progressPct
+    };
+  }
+  return {
+    dueDate: normalizedDue,
+    hasDueDate: true,
+    daysRemaining,
+    status: 'ON_TRACK',
+    badgeText: `${daysRemaining}d left`,
+    progressPct
+  };
+}
+
 export interface ContractorOrderAllocation {
   maker: string;
   sizes: SizeBreakdown;
@@ -544,6 +647,7 @@ export interface OrderTraceabilityItem {
   shortCloseReason?: string;
   dueDate?: string;
   createdAt?: string;
+  deliveryCountdown?: DeliveryCountdownInfo;
   contractorAllocations?: ContractorOrderAllocation[];
   grnCodes: string[];
   reqNumbers: string[];
@@ -1586,6 +1690,11 @@ export function buildSuperUserOrderRollups(params: {
       shortCloseReason: ord.shortCloseReason,
       dueDate: ord.dueDate || '',
       createdAt: ord.createdAt || '',
+      deliveryCountdown: computeDeliveryCountdown({
+        dueDate: ord.dueDate,
+        createdAt: ord.createdAt,
+        isCompleted: orderStatus === 'COMPLETED & DISPATCHED' || Boolean(ord.shortClosed)
+      }),
       contractorAllocations,
       grnCodes: grnBatches.map(g => g.grnCode),
       reqNumbers: reqBatches.map(r => r.reqNumber),

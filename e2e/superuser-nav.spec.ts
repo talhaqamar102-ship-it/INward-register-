@@ -659,4 +659,75 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     await page.click('#btn-return-admin');
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('Multi-contractor order split and delivery countdown render across Super User and Inward Register', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const articleSelect = page.locator('#admin-pending-order-article');
+    const articleOption = await articleSelect.locator('option').nth(1).getAttribute('value');
+    await articleSelect.selectOption(articleOption!);
+    await page.fill('#admin-pending-order-po', 'PO-SPLIT-E2E');
+    await page.fill('#admin-pending-order-color', 'Hi-Vis Green');
+
+    const futureDate = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
+    await page.fill('#admin-pending-order-due-date', futureDate);
+    await page.fill('.admin-order-size-val[data-size="7"]', '50');
+    await page.fill('.admin-order-size-val[data-size="8"]', '50');
+    await page.click('#btn-admin-toggle-split');
+
+    await expect(page.locator('[data-testid="admin-contractor-split-panel"]')).toBeVisible();
+    const maker1Select = page.locator('.admin-split-maker[data-split-index="0"]');
+    const maker2Select = page.locator('.admin-split-maker[data-split-index="1"]');
+    const m1Val = await maker1Select.inputValue();
+    const m2Val = await maker2Select.inputValue();
+    expect(m1Val).toBeTruthy();
+    expect(m2Val).toBeTruthy();
+    expect(m1Val).not.toBe(m2Val);
+
+    // Split Size 7: 30/20, Size 8: 30/20 => 60 / 40
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="7"]', '30');
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="8"]', '30');
+    await page.fill('.admin-split-size-val[data-split-index="1"][data-size="7"]', '20');
+    await page.fill('.admin-split-size-val[data-split-index="1"][data-size="8"]', '20');
+    await expect(page.locator('#admin-split-balance-bar')).toContainText('Split Matches Order 100%');
+
+    await page.click('#btn-admin-add-pending-order');
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    // Verify Live Tracking displays countdown badge and split contractor chips
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    const orderCard = page.locator(`#tracking-order-card-${orderId}`);
+    await expect(orderCard).toBeVisible();
+    await expect(orderCard.locator('[data-testid="order-countdown-badge"]')).toContainText(/\d+d left/);
+    await expect(orderCard.locator('[data-testid="order-contractor-splits"]')).toContainText(m1Val);
+    await expect(orderCard.locator('[data-testid="order-contractor-splits"]')).toContainText(m2Val);
+
+    // Jump to Inward Register & confirm contractor dropdown only lists the 2 split contractors and locks Article/Colour
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await expect(page.locator('#grn-article')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#grn-color')).toHaveValue('Hi-Vis Green');
+    await expect(page.locator('#grn-delivery-timeline')).toContainText(futureDate);
+    const grnMakerOptions = await page.locator('#grn-maker option').allTextContents();
+    expect(grnMakerOptions.some(t => t.includes(m1Val))).toBe(true);
+    expect(grnMakerOptions.some(t => t.includes(m2Val))).toBe(true);
+    expect(grnMakerOptions.length).toBe(3); // Choose prompt + 2 allocated contractors
+
+    expect(runtimeErrors).toEqual([]);
+  });
 });

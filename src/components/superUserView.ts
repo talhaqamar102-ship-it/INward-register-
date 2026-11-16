@@ -1,8 +1,10 @@
 import {
   PendingOrder,
   SizeBreakdown,
+  DeliveryCountdownInfo,
   calculateSizeTotal,
   validateContractorAllocations,
+  computeDeliveryCountdown,
   SuperUserDashboardSummary,
   SuperUserOrderRollup,
   SuperUserGrnBatchItem,
@@ -98,6 +100,35 @@ function renderReconciliationBadge(rec: ReconciliationResult): string {
   }
   const deltaSign = rec.deltaPairs > 0 ? `+${rec.deltaPairs}` : `${rec.deltaPairs}`;
   return `<span class="su-badge su-badge-variance" title="${escapeHtml(rec.detail)}">VARIANCE &Delta; (${deltaSign} Prs &bull; ${escapeHtml(rec.failingGate)})</span>`;
+}
+
+function renderDeliveryCountdownChip(cd?: DeliveryCountdownInfo, showTimelineBar = false): string {
+  if (!cd || (!cd.hasDueDate && cd.status !== 'DELIVERED')) {
+    return `<span class="su-countdown-badge" data-testid="order-countdown-badge">No Due Date</span>`;
+  }
+  const toneClass = cd.status === 'OVERDUE'
+    ? 'is-overdue'
+    : cd.status === 'DUE_SOON'
+      ? 'is-soon'
+      : cd.status === 'DELIVERED'
+        ? 'is-delivered'
+        : 'is-ontrack';
+  const fillClass = cd.status === 'OVERDUE'
+    ? 'is-overdue'
+    : cd.status === 'DELIVERED'
+      ? 'is-delivered'
+      : '';
+  const dueTitle = cd.dueDate ? `Delivery Due: ${cd.dueDate}` : 'Delivery Timeline';
+  return `
+    <span class="su-countdown-badge ${toneClass}" data-testid="order-countdown-badge" title="${escapeHtml(dueTitle)}">
+      ${escapeHtml(cd.badgeText)}${cd.dueDate ? ` (${escapeHtml(cd.dueDate)})` : ''}
+    </span>
+    ${showTimelineBar && cd.hasDueDate ? `
+      <div class="su-timeline-track" title="${escapeHtml(dueTitle)} &bull; ${cd.progressPct}% elapsed">
+        <div class="su-timeline-fill ${fillClass}" style="width: ${cd.progressPct}%;"></div>
+      </div>
+    ` : ''}
+  `;
 }
 
 function renderStageMiniTrack(activeStage: string, awaitingQc: boolean, isClosed: boolean): string {
@@ -824,6 +855,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
               <th class="text-right">WIP / S4 Hold</th>
               <th class="text-right">Alt / Scrap</th>
               <th class="text-right">Packed (S5)</th>
+              <th class="text-center">Delivery Timeline</th>
               <th class="text-center">Reconciliation</th>
               <th class="text-center">Status</th>
             </tr>
@@ -833,7 +865,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
               s.orderRollups.length === 0
                 ? `
               <tr>
-                <td colspan="15" class="text-center" style="padding: 28px 16px; color: var(--su-text-muted);">
+                <td colspan="16" class="text-center" style="padding: 28px 16px; color: var(--su-text-muted);">
                   <div style="margin-bottom: 10px;">
                     No Master Orders created yet. Go to <strong>Order Creation</strong> to create a Buyer Order and issue it to Inward Receiving.
                   </div>
@@ -872,6 +904,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
                   ${o.inAlterationQty} / ${o.scrappedQty}
                 </td>
                 <td class="text-right font-bold" style="color: var(--su-complete-dark);">${o.packedStage5Qty.toLocaleString()}</td>
+                <td class="text-center">${renderDeliveryCountdownChip(o.deliveryCountdown, false)}</td>
                 <td class="text-center">${renderReconciliationBadge(o.reconciliation)}</td>
                 <td class="text-center"><span class="${getSuperUserStatusBadgeClass(o.orderStatus)}">${escapeHtml(o.orderStatus)}</span></td>
               </tr>
@@ -957,10 +990,19 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
     return hay.includes(search);
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const urgencyRank = (o: SuperUserOrderRollup): number => {
+    const st = o.deliveryCountdown?.status;
+    if (st === 'OVERDUE') return 0;
+    if (st === 'DUE_SOON') return 1;
+    if (st === 'ON_TRACK') return 2;
+    if (st === 'NO_DATE') return 3;
+    return 4;
+  };
+  const sortedOrders = [...filteredOrders].sort((a, b) => urgencyRank(a) - urgencyRank(b));
+  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const startIdx = (safePage - 1) * pageSize;
-  const pagedOrders = filteredOrders.slice(startIdx, startIdx + pageSize);
+  const pagedOrders = sortedOrders.slice(startIdx, startIdx + pageSize);
 
   return `
     <!-- 6.1 & 6.7: Live Tracking Filter, Buyer/Contractor Dropdowns, Search & Pagination Bar -->
@@ -1147,6 +1189,7 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                   <span>${escapeHtml(ord.article)} (${escapeHtml(ord.color)})</span>
                   <span style="font-weight: 400; color: var(--su-text-muted);">|</span>
                   <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--su-text-secondary);">Plan: <strong>${ord.plannedQty.toLocaleString()} Prs</strong></span>
+                  ${renderDeliveryCountdownChip(ord.deliveryCountdown, true)}
                   ${renderReconciliationBadge(ord.reconciliation)}
                 </div>
                 <div style="font-size: 11.5px; color: var(--su-text-secondary); margin-top: 2px;">
@@ -1158,13 +1201,17 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                   (ord.contractorAllocations || []).length > 1
                     ? `
                   <div class="su-contractor-chips" data-testid="order-contractor-splits">
-                    ${(ord.contractorAllocations || []).map(a => `
+                    ${(ord.contractorAllocations || []).map(a => {
+                      const splitCd = a.dueDate
+                        ? computeDeliveryCountdown({ dueDate: a.dueDate, createdAt: ord.createdAt, isCompleted: Number(a.remainingPairs ?? a.totalQty) === 0 })
+                        : null;
+                      return `
                       <span class="su-contractor-chip">
                         <strong>${escapeHtml(a.maker)}</strong>:
                         Rcvd <strong>${Number(a.receivedPairs || 0).toLocaleString()}</strong> / ${a.totalQty.toLocaleString()} Prs
-                        (Bal: <strong>${Number(a.remainingPairs ?? a.totalQty).toLocaleString()}</strong>)
-                      </span>
-                    `).join('')}
+                        (Bal: <strong>${Number(a.remainingPairs ?? a.totalQty).toLocaleString()}</strong>)${splitCd?.hasDueDate ? ` &bull; ${escapeHtml(splitCd.badgeText)}` : ''}
+                      </span>`;
+                    }).join('')}
                   </div>
                 `
                     : ''
@@ -1680,6 +1727,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                 <th class="text-center">10/XL</th>
                 <th class="text-center">11/XXL</th>
                 <th class="text-right">Planned Pairs</th>
+                <th class="text-center">Delivery</th>
                 <th class="text-center">GRNs / REQs</th>
                 <th class="text-center">Action</th>
               </tr>
@@ -1688,13 +1736,18 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
               ${
                 ctx.pendingOrders.length === 0
                   ? `
-                <tr><td colspan="14" class="table-empty-cell">No orders in database yet. Fill out the form above and click "Save &amp; Issue Master Order".</td></tr>
+                <tr><td colspan="15" class="table-empty-cell">No orders in database yet. Fill out the form above and click "Save &amp; Issue Master Order".</td></tr>
               `
                   : ctx.pendingOrders
                       .map(o => {
                         const rollup = ctx.rollupSummary.orderRollups.find(
                           r => r.orderId === o.orderId
                         );
+                        const rowCountdown = rollup?.deliveryCountdown || computeDeliveryCountdown({
+                          dueDate: o.dueDate,
+                          createdAt: o.createdAt,
+                          isCompleted: o.shortClosed
+                        });
                         return `
                   <tr>
                     <td class="font-bold">${escapeHtml(o.orderId)}</td>
@@ -1709,6 +1762,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                     <td class="text-center">${o.sizes?.['10'] ?? '-'}</td>
                     <td class="text-center">${o.sizes?.['11'] ?? '-'}</td>
                     <td class="text-right font-bold">${(o.totalQty || calculateSizeTotal(o.sizes || {}) || 0).toLocaleString()}</td>
+                    <td class="text-center">${renderDeliveryCountdownChip(rowCountdown, false)}</td>
                     <td class="text-center" style="font-size: 11px;">
                       ${rollup ? `${rollup.grnBatches.length} GRNs &middot; ${rollup.reqBatches.length} REQs` : '0 GRNs &middot; 0 REQs'}
                     </td>
