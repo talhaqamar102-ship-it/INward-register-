@@ -27,6 +27,17 @@ export function backfillOrderSequence(database) {
   }
 }
 
+function getOrderSchemaSupport(database) {
+  const orderCols = database.prepare(`PRAGMA table_info(pending_orders)`).all().map(c => c.name);
+  const allocTable = database.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='order_contractor_allocations'`
+  ).get();
+  return {
+    hasDueDateCol: orderCols.includes('due_date'),
+    hasAllocTable: Boolean(allocTable)
+  };
+}
+
 export function createPendingOrder(database, payload, {
   year = new Date().getFullYear(),
   actor = 'System Operator',
@@ -34,7 +45,6 @@ export function createPendingOrder(database, payload, {
   recordAuditLog
 } = {}) {
   const buyer = String(payload.buyer || '').trim();
-  const maker = String(payload.maker || '').trim();
   const po = String(payload.po || '').trim();
   const article = String(payload.article || '').trim();
   const color = String(payload.color || 'Standard').trim();
@@ -45,6 +55,81 @@ export function createPendingOrder(database, payload, {
   const size10 = Math.max(0, Number(sizes['10'] || 0));
   const size11 = Math.max(0, Number(sizes['11'] || 0));
   const totalQty = Math.max(0, Number(payload.totalQty ?? (size7 + size8 + size9 + size10 + size11)));
+  const rawDueDate = String(payload.dueDate || payload.due_date || '').trim();
+
+  let normalizedAllocations = [];
+  if (Array.isArray(payload.allocations) && payload.allocations.length > 0) {
+    const seenMakers = new Set();
+    const sumSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+    for (const rawAlloc of payload.allocations) {
+      const allocMaker = String(rawAlloc?.maker || rawAlloc?.makerContractor || '').trim();
+      if (!allocMaker) {
+        throw new Error('Every contractor split row must have a Contractor / Maker selected.');
+      }
+      const makerKey = allocMaker.toLowerCase();
+      if (seenMakers.has(makerKey)) {
+        throw new Error(`Duplicate contractor "${allocMaker}" in order split allocations.`);
+      }
+      seenMakers.add(makerKey);
+      const aSizes = rawAlloc?.sizes || {};
+      const a7 = Math.max(0, Number(aSizes['7'] || 0));
+      const a8 = Math.max(0, Number(aSizes['8'] || 0));
+      const a9 = Math.max(0, Number(aSizes['9'] || 0));
+      const a10 = Math.max(0, Number(aSizes['10'] || 0));
+      const a11 = Math.max(0, Number(aSizes['11'] || 0));
+      const aTotal = a7 + a8 + a9 + a10 + a11;
+      if (totalQty > 0 && aTotal <= 0) {
+        throw new Error(`Contractor "${allocMaker}" must be assigned at least 1 pair.`);
+      }
+      sumSizes['7'] += a7;
+      sumSizes['8'] += a8;
+      sumSizes['9'] += a9;
+      sumSizes['10'] += a10;
+      sumSizes['11'] += a11;
+      normalizedAllocations.push({
+        maker: allocMaker,
+        s7: a7,
+        s8: a8,
+        s9: a9,
+        s10: a10,
+        s11: a11,
+        total: aTotal,
+        dueDate: String(rawAlloc?.dueDate || rawAlloc?.due_date || rawDueDate || '').trim()
+      });
+    }
+    if (
+      sumSizes['7'] !== size7 ||
+      sumSizes['8'] !== size8 ||
+      sumSizes['9'] !== size9 ||
+      sumSizes['10'] !== size10 ||
+      sumSizes['11'] !== size11
+    ) {
+      throw new Error('Contractor size splits must add up exactly to the order size breakdown.');
+    }
+  }
+
+  const maker = normalizedAllocations.length > 0
+    ? normalizedAllocations.map(a => a.maker).join(', ')
+    : String(payload.maker || '').trim();
+  const latestAllocDue = normalizedAllocations
+    .map(a => a.dueDate)
+    .filter(Boolean)
+    .sort()
+    .pop() || '';
+  const dueDate = rawDueDate || latestAllocDue;
+
+  if (normalizedAllocations.length === 0) {
+    normalizedAllocations = [{
+      maker,
+      s7: size7,
+      s8: size8,
+      s9: size9,
+      s10: size10,
+      s11: size11,
+      total: totalQty,
+      dueDate
+    }];
+  }
 
   if (!maker || !article) {
     throw new Error('maker and article are required');
@@ -55,6 +140,8 @@ export function createPendingOrder(database, payload, {
   if (typeof recordAuditLog !== 'function') {
     throw new Error('Order creation requires an audit logger');
   }
+
+  const schema = getOrderSchemaSupport(database);
 
   database.exec('BEGIN IMMEDIATE');
   try {
@@ -67,27 +154,64 @@ export function createPendingOrder(database, payload, {
       database.prepare(`INSERT INTO order_seq (year, last_n) VALUES (?, ?)`).run(year, nextNumber);
     }
 
-    database.prepare(`
-      INSERT INTO pending_orders (
-        order_id, buyer_name, maker_contractor, po_number, article_name, color_shade,
-        size_7, size_8, size_9, size_10, size_11, total_qty, notes
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      orderId,
-      buyer,
-      maker,
-      po,
-      article,
-      color,
-      size7,
-      size8,
-      size9,
-      size10,
-      size11,
-      totalQty,
-      String(payload.notes || '')
-    );
+    if (schema.hasDueDateCol) {
+      database.prepare(`
+        INSERT INTO pending_orders (
+          order_id, buyer_name, maker_contractor, po_number, article_name, color_shade,
+          size_7, size_8, size_9, size_10, size_11, total_qty, due_date, notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        orderId,
+        buyer,
+        maker,
+        po,
+        article,
+        color,
+        size7,
+        size8,
+        size9,
+        size10,
+        size11,
+        totalQty,
+        dueDate,
+        String(payload.notes || '')
+      );
+    } else {
+      database.prepare(`
+        INSERT INTO pending_orders (
+          order_id, buyer_name, maker_contractor, po_number, article_name, color_shade,
+          size_7, size_8, size_9, size_10, size_11, total_qty, notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        orderId,
+        buyer,
+        maker,
+        po,
+        article,
+        color,
+        size7,
+        size8,
+        size9,
+        size10,
+        size11,
+        totalQty,
+        String(payload.notes || '')
+      );
+    }
+
+    if (schema.hasAllocTable) {
+      const insertAlloc = database.prepare(`
+        INSERT INTO order_contractor_allocations (
+          order_id, maker_contractor, size_7, size_8, size_9, size_10, size_11, total_qty, due_date
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const a of normalizedAllocations) {
+        insertAlloc.run(orderId, a.maker, a.s7, a.s8, a.s9, a.s10, a.s11, a.total, a.dueDate);
+      }
+    }
 
     recordAuditLog({
       actor,
@@ -125,6 +249,8 @@ export function deletePendingOrder(database, orderId, {
     throw new Error('Order deletion requires an audit logger');
   }
 
+  const schema = getOrderSchemaSupport(database);
+
   database.exec('BEGIN IMMEDIATE');
   try {
     const order = database.prepare(`SELECT * FROM pending_orders WHERE order_id = ?`).get(normalizedOrderId);
@@ -143,6 +269,9 @@ export function deletePendingOrder(database, orderId, {
       throw new Error(`Cannot delete Order ${normalizedOrderId}: linked production records exist.`);
     }
 
+    if (schema.hasAllocTable) {
+      database.prepare(`DELETE FROM order_contractor_allocations WHERE order_id = ?`).run(normalizedOrderId);
+    }
     database.prepare(`DELETE FROM pending_orders WHERE order_id = ?`).run(normalizedOrderId);
     recordAuditLog({
       actor,

@@ -1795,6 +1795,113 @@ body {
   margin-bottom: 6px;
 }
 
+.su-split-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--su-border, var(--border-strong));
+}
+
+.su-split-balance-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--white);
+}
+
+.su-split-balance-bar.is-balanced {
+  border-color: var(--su-complete-primary, var(--ink-900));
+}
+
+.su-split-balance-bar.is-unbalanced {
+  border-color: var(--su-areq-primary, var(--ink-950));
+}
+
+.su-contractor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.su-contractor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  border: 1px solid var(--su-border, var(--border-strong));
+  background: var(--su-bg-primary, var(--ink-50));
+  color: var(--su-text-primary, var(--ink-900));
+  font-variant-numeric: tabular-nums;
+}
+
+.su-countdown-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border: 1px solid var(--su-border, var(--border-strong));
+  background: var(--su-bg-primary, var(--ink-100));
+  color: var(--su-text-primary, var(--ink-900));
+}
+
+.su-countdown-badge.is-overdue {
+  border-color: var(--su-areq-primary);
+  background: var(--su-areq-fill-soft);
+  color: var(--su-areq-dark);
+}
+
+.su-countdown-badge.is-soon {
+  border-color: var(--su-grn-border);
+  background: var(--su-grn-bg);
+  color: var(--su-grn-deep);
+}
+
+.su-countdown-badge.is-ontrack {
+  border-color: var(--su-req-primary);
+  background: var(--su-req-bg);
+  color: var(--su-req-primary);
+}
+
+.su-countdown-badge.is-delivered {
+  border-color: var(--su-complete-primary);
+  background: var(--su-bg-primary);
+  color: var(--su-complete-dark);
+}
+
+.su-timeline-track {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--su-border-subtle, var(--ink-200));
+  overflow: hidden;
+  min-width: 90px;
+}
+
+.su-timeline-fill {
+  height: 100%;
+  background: var(--su-req-primary, var(--ink-900));
+}
+
+.su-timeline-fill.is-overdue {
+  background: var(--su-areq-primary, var(--ink-950));
+}
+
+.su-timeline-fill.is-delivered {
+  background: var(--su-complete-primary, var(--ink-950));
+}
+
 .su-order-action-row {
   display: flex;
   justify-content: space-between;

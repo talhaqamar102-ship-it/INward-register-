@@ -895,7 +895,120 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
       assert.equal(validData.received_from, 'Bilal Driver');
     } finally {
       if (rcvNumber) db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
-      if (orderId) db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+      if (orderId) {
+        db.prepare('DELETE FROM order_contractor_allocations WHERE order_id = ?').run(orderId);
+        db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+      }
+    }
+  });
+
+  test('API: Multi-contractor split order enforces allocations and tracks per-contractor balances', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    let orderId;
+    const rcvNumbers = [];
+
+    try {
+      const orderResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'Hall A, Hall B',
+          po: `PO-SPLIT-${randomUUID().slice(0, 6)}`,
+          article: master.article,
+          color: 'Black',
+          sizes: { '7': 40, '8': 40, '9': 40, '10': 40, '11': 40 },
+          totalQty: 200,
+          allocations: [
+            { maker: 'Hall A', sizes: { '7': 25, '8': 25, '9': 25, '10': 25, '11': 20 } },
+            { maker: 'Hall B', sizes: { '7': 15, '8': 15, '9': 15, '10': 15, '11': 20 } }
+          ]
+        })
+      });
+      assert.equal(orderResp.status, 200);
+      const orderData = (await orderResp.json()).data;
+      orderId = orderData.orderId;
+      const created = orderData.orders.find(o => o.orderId === orderId);
+      assert.equal(created.contractorAllocations.length, 2);
+
+      // Receive full 120 pairs for Hall A -> 200
+      const rcvA = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Hall A',
+          receivedFrom: 'Asif Carrier',
+          strictInwardEntry: true,
+          rcvdPairs: 120
+        })
+      }, inwardCookie);
+      assert.equal(rcvA.status, 200);
+      rcvNumbers.push((await rcvA.json()).data.rcv_number);
+
+      // Over-receipt for Hall A (even 10 pairs over 120) must reject 400
+      const overA = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Hall A',
+          receivedFrom: 'Asif Carrier',
+          strictInwardEntry: true,
+          rcvdPairs: 10
+        })
+      }, inwardCookie);
+      assert.equal(overA.status, 400);
+
+      // Unassigned contractor Maker C must reject 400
+      const wrongMaker = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Maker C',
+          receivedFrom: 'Unknown Driver',
+          strictInwardEntry: true,
+          rcvdPairs: 10
+        })
+      }, inwardCookie);
+      assert.equal(wrongMaker.status, 400);
+
+      // Receive 80 pairs for Hall B -> 200 and verify updated allocations
+      const rcvB = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Hall B',
+          receivedFrom: 'Rashid Driver',
+          strictInwardEntry: true,
+          rcvdPairs: 80
+        })
+      }, inwardCookie);
+      assert.equal(rcvB.status, 200);
+      rcvNumbers.push((await rcvB.json()).data.rcv_number);
+
+      const pendingAfter = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {}, inwardCookie);
+      const updated = (await pendingAfter.json()).data.find(o => o.orderId === orderId);
+      assert.equal(updated.contractorAllocations[0].receivedPairs, 120);
+      assert.equal(updated.contractorAllocations[0].remainingPairs, 0);
+      assert.equal(updated.contractorAllocations[1].receivedPairs, 80);
+      assert.equal(updated.contractorAllocations[1].remainingPairs, 0);
+    } finally {
+      for (const rcvNo of rcvNumbers) {
+        db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNo);
+      }
+      if (orderId) {
+        db.prepare('DELETE FROM order_contractor_allocations WHERE order_id = ?').run(orderId);
+        db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+      }
     }
   });
 });

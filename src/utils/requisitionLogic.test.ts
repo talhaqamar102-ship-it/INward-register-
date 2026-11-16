@@ -54,6 +54,7 @@ import {
   renderRequisitionWipAnalyticsChart,
   buildConfirmDialogHtml,
   validatePendingOrderInputs,
+  validateContractorAllocations,
   validateCustomerMasterInputs,
   validateProductMasterInputs,
   validateSystemUserInputs,
@@ -1689,4 +1690,59 @@ test('Phase 4.4: Customer Master and Article/BOM Master forms use responsive CSS
     /grid-template-columns:\s*(?:1\.1fr|1\.2fr)/,
     'Master forms must not use brittle fixed inline fr track lists'
   );
+});
+
+test('Multi-contractor order split validation & per-contractor rollup tracking', () => {
+  const orderSizes = { '7': 40, '8': 50, '9': 60, '10': 30, '11': 20 };
+
+  const valid = validateContractorAllocations(orderSizes, [
+    { maker: 'Hall A', sizes: { '7': 25, '8': 30, '9': 40, '10': 15, '11': 10 } },
+    { maker: 'Hall B', sizes: { '7': 15, '8': 20, '9': 20, '10': 15, '11': 10 } }
+  ]);
+  assert.equal(valid.valid, true);
+  assert.equal(valid.totalUnassigned, 0);
+
+  const dup = validateContractorAllocations(orderSizes, [
+    { maker: 'Hall A', sizes: { '7': 20, '8': 25, '9': 30, '10': 15, '11': 10 } },
+    { maker: 'hall a', sizes: { '7': 20, '8': 25, '9': 30, '10': 15, '11': 10 } }
+  ]);
+  assert.equal(dup.valid, false);
+  assert.match(dup.error || '', /Duplicate contractor/);
+
+  const mismatch = validateContractorAllocations(orderSizes, [
+    { maker: 'Hall A', sizes: { '7': 20, '8': 30, '9': 40, '10': 15, '11': 10 } },
+    { maker: 'Hall B', sizes: { '7': 15, '8': 20, '9': 20, '10': 15, '11': 10 } }
+  ]);
+  assert.equal(mismatch.valid, false);
+  assert.equal(mismatch.unassignedBySize['7'], 5);
+  assert.equal(mismatch.totalUnassigned, 5);
+
+  const rollupSummary = buildOrderTraceability({
+    pendingOrders: [{
+      orderId: 'ORD-SPLIT-1',
+      buyer: 'Globex Supply Co.',
+      maker: 'Hall A, Hall B',
+      po: 'PO-SPLIT-1',
+      article: 'Model A1',
+      sizes: orderSizes,
+      totalQty: 200,
+      contractorAllocations: [
+        { maker: 'Hall A', sizes: { '7': 25, '8': 30, '9': 40, '10': 15, '11': 10 }, totalQty: 120 },
+        { maker: 'Hall B', sizes: { '7': 15, '8': 20, '9': 20, '10': 15, '11': 10 }, totalQty: 80 }
+      ]
+    }],
+    grnList: [
+      { sr: 1, grnCode: 'RCV-2026-9001', date: '2026-11-16', pendingOrderId: 'ORD-SPLIT-1', maker: 'Hall A', article: 'Model A1', rcvdPairs: 90, sizes: { '7': 25, '8': 30, '9': 35, '10': 0, '11': 0 } },
+      { sr: 2, grnCode: 'RCV-2026-9002', date: '2026-11-16', pendingOrderId: 'ORD-SPLIT-1', maker: 'Hall B', article: 'Model A1', rcvdPairs: 80, sizes: { '7': 15, '8': 20, '9': 20, '10': 15, '11': 10 } }
+    ],
+    requisitions: [],
+    defectList: []
+  });
+
+  const ord = rollupSummary.orderRollups[0];
+  assert.equal(ord.contractorAllocations?.length, 2);
+  assert.equal(ord.contractorAllocations?.[0].receivedPairs, 90);
+  assert.equal(ord.contractorAllocations?.[0].remainingPairs, 30);
+  assert.equal(ord.contractorAllocations?.[1].receivedPairs, 80);
+  assert.equal(ord.contractorAllocations?.[1].remainingPairs, 0);
 });

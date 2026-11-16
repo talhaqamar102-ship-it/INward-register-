@@ -765,6 +765,38 @@ export class PackingService {
     if (rcvdNum <= 0) {
       throw new Error('Received pairs count must be greater than 0');
     }
+
+    if (linkedOrder) {
+      const allocRows = db.prepare(`
+        SELECT * FROM order_contractor_allocations WHERE order_id = ? ORDER BY id ASC
+      `).all(orderIdVal);
+      if (allocRows.length > 0) {
+        const matchedAlloc = allocRows.find(
+          a => String(a.maker_contractor || '').trim().toLowerCase() === String(makerContractor).trim().toLowerCase()
+        );
+        if (!matchedAlloc) {
+          throw new Error(`Contractor "${makerContractor}" is not allocated to Order ${orderIdVal}`);
+        }
+        const allocCap = Number(matchedAlloc.total_qty || 0);
+        if (allocCap > 0 && (allocRows.length > 1 || Boolean(strictInwardEntry))) {
+          const priorForMaker = db.prepare(`
+            SELECT COALESCE(SUM(rcvd_pairs), 0) AS total_rcvd
+            FROM store_receivings
+            WHERE (order_id = ? OR po_number = ?)
+              AND LOWER(TRIM(maker_contractor)) = LOWER(TRIM(?))
+              AND COALESCE(is_voided, 0) = 0
+          `).get(orderIdVal, orderIdVal, matchedAlloc.maker_contractor);
+          const alreadyRcvd = Number(priorForMaker?.total_rcvd || 0);
+          if (alreadyRcvd + rcvdNum > allocCap) {
+            const rem = Math.max(0, allocCap - alreadyRcvd);
+            throw new Error(
+              `Receiving ${rcvdNum} pairs for ${matchedAlloc.maker_contractor} exceeds their remaining allocation (${rem} pairs left on ${orderIdVal})`
+            );
+          }
+        }
+      }
+    }
+
     const balanceNum = Math.max(0, orderNum - rcvdNum);
 
     const year = new Date().getFullYear();
@@ -1209,24 +1241,82 @@ export class PackingService {
     }
 
     const grnRows = db.prepare(`
-      SELECT rcv_number, rcvd_pairs
+      SELECT rcv_number, maker_contractor, rcvd_pairs
       FROM store_receivings
       WHERE (order_id = ? OR po_number = ?) AND COALESCE(is_voided, 0) = 0
     `).all(orderId, orderId);
     const receivedPairs = grnRows.reduce((sum, row) => sum + Number(row.rcvd_pairs || 0), 0);
 
     const receivedSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+    const grnSizeMap = new Map();
     if (grnRows.length > 0) {
       const sizeStmt = db.prepare(`SELECT size_code, rcvd_pairs FROM receiving_size_breakdowns WHERE rcv_number = ?`);
       for (const grn of grnRows) {
+        const sMap = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
         for (const sRow of sizeStmt.all(grn.rcv_number)) {
           const code = String(sRow.size_code || '');
           if (REQUISITION_SIZES.includes(code)) {
-            receivedSizes[code] += Number(sRow.rcvd_pairs || 0);
+            const qty = Number(sRow.rcvd_pairs || 0);
+            receivedSizes[code] += qty;
+            sMap[code] += qty;
           }
         }
+        grnSizeMap.set(grn.rcv_number, sMap);
       }
     }
+
+    const allocRows = db.prepare(`
+      SELECT * FROM order_contractor_allocations WHERE order_id = ? ORDER BY id ASC
+    `).all(orderId);
+    const effectiveAllocRows = allocRows.length > 0
+      ? allocRows
+      : [{
+          maker_contractor: orderRow.maker_contractor,
+          size_7: orderRow.size_7,
+          size_8: orderRow.size_8,
+          size_9: orderRow.size_9,
+          size_10: orderRow.size_10,
+          size_11: orderRow.size_11,
+          total_qty: orderRow.total_qty,
+          due_date: orderRow.due_date || ''
+        }];
+    const contractorAllocations = effectiveAllocRows.map(a => {
+      const makerName = String(a.maker_contractor || '').trim();
+      const allocSizes = {
+        '7': Number(a.size_7 || 0),
+        '8': Number(a.size_8 || 0),
+        '9': Number(a.size_9 || 0),
+        '10': Number(a.size_10 || 0),
+        '11': Number(a.size_11 || 0)
+      };
+      const allocTotal = Number(a.total_qty || (allocSizes['7'] + allocSizes['8'] + allocSizes['9'] + allocSizes['10'] + allocSizes['11']));
+      const makerGrns = grnRows.filter(
+        g => String(g.maker_contractor || '').trim().toLowerCase() === makerName.toLowerCase()
+      );
+      const makerRcvdPairs = makerGrns.reduce((sum, g) => sum + Number(g.rcvd_pairs || 0), 0);
+      const makerRcvdSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+      for (const mg of makerGrns) {
+        const sMap = grnSizeMap.get(mg.rcv_number);
+        if (!sMap) continue;
+        for (const sz of REQUISITION_SIZES) {
+          makerRcvdSizes[sz] += Number(sMap[sz] || 0);
+        }
+      }
+      const makerRemainingSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+      for (const sz of REQUISITION_SIZES) {
+        makerRemainingSizes[sz] = Math.max(0, allocSizes[sz] - makerRcvdSizes[sz]);
+      }
+      return {
+        maker: makerName,
+        sizes: allocSizes,
+        totalQty: allocTotal,
+        dueDate: a.due_date || orderRow.due_date || '',
+        receivedPairs: makerRcvdPairs,
+        receivedSizes: makerRcvdSizes,
+        remainingPairs: Math.max(0, allocTotal - makerRcvdPairs),
+        remainingSizes: makerRemainingSizes
+      };
+    });
 
     const allocRow = db.prepare(`
       SELECT COALESCE(SUM(allocated_pairs), 0) AS total_alloc
@@ -1247,7 +1337,8 @@ export class PackingService {
       receivedSizes,
       issuedPairs,
       availableDockPairs,
-      unclaimedDockPairs
+      unclaimedDockPairs,
+      contractorAllocations
     };
   }
 
@@ -1265,6 +1356,8 @@ export class PackingService {
           color: r.color_shade,
           sizes: stock.plannedSizes,
           totalQty: Number(r.total_qty || 0),
+          dueDate: r.due_date || '',
+          createdAt: r.created_at || '',
           notes: r.notes || '',
           receivedPairs: stock.receivedPairs,
           issuedPairs: stock.issuedPairs,
@@ -1273,7 +1366,8 @@ export class PackingService {
           availableDockPairs: stock.availableDockPairs,
           unclaimedDockPairs: stock.unclaimedDockPairs,
           remainingOrderSizes: stock.remainingOrderSizes,
-          receivedSizes: stock.receivedSizes
+          receivedSizes: stock.receivedSizes,
+          contractorAllocations: stock.contractorAllocations
         };
       });
     } catch {

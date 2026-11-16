@@ -1,6 +1,8 @@
 import {
   PendingOrder,
+  SizeBreakdown,
   calculateSizeTotal,
+  validateContractorAllocations,
   SuperUserDashboardSummary,
   SuperUserOrderRollup,
   SuperUserGrnBatchItem,
@@ -74,6 +76,20 @@ export interface SuperUserRenderContext {
   };
   lastBackupPath: string;
   rollupSummary: SuperUserDashboardSummary;
+  orderDraft?: {
+    buyer: string;
+    maker: string;
+    po: string;
+    article: string;
+    color: string;
+    dueDate: string;
+    sizes: SizeBreakdown;
+  };
+  orderSplitRows?: Array<{
+    maker: string;
+    sizes: SizeBreakdown;
+    dueDate: string;
+  }>;
 }
 
 function renderReconciliationBadge(rec: ReconciliationResult): string {
@@ -885,7 +901,13 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
   const currentPage = Math.max(1, Number(ctx.trackingPage || 1));
 
   const uniqueBuyers = Array.from(new Set(s.orderRollups.map(o => o.buyer).filter(Boolean)));
-  const uniqueMakers = Array.from(new Set(s.orderRollups.map(o => o.maker).filter(Boolean)));
+  const uniqueMakers = Array.from(new Set(
+    s.orderRollups.flatMap(o =>
+      o.contractorAllocations && o.contractorAllocations.length > 0
+        ? o.contractorAllocations.map(a => a.maker)
+        : [o.maker]
+    ).filter(Boolean)
+  ));
 
   const filteredOrders = s.orderRollups.filter(o => {
     if (
@@ -911,7 +933,11 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
     if (buyerFilter !== 'ALL' && o.buyer !== buyerFilter) {
       return false;
     }
-    if (makerFilter !== 'ALL' && o.maker !== makerFilter) {
+    if (
+      makerFilter !== 'ALL' &&
+      o.maker !== makerFilter &&
+      !(o.contractorAllocations || []).some(a => a.maker === makerFilter)
+    ) {
       return false;
     }
     if (!search) return true;
@@ -919,6 +945,7 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
       o.orderId,
       o.buyer,
       o.maker,
+      ...(o.contractorAllocations || []).map(a => a.maker),
       o.po,
       o.article,
       o.color,
@@ -1127,6 +1154,21 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                   Planned Sizes: <strong>7:${ord.sizes['7'] || 0} | 8:${ord.sizes['8'] || 0} | 9:${ord.sizes['9'] || 0} | 10:${ord.sizes['10'] || 0} | 11:${ord.sizes['11'] || 0}</strong> &bull;
                   Packed S5 Sizes: <strong>7:${ord.packedSizes['7'] || 0} | 8:${ord.packedSizes['8'] || 0} | 9:${ord.packedSizes['9'] || 0} | 10:${ord.packedSizes['10'] || 0} | 11:${ord.packedSizes['11'] || 0}</strong>
                 </div>
+                ${
+                  (ord.contractorAllocations || []).length > 1
+                    ? `
+                  <div class="su-contractor-chips" data-testid="order-contractor-splits">
+                    ${(ord.contractorAllocations || []).map(a => `
+                      <span class="su-contractor-chip">
+                        <strong>${escapeHtml(a.maker)}</strong>:
+                        Rcvd <strong>${Number(a.receivedPairs || 0).toLocaleString()}</strong> / ${a.totalQty.toLocaleString()} Prs
+                        (Bal: <strong>${Number(a.remainingPairs ?? a.totalQty).toLocaleString()}</strong>)
+                      </span>
+                    `).join('')}
+                  </div>
+                `
+                    : ''
+                }
               </div>
             </div>
 
@@ -1411,6 +1453,19 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
   const counts = ov.dbHealth.tableCounts || {};
   const totalRows = Object.values(counts).reduce((sum: number, n: any) => sum + Number(n || 0), 0);
   const auditTrail: AuditTrailEntry[] = ctx.auditTrail || [];
+  const draft = ctx.orderDraft || {
+    buyer: '',
+    maker: '',
+    po: '',
+    article: '',
+    color: '',
+    dueDate: '',
+    sizes: { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 }
+  };
+  const draftTotal = calculateSizeTotal(draft.sizes);
+  const splitRows = ctx.orderSplitRows || [];
+  const splitActive = splitRows.length > 0;
+  const splitValidation = splitActive ? validateContractorAllocations(draft.sizes, splitRows) : null;
 
   return `
     <!-- 7.1: Super User Master Order Creation Suite (Primary View) -->
@@ -1436,18 +1491,18 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
               <option value="">-- Choose Buyer --</option>
               ${(ov.customers.length
                 ? ov.customers.map(
-                    (c: any) => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${escapeHtml(c.country || 'Global')})</option>`
+                    (c: any) => `<option value="${escapeHtml(c.name)}" ${draft.buyer === c.name ? 'selected' : ''}>${escapeHtml(c.name)} (${escapeHtml(c.country || 'Global')})</option>`
                   )
-                : ctx.dropdownOptions.customers.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
+                : ctx.dropdownOptions.customers.map(c => `<option value="${escapeHtml(c)}" ${draft.buyer === c ? 'selected' : ''}>${escapeHtml(c)}</option>`)
               ).join('')}
               ${
                 !ov.customers.length && !ctx.dropdownOptions.customers.length
                   ? `
-                <option value="Northwind Safety Ltd">Northwind Safety Ltd (UK)</option>
-                <option value="Globex Supply Co.">Globex Supply Co. (Japan)</option>
-                <option value="Initech Safety Ltd">Initech Safety Ltd (France)</option>
-                <option value="Umbrella Workwear GmbH">Umbrella Workwear GmbH (Germany)</option>
-                <option value="Stark Protective Ltd">Stark Protective Ltd (Norway)</option>
+                <option value="Northwind Safety Ltd" ${draft.buyer === 'Northwind Safety Ltd' ? 'selected' : ''}>Northwind Safety Ltd (UK)</option>
+                <option value="Globex Supply Co." ${draft.buyer === 'Globex Supply Co.' ? 'selected' : ''}>Globex Supply Co. (Japan)</option>
+                <option value="Initech Safety Ltd" ${draft.buyer === 'Initech Safety Ltd' ? 'selected' : ''}>Initech Safety Ltd (France)</option>
+                <option value="Umbrella Workwear GmbH" ${draft.buyer === 'Umbrella Workwear GmbH' ? 'selected' : ''}>Umbrella Workwear GmbH (Germany)</option>
+                <option value="Stark Protective Ltd" ${draft.buyer === 'Stark Protective Ltd' ? 'selected' : ''}>Stark Protective Ltd (Norway)</option>
               `
                   : ''
               }
@@ -1455,16 +1510,16 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
 
           <div class="form-group">
-            <label for="admin-pending-order-maker">Contractor / Maker <span class="su-required-mark" aria-hidden="true">*</span></label>
-            <select id="admin-pending-order-maker" class="form-select" required aria-required="true">
+            <label for="admin-pending-order-maker">${splitActive ? 'Primary Contractor' : 'Contractor / Maker'} <span class="su-required-mark" aria-hidden="true">*</span></label>
+            <select id="admin-pending-order-maker" class="form-select" required aria-required="true" ${splitActive ? 'disabled title="Contractors are assigned in the Split Allocation table below."' : ''}>
               <option value="">-- Choose Contractor --</option>
-              ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}
+              ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${draft.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
             </select>
           </div>
 
           <div class="form-group">
             <label for="admin-pending-order-po">PO Number</label>
-            <input type="text" id="admin-pending-order-po" class="form-input" placeholder="e.g. 27351" list="admin-po-preset-list" />
+            <input type="text" id="admin-pending-order-po" class="form-input" placeholder="e.g. 27351" list="admin-po-preset-list" value="${escapeHtml(draft.po)}" />
             <datalist id="admin-po-preset-list">
               ${ctx.dropdownOptions.poList.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
             </datalist>
@@ -1474,13 +1529,18 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             <label for="admin-pending-order-article">Article <span class="su-required-mark" aria-hidden="true">*</span></label>
             <select id="admin-pending-order-article" class="form-select" required aria-required="true">
               <option value="">-- Choose Article --</option>
-              ${ctx.dropdownOptions.articles.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}
+              ${ctx.dropdownOptions.articles.map(a => `<option value="${escapeHtml(a)}" ${draft.article === a ? 'selected' : ''}>${escapeHtml(a)}</option>`).join('')}
             </select>
           </div>
 
           <div class="form-group">
             <label for="admin-pending-order-color">Colour / Shade</label>
-            <input type="text" id="admin-pending-order-color" class="form-input" placeholder="e.g. Black / Hi-Vis Yellow" />
+            <input type="text" id="admin-pending-order-color" class="form-input" placeholder="e.g. Black / Hi-Vis Yellow" value="${escapeHtml(draft.color)}" />
+          </div>
+
+          <div class="form-group">
+            <label for="admin-pending-order-due-date">Delivery Due Date</label>
+            <input type="date" id="admin-pending-order-due-date" class="form-input" value="${escapeHtml(draft.dueDate)}" />
           </div>
         </div>
 
@@ -1489,9 +1549,14 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             <span style="font-weight: 700; color: var(--ink-950); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;">
               Planned Order Size Breakdown Matrix (Pairs)
             </span>
-            <span style="font-size: 12px; color: var(--ink-700);">
-              Enter pairs for each size. The order total calculates automatically.
-            </span>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span style="font-size: 12px; color: var(--ink-700);">
+                Enter pairs for each size. The order total calculates automatically.
+              </span>
+              <button type="button" class="btn-outline" id="btn-admin-toggle-split" style="padding: 4px 10px; font-size: 11.5px;">
+                ${splitActive ? 'Use Single Contractor' : '+ Split Across Contractors'}
+              </button>
+            </div>
           </div>
           <table class="size-matrix-table" style="margin: 0;">
             <thead>
@@ -1506,15 +1571,82 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             </thead>
             <tbody>
               <tr>
-                <td><input type="number" aria-label="Order Size 7 / S" class="size-matrix-input admin-order-size-val" data-size="7" min="0" placeholder="0" /></td>
-                <td><input type="number" aria-label="Order Size 8 / M" class="size-matrix-input admin-order-size-val" data-size="8" min="0" placeholder="0" /></td>
-                <td><input type="number" aria-label="Order Size 9 / L" class="size-matrix-input admin-order-size-val" data-size="9" min="0" placeholder="0" /></td>
-                <td><input type="number" aria-label="Order Size 10 / XL" class="size-matrix-input admin-order-size-val" data-size="10" min="0" placeholder="0" /></td>
-                <td><input type="number" aria-label="Order Size 11 / XXL" class="size-matrix-input admin-order-size-val" data-size="11" min="0" placeholder="0" /></td>
-                <td style="font-weight: 800; font-size: 13.5px; color: var(--ink-950); text-align: center;" id="admin-order-size-total">0</td>
+                <td><input type="number" aria-label="Order Size 7 / S" class="size-matrix-input admin-order-size-val" data-size="7" min="0" placeholder="0" value="${draft.sizes['7'] || ''}" /></td>
+                <td><input type="number" aria-label="Order Size 8 / M" class="size-matrix-input admin-order-size-val" data-size="8" min="0" placeholder="0" value="${draft.sizes['8'] || ''}" /></td>
+                <td><input type="number" aria-label="Order Size 9 / L" class="size-matrix-input admin-order-size-val" data-size="9" min="0" placeholder="0" value="${draft.sizes['9'] || ''}" /></td>
+                <td><input type="number" aria-label="Order Size 10 / XL" class="size-matrix-input admin-order-size-val" data-size="10" min="0" placeholder="0" value="${draft.sizes['10'] || ''}" /></td>
+                <td><input type="number" aria-label="Order Size 11 / XXL" class="size-matrix-input admin-order-size-val" data-size="11" min="0" placeholder="0" value="${draft.sizes['11'] || ''}" /></td>
+                <td style="font-weight: 800; font-size: 13.5px; color: var(--ink-950); text-align: center;" id="admin-order-size-total">${draftTotal}</td>
               </tr>
             </tbody>
           </table>
+          ${
+            splitActive
+              ? `
+            <div class="su-split-panel" data-testid="admin-contractor-split-panel">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
+                <span style="font-weight: 700; color: var(--ink-950); font-size: 11.5px; text-transform: uppercase;">
+                  Contractor Share Split (Must Match Order Sizes)
+                </span>
+                <button type="button" class="btn-outline" id="btn-admin-add-split-row" style="padding: 3px 10px; font-size: 11.5px;">
+                  + Add Contractor Row
+                </button>
+              </div>
+              <table class="size-matrix-table" style="margin: 0;">
+                <thead>
+                  <tr>
+                    <th style="min-width: 150px;">Contractor</th>
+                    <th>7/S</th>
+                    <th>8/M</th>
+                    <th>9/L</th>
+                    <th>10/XL</th>
+                    <th>11/XXL</th>
+                    <th>Total</th>
+                    <th>Due Date</th>
+                    <th>Remove</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${splitRows.map((row, idx) => {
+                    const rowTotal = calculateSizeTotal(row.sizes);
+                    return `
+                    <tr class="su-split-row" data-split-index="${idx}">
+                      <td>
+                        <select class="form-select admin-split-maker" data-split-index="${idx}" aria-label="Split Contractor ${idx + 1}" style="font-size: 12px;">
+                          <option value="">-- Choose Contractor --</option>
+                          ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${row.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
+                        </select>
+                      </td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="7" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 7" value="${row.sizes['7'] || ''}" /></td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="8" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 8" value="${row.sizes['8'] || ''}" /></td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="9" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 9" value="${row.sizes['9'] || ''}" /></td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="10" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 10" value="${row.sizes['10'] || ''}" /></td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="11" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 11" value="${row.sizes['11'] || ''}" /></td>
+                      <td class="text-center font-bold" id="admin-split-row-total-${idx}">${rowTotal.toLocaleString()}</td>
+                      <td><input type="date" class="form-input admin-split-due-date" data-split-index="${idx}" aria-label="Contractor ${idx + 1} Due Date" value="${escapeHtml(row.dueDate || '')}" style="font-size: 11.5px;" /></td>
+                      <td class="text-center">
+                        ${splitRows.length > 2 ? `<button type="button" class="btn-outline" data-su-action="remove-split-row" data-split-index="${idx}" style="padding: 2px 8px; font-size: 11px;">&times;</button>` : '<span style="color: var(--ink-500); font-size: 11px;">Min 2</span>'}
+                      </td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+              <div id="admin-split-balance-bar" class="su-split-balance-bar ${splitValidation?.valid ? 'is-balanced' : 'is-unbalanced'}">
+                <span>
+                  Unassigned Balance:
+                  <strong>7:${splitValidation?.unassignedBySize['7'] ?? 0}</strong> |
+                  <strong>8:${splitValidation?.unassignedBySize['8'] ?? 0}</strong> |
+                  <strong>9:${splitValidation?.unassignedBySize['9'] ?? 0}</strong> |
+                  <strong>10:${splitValidation?.unassignedBySize['10'] ?? 0}</strong> |
+                  <strong>11:${splitValidation?.unassignedBySize['11'] ?? 0}</strong>
+                  (<strong>${splitValidation?.totalUnassigned ?? 0}</strong> Prs remaining)
+                </span>
+                <strong>${splitValidation?.valid ? 'Split Matches Order 100% ✓' : escapeHtml(splitValidation?.error || 'Adjust contractor quantities to match order totals')}</strong>
+              </div>
+            </div>
+          `
+              : ''
+          }
         </div>
 
         <div class="su-order-action-row">

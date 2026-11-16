@@ -41,6 +41,17 @@ export const SIZE_LABELS: Array<{ key: '7' | '8' | '9' | '10' | '11'; label: str
   { key: '11', label: '11 / XXL' }
 ];
 
+export interface ContractorOrderAllocation {
+  maker: string;
+  sizes: SizeBreakdown;
+  totalQty: number;
+  dueDate?: string;
+  receivedPairs?: number;
+  receivedSizes?: SizeBreakdown;
+  remainingPairs?: number;
+  remainingSizes?: SizeBreakdown;
+}
+
 export interface PendingOrder {
   orderId: string;
   buyer?: string;
@@ -48,6 +59,8 @@ export interface PendingOrder {
   po?: string;
   article: string;
   color?: string;
+  dueDate?: string;
+  createdAt?: string;
   sizes?: SizeBreakdown;
   totalQty?: number;
   notes?: string;
@@ -64,6 +77,88 @@ export interface PendingOrder {
   unclaimedDockPairs?: number;
   remainingOrderSizes?: SizeBreakdown;
   receivedSizes?: SizeBreakdown;
+  contractorAllocations?: ContractorOrderAllocation[];
+}
+
+export function validateContractorAllocations(
+  orderSizes: SizeBreakdown,
+  allocations: Array<{ maker: string; sizes: SizeBreakdown; dueDate?: string }>
+): {
+  valid: boolean;
+  error?: string;
+  unassignedBySize: SizeBreakdown;
+  totalUnassigned: number;
+} {
+  const orderTotal = STANDARD_GLOVE_SIZES.reduce((sum, sz) => sum + Math.max(0, Number(orderSizes[sz] || 0)), 0);
+  const sumBySize = createEmptySizes();
+  const seenMakers = new Set<string>();
+
+  if (!Array.isArray(allocations) || allocations.length === 0) {
+    return {
+      valid: false,
+      error: 'Add at least one contractor allocation.',
+      unassignedBySize: {
+        '7': Number(orderSizes['7'] || 0),
+        '8': Number(orderSizes['8'] || 0),
+        '9': Number(orderSizes['9'] || 0),
+        '10': Number(orderSizes['10'] || 0),
+        '11': Number(orderSizes['11'] || 0)
+      },
+      totalUnassigned: orderTotal
+    };
+  }
+
+  let firstError: string | undefined;
+  for (let i = 0; i < allocations.length; i++) {
+    const row = allocations[i];
+    const maker = String(row?.maker || '').trim();
+    if (!maker && !firstError) {
+      firstError = `Row ${i + 1}: Select a Contractor / Maker.`;
+    }
+    const makerKey = maker.toLowerCase();
+    if (maker && seenMakers.has(makerKey) && !firstError) {
+      firstError = `Duplicate contractor "${maker}" in split allocation.`;
+    }
+    if (maker) seenMakers.add(makerKey);
+
+    let rowTotal = 0;
+    for (const sz of STANDARD_GLOVE_SIZES) {
+      const val = Number(row?.sizes?.[sz] || 0);
+      if ((!Number.isFinite(val) || val < 0) && !firstError) {
+        firstError = `Contractor "${maker || `#${i + 1}`}": size ${sz} quantity cannot be negative.`;
+      }
+      const cleanVal = Math.max(0, val);
+      sumBySize[sz] += cleanVal;
+      rowTotal += cleanVal;
+    }
+    if (orderTotal > 0 && rowTotal <= 0 && !firstError) {
+      firstError = `Contractor "${maker || `#${i + 1}`}" must have at least 1 pair assigned.`;
+    }
+  }
+
+  const unassignedBySize = createEmptySizes();
+  let totalUnassigned = 0;
+  for (const sz of STANDARD_GLOVE_SIZES) {
+    unassignedBySize[sz] = Math.max(0, Number(orderSizes[sz] || 0)) - sumBySize[sz];
+    totalUnassigned += unassignedBySize[sz];
+  }
+
+  if (!firstError) {
+    const mismatchSize = STANDARD_GLOVE_SIZES.find(sz => unassignedBySize[sz] !== 0);
+    if (mismatchSize) {
+      const diff = unassignedBySize[mismatchSize];
+      firstError = diff > 0
+        ? `Size ${mismatchSize} still has ${diff} unassigned pairs across contractors.`
+        : `Size ${mismatchSize} is over-allocated by ${Math.abs(diff)} pairs.`;
+    }
+  }
+
+  return {
+    valid: !firstError,
+    error: firstError,
+    unassignedBySize,
+    totalUnassigned
+  };
 }
 
 export function createEmptySizes(): SizeBreakdown {
@@ -447,6 +542,9 @@ export interface OrderTraceabilityItem {
   orderLifecycleStatus: OrderLifecycleStatus;
   shortClosed?: boolean;
   shortCloseReason?: string;
+  dueDate?: string;
+  createdAt?: string;
+  contractorAllocations?: ContractorOrderAllocation[];
   grnCodes: string[];
   reqNumbers: string[];
   mReqNumbers: string[];
@@ -1413,6 +1511,49 @@ export function buildSuperUserOrderRollups(params: {
       orderStatus = 'RECEIVING AT DOCK #1';
     }
 
+    const rawAllocations: ContractorOrderAllocation[] =
+      ord.contractorAllocations && ord.contractorAllocations.length > 0
+        ? ord.contractorAllocations
+        : [
+            {
+              maker: ord.maker,
+              sizes: plannedSizes,
+              totalQty: plannedQty,
+              dueDate: ord.dueDate || ''
+            }
+          ];
+    const contractorAllocations: ContractorOrderAllocation[] = rawAllocations.map(alloc => {
+      const allocMaker = String(alloc.maker || '').trim();
+      const allocSizes = alloc.sizes || createEmptySizes();
+      const allocTotal = Math.max(Number(alloc.totalQty || 0), calculateSizeTotal(allocSizes));
+      const makerGrns = rawGrnBatches.filter(
+        g =>
+          rawAllocations.length === 1 ||
+          String(g.maker || '').trim().toLowerCase() === allocMaker.toLowerCase()
+      );
+      const allocRcvdPairs = makerGrns.reduce((sum, g) => sum + Number(g.rcvdPairs || 0), 0);
+      const allocRcvdSizes = createEmptySizes();
+      for (const mg of makerGrns) {
+        for (const sz of STANDARD_GLOVE_SIZES) {
+          allocRcvdSizes[sz] += Number(mg.sizes?.[sz] || 0);
+        }
+      }
+      const allocRemSizes = createEmptySizes();
+      for (const sz of STANDARD_GLOVE_SIZES) {
+        allocRemSizes[sz] = ord.shortClosed ? 0 : Math.max(0, Number(allocSizes[sz] || 0) - allocRcvdSizes[sz]);
+      }
+      return {
+        maker: allocMaker,
+        sizes: allocSizes,
+        totalQty: allocTotal,
+        dueDate: alloc.dueDate || ord.dueDate || '',
+        receivedPairs: allocRcvdPairs,
+        receivedSizes: allocRcvdSizes,
+        remainingPairs: ord.shortClosed ? 0 : Math.max(0, allocTotal - allocRcvdPairs),
+        remainingSizes: allocRemSizes
+      };
+    });
+
     orderRollups.push({
       orderId: ord.orderId,
       buyer: ord.buyer || 'Standard Client',
@@ -1443,6 +1584,9 @@ export function buildSuperUserOrderRollups(params: {
       orderLifecycleStatus: orderStatus,
       shortClosed: ord.shortClosed,
       shortCloseReason: ord.shortCloseReason,
+      dueDate: ord.dueDate || '',
+      createdAt: ord.createdAt || '',
+      contractorAllocations,
       grnCodes: grnBatches.map(g => g.grnCode),
       reqNumbers: reqBatches.map(r => r.reqNumber),
       mReqNumbers: reqBatches.map(r => r.mreqNo),
@@ -2510,11 +2654,15 @@ export function applyPendingOrderSelection(
   po?: string;
   article: string;
   color?: string;
+  dueDate?: string;
   sizes?: SizeBreakdown;
   totalQty?: number;
+  contractorAllocations?: ContractorOrderAllocation[];
 } | null {
   const found = orders.find(o => o.orderId === selectedOrderId);
   if (!found) return null;
+  const allocs = found.contractorAllocations || [];
+  const defaultMaker = allocs.length === 1 ? allocs[0].maker : (allocs.length > 1 ? '' : found.maker);
   const result: {
     pendingOrderId: string;
     buyer?: string;
@@ -2522,18 +2670,22 @@ export function applyPendingOrderSelection(
     po?: string;
     article: string;
     color?: string;
+    dueDate?: string;
     sizes?: SizeBreakdown;
     totalQty?: number;
+    contractorAllocations?: ContractorOrderAllocation[];
   } = {
     pendingOrderId: found.orderId,
-    maker: found.maker,
+    maker: defaultMaker,
     article: found.article
   };
   if (found.buyer !== undefined) result.buyer = found.buyer;
   if (found.po !== undefined) result.po = found.po;
   if (found.color !== undefined) result.color = found.color;
+  if (found.dueDate !== undefined) result.dueDate = found.dueDate;
   if (found.sizes !== undefined) result.sizes = found.sizes;
   if (found.totalQty !== undefined) result.totalQty = found.totalQty;
+  if (found.contractorAllocations !== undefined) result.contractorAllocations = found.contractorAllocations;
   return result;
 }
 
