@@ -29,7 +29,7 @@ import crypto from 'node:crypto';
 export interface GraphNode {
   id: string;
   label: string;
-  kind: 'file' | 'function' | 'class' | 'interface' | 'route' | 'table' | 'screen' | 'concept';
+  kind: 'file' | 'function' | 'class' | 'interface' | 'route' | 'table' | 'screen' | 'dom' | 'concept';
   file_type: 'code' | 'document' | 'paper' | 'image';
   source_file: string;
   source_location: string | null;
@@ -42,7 +42,7 @@ export interface GraphNode {
 export interface GraphEdge {
   source: string;
   target: string;
-  relation: 'imports' | 'calls' | 'implements' | 'routes_to' | 'queries_table' | 'renders' | 'references' | 'shares_data_with';
+  relation: 'imports' | 'calls' | 'implements' | 'routes_to' | 'queries_table' | 'renders' | 'handled_by' | 'references' | 'shares_data_with';
   confidence: 'EXTRACTED' | 'INFERRED' | 'AMBIGUOUS';
   source_file: string;
   source_location: string | null;
@@ -292,13 +292,15 @@ export function buildProjectGraph(rootDir: string) {
       const fnName = fnm[1];
       const line = lineNumberAt(content, fnm.index);
       const bodyText = extractBraceBlock(content, fnm.index);
+      const endLine = line + bodyText.split('\n').length - 1;
+      const locRange = `L${line}-L${endLine}`;
       const fnId = addNode({
         id: `fn:${rel}:${fnName}`,
         label: `${fnName}()`,
         kind: fnName.startsWith('renderScreen') ? 'screen' : 'function',
         file_type: 'code',
         source_file: rel,
-        source_location: `L${line}`
+        source_location: locRange
       });
       symbolToNodeId.set(fnName, fnId);
       addEdge({
@@ -307,7 +309,43 @@ export function buildProjectGraph(rootDir: string) {
         relation: 'implements',
         confidence: 'EXTRACTED',
         source_file: rel,
-        source_location: `L${line}`,
+        source_location: locRange,
+        weight: 1.0
+      });
+      fileFunctionNodes.push({
+        nodeId: fnId,
+        name: fnName,
+        rel,
+        bodyText,
+        line
+      });
+    }
+
+    // 3c-2. Window global handlers (window.admin* = function...)
+    const winFnRegex = /window\.([A-Za-z0-9_]+)\s*=\s*(?:async\s+)?function\s*\(/g;
+    let wfm: RegExpExecArray | null;
+    while ((wfm = winFnRegex.exec(content)) !== null) {
+      const fnName = wfm[1];
+      const line = lineNumberAt(content, wfm.index);
+      const bodyText = extractBraceBlock(content, wfm.index);
+      const endLine = line + bodyText.split('\n').length - 1;
+      const locRange = `L${line}-L${endLine}`;
+      const fnId = addNode({
+        id: `fn:${rel}:window.${fnName}`,
+        label: `window.${fnName}()`,
+        kind: 'function',
+        file_type: 'code',
+        source_file: rel,
+        source_location: locRange
+      });
+      symbolToNodeId.set(fnName, fnId);
+      addEdge({
+        source: `file:${rel}`,
+        target: fnId,
+        relation: 'implements',
+        confidence: 'EXTRACTED',
+        source_file: rel,
+        source_location: locRange,
         weight: 1.0
       });
       fileFunctionNodes.push({
@@ -326,13 +364,14 @@ export function buildProjectGraph(rootDir: string) {
       const clsName = clm[1];
       const line = lineNumberAt(content, clm.index);
       const classBlock = extractBraceBlock(content, clm.index);
+      const clsEndLine = line + classBlock.split('\n').length - 1;
       const clsId = addNode({
         id: `class:${rel}:${clsName}`,
         label: `class ${clsName}`,
         kind: 'class',
         file_type: 'code',
         source_file: rel,
-        source_location: `L${line}`
+        source_location: `L${line}-L${clsEndLine}`
       });
       symbolToNodeId.set(clsName, clsId);
       addEdge({
@@ -341,7 +380,7 @@ export function buildProjectGraph(rootDir: string) {
         relation: 'implements',
         confidence: 'EXTRACTED',
         source_file: rel,
-        source_location: `L${line}`,
+        source_location: `L${line}-L${clsEndLine}`,
         weight: 1.0
       });
 
@@ -352,13 +391,15 @@ export function buildProjectGraph(rootDir: string) {
         const absIdx = clm.index + mm.index;
         const mLine = lineNumberAt(content, absIdx);
         const mBody = extractBraceBlock(content, absIdx);
+        const mEndLine = mLine + mBody.split('\n').length - 1;
+        const mLocRange = `L${mLine}-L${mEndLine}`;
         const mId = addNode({
           id: `method:${rel}:${clsName}.${mName}`,
           label: `${clsName}.${mName}()`,
           kind: 'function',
           file_type: 'code',
           source_file: rel,
-          source_location: `L${mLine}`
+          source_location: mLocRange
         });
         symbolToNodeId.set(`${clsName}.${mName}`, mId);
         symbolToNodeId.set(mName, mId);
@@ -368,7 +409,7 @@ export function buildProjectGraph(rootDir: string) {
           relation: 'implements',
           confidence: 'EXTRACTED',
           source_file: rel,
-          source_location: `L${mLine}`,
+          source_location: mLocRange,
           weight: 1.0
         });
         fileFunctionNodes.push({
@@ -377,6 +418,57 @@ export function buildProjectGraph(rootDir: string) {
           rel,
           bodyText: mBody,
           line: mLine
+        });
+      }
+    }
+
+    // 3d-2. DOM IDs & data-* attributes rendered or handled in src/
+    if (rel.startsWith('src/')) {
+      const domIdRenderRegex = /\bid="([a-zA-Z0-9_-]{3,64})"/g;
+      let dm: RegExpExecArray | null;
+      while ((dm = domIdRenderRegex.exec(content)) !== null) {
+        const domId = dm[1];
+        const dLine = lineNumberAt(content, dm.index);
+        const domNodeId = addNode({
+          id: `dom:#${domId}`,
+          label: `#${domId}`,
+          kind: 'dom',
+          file_type: 'code',
+          source_file: rel,
+          source_location: `L${dLine}`
+        });
+        addEdge({
+          source: `file:${rel}`,
+          target: domNodeId,
+          relation: 'renders',
+          confidence: 'EXTRACTED',
+          source_file: rel,
+          source_location: `L${dLine}`,
+          weight: 0.9
+        });
+      }
+
+      const getByIdRegex = /getElementById\(\s*['"]([a-zA-Z0-9_-]+)['"]\s*\)/g;
+      let gm: RegExpExecArray | null;
+      while ((gm = getByIdRegex.exec(content)) !== null) {
+        const domId = gm[1];
+        const gLine = lineNumberAt(content, gm.index);
+        const domNodeId = addNode({
+          id: `dom:#${domId}`,
+          label: `#${domId}`,
+          kind: 'dom',
+          file_type: 'code',
+          source_file: rel,
+          source_location: `L${gLine}`
+        });
+        addEdge({
+          source: domNodeId,
+          target: `file:${rel}`,
+          relation: 'handled_by',
+          confidence: 'EXTRACTED',
+          source_file: rel,
+          source_location: `L${gLine}`,
+          weight: 1.0
         });
       }
     }
@@ -782,30 +874,42 @@ function queryGraph(rootDir: string, question: string) {
     writeGraphifyArtifacts(rootDir);
   }
   const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
-  const terms = question
+  const rawTokens = question
     .toLowerCase()
-    .replace(/[^a-z0-9_/-]+/g, ' ')
+    .replace(/[^a-z0-9_/#.-]+/g, ' ')
     .split(/\s+/)
     .filter(t => t.length >= 2 && !['what', 'where', 'how', 'does', 'the', 'and', 'for', 'with', 'from', 'into'].includes(t));
+  const subTokens = rawTokens
+    .flatMap(t => t.split(/[-_./#]+/))
+    .filter(t => t.length >= 3);
+  const terms = Array.from(new Set([...rawTokens, ...subTokens]));
 
   const scoredNodes = (graph.nodes as GraphNode[])
     .map(n => {
       const hay = `${n.id} ${n.label} ${n.source_file} ${n.community_label}`.toLowerCase();
       let score = 0;
+      for (const rt of rawTokens) {
+        const cleanRt = rt.replace(/^#/, '');
+        if (n.label.toLowerCase() === rt || n.label.toLowerCase() === `#${cleanRt}` || n.label.toLowerCase() === `${cleanRt}()`) {
+          score += 15;
+        } else if (hay.includes(cleanRt)) {
+          score += 6;
+        }
+      }
       for (const t of terms) {
-        if (hay.includes(t)) score += 3;
+        if (hay.includes(t)) score += 2;
       }
       score += Math.min(2, (n.degree || 0) * 0.1);
       return { node: n, score };
     })
     .filter(x => x.score > 2)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 10);
+    .slice(0, 12);
 
   const seedIds = new Set(scoredNodes.map(s => s.node.id));
   const relatedEdges = (graph.edges as GraphEdge[])
     .filter(e => seedIds.has(e.source) || seedIds.has(e.target))
-    .slice(0, 20);
+    .slice(0, 24);
 
   console.log(`=== Graphify Scoped Subgraph Query: "${question}" ===`);
   console.log(`Matched Nodes (${scoredNodes.length}):`);

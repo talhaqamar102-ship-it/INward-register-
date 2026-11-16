@@ -25,3 +25,12 @@ Rules:
 - Use the ECC workflows/skills under `.agents/` (`tdd-workflow`, `e2e-testing`, `browser-qa`, `click-path-audit`, `verification-loop`, `delivery-gate`) whenever applicable instead of ad-hoc shortcuts.
 - Never skip automated browser verification or hand off UI/layout/interactive checks as "manual verification steps" for the user: run `npm run test:e2e` (isolated via `MES_DB_PATH` in `e2e/start-test-server.mjs`) and assert layout, viewport geometry, interactive states, and zero console/page/5xx errors in Playwright.
 - Before claiming any task done, run the full post-edit verification sequence (`npm run lint`, `npm run test:unit`, `npm test`, `npm run build`, `npm run test:e2e`, `npm run graphify`, or `npm run verify:all`) with zero failures or skipped assertions.
+
+## 1M Context Window & Low-Latency Execution Rules
+
+Rules:
+- **Precision `graphify` lookup first (`Lstart-Lend` + DOM `#id` index)**: Run `npx tsx scripts/graphify.ts query "<function or #dom-id>"` to get the exact `L<start>-L<end>` function range, DOM render line (`renders`), and event handler line (`handled_by`). Read **only** the returned line range in `src/main.ts`, `src/components/superUserView.ts`, `src/utils/requisitionLogic.ts`, or `src/style.css`—never browse those large files sequentially.
+- **Leverage the full 1M token context window (read once, reuse from memory)**: Any file or section already read in the active conversation window stays in memory—never re-read a file that is already in context. When reading for the first time, load all target ranges in **1 single parallel `read_file` batch**.
+- **Confirmation / planning questions ("is that understandable?", "what's your plan?")**: Answer immediately in 1 turn with **0 file reads** (or at most 1 `graphify` lookup). Do not read files until the user confirms to execute.
+- **Zero re-reading between Planner and Executor**: Include exact `Target` snippets in `exit_plan_mode` so the execution model calls `edit_file` immediately on its first step using the shared 1M conversation context.
+- **Fast iteration & targeted E2E**: During incremental edits, run `npm run lint` and a targeted Playwright filter (`npx playwright test -g "<test name>"`, ~4s) instead of all 9 E2E tests. Only run `docker compose up -d --build` when updating the live `:3000` container or when requested by the user.
