@@ -1,6 +1,6 @@
 # C6: Legacy & Standalone Portals (public/, vanilla/, Program.cs)
 
-Cohesion Score: `0.7` • Total Nodes: 89
+Cohesion Score: `0.69` • Total Nodes: 89
 
 ## Nodes in Community
 
@@ -14,13 +14,13 @@ Cohesion Score: `0.7` • Total Nodes: 89
 - **exportTableToCSV()** (`fn:vanilla/app.js:exportTableToCSV`) — `vanilla/app.js:L1122-L1146` (degree: 12)
 - **attachEventHandlers()** (`fn:vanilla/app.js:attachEventHandlers`) — `vanilla/app.js:L884-L930` (degree: 11)
 - **loadStoreData()** (`fn:public/app-store.js:loadStoreData`) — `public/app-store.js:L43-L52` (degree: 10)
+- **public/index.html** (`file:public/index.html`) — `public/index.html:L1` (degree: 9)
+- **vanilla/index.html** (`file:vanilla/index.html`) — `vanilla/index.html:L1` (degree: 9)
 - **submitStoreReceiving()** (`fn:public/app-store.js:submitStoreReceiving`) — `public/app-store.js:L261-L340` (degree: 9)
 - **attachGRNHandlers()** (`fn:vanilla/app.js:attachGRNHandlers`) — `vanilla/app.js:L932-L997` (degree: 9)
 - **loadRequisitionsDropdown()** (`fn:public/app-packing.js:loadRequisitionsDropdown`) — `public/app-packing.js:L33-L61` (degree: 8)
 - **closeModal()** (`fn:vanilla/app.js:closeModal`) — `vanilla/app.js:L139-L142` (degree: 8)
-- **public/index.html** (`file:public/index.html`) — `public/index.html:L1` (degree: 7)
 - **public/style.css** (`file:public/style.css`) — `public/style.css:L1` (degree: 7)
-- **vanilla/index.html** (`file:vanilla/index.html`) — `vanilla/index.html:L1` (degree: 7)
 - **vanilla/style.css** (`file:vanilla/style.css`) — `vanilla/style.css:L1` (degree: 7)
 - **attachRepairHandlers()** (`fn:vanilla/app.js:attachRepairHandlers`) — `vanilla/app.js:L1032-L1054` (degree: 7)
 - **attachQCHandlers()** (`fn:vanilla/app.js:attachQCHandlers`) — `vanilla/app.js:L1056-L1068` (degree: 7)

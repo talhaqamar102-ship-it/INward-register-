@@ -1,0 +1,184 @@
+<template>
+  <style>
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 400;
+      src: url("assets/fonts/fira-sans-400.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 600;
+      src: url("assets/fonts/fira-sans-600.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 800;
+      src: url("assets/fonts/fira-sans-800.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Code";
+      font-weight: 700;
+      src: url("assets/fonts/fira-code-700.woff2") format("woff2");
+    }
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: linear-gradient(155deg, #0b1120 0%, #111b36 100%);
+      font-family: "Fira Sans", sans-serif;
+      color: #f8fafc;
+    }
+    .stage {
+      width: 100%;
+      height: 100%;
+      padding: 64px 84px;
+      display: grid;
+      grid-template-columns: 500px 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+    .rail {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .scene-chip {
+      align-self: flex-start;
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(2, 132, 199, 0.18);
+      border: 1.5px solid #0284c7;
+      border-radius: 999px;
+      padding: 8px 20px;
+    }
+    .scene-title {
+      font-size: 54px;
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.025em;
+      color: #ffffff;
+    }
+    .scene-lead {
+      font-size: 28px;
+      line-height: 1.38;
+      color: #cbd5e1;
+    }
+    .feature-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .feature-card {
+      background: #0f172a;
+      border: 1.5px solid #334155;
+      border-left: 6px solid #2563eb;
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .feature-card.is-emerald { border-left-color: #16a34a; }
+    .feature-card.is-amber { border-left-color: #d97706; }
+    .feature-head {
+      font-size: 28px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .feature-body {
+      font-size: 28px;
+      color: #94a3b8;
+    }
+    .plate-frame {
+      height: 750px;
+      background: #f8fafc;
+      border: 3px solid #3b82f6;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+    }
+    .plate-chrome {
+      background: #0f172a;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1.5px solid #334155;
+      flex-shrink: 0;
+    }
+    .plate-url {
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #93c5fd;
+    }
+    .plate-status {
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #4ade80;
+    }
+    .plate-img {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      object-fit: contain;
+      object-position: center center;
+      background: #ffffff;
+      display: block;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-02-buyers" data-width="1920" data-height="1080">
+    <div class="stage">
+      <div id="s2-rail-clip" class="clip" data-start="0" data-duration="5">
+        <div id="s2-rail" class="rail">
+          <span class="scene-chip">MODULE 02 // BUYER WORKBENCH</span>
+          <h2 class="scene-title">Commercial Buyer &amp; AQL Registry</h2>
+          <p class="scene-lead">Flagship split workbench uniting live Bento KPIs, quick edits, and QC gates.</p>
+          <div class="feature-stack">
+            <div id="s2-f1" class="feature-card">
+              <span class="feature-head">4-Card Bento Telemetry</span>
+              <span class="feature-body">Markets, linked BOMs &amp; QC share</span>
+            </div>
+            <div id="s2-f2" class="feature-card is-emerald">
+              <span class="feature-head">Onboarding &amp; Edit Dock</span>
+              <span class="feature-body">Auto-ID buyer upsert to SQLite</span>
+            </div>
+            <div id="s2-f3" class="feature-card is-amber">
+              <span class="feature-head">RANDOM vs. THOROUGH</span>
+              <span class="feature-body">Flip QC sampling live per buyer</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="s2-plate-clip" class="clip" data-start="0" data-duration="5">
+        <div id="s2-plate" class="plate-frame" data-layout-allow-overflow="true">
+          <div class="plate-chrome">
+            <span class="plate-url">Super User &rarr; Buyer Master</span>
+            <span class="plate-status">SQLITE LIVE</span>
+          </div>
+          <img id="s2-img" class="plate-img" src="assets/screen-buyer-workbench.png" alt="Buyer Master Split Workbench UI" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#s2-rail", { x: -40, opacity: 0.1 }, { x: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, 0);
+    tl.fromTo("#s2-plate", { x: 56, scale: 0.96, opacity: 0.1 }, { x: 0, scale: 1, opacity: 1, duration: 0.55, ease: "expo.out" }, 0.08);
+    tl.fromTo("#s2-f1", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 0.45);
+    tl.fromTo("#s2-f2", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 1.1);
+    tl.fromTo("#s2-f3", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 1.75);
+    tl.to("#s2-plate", { y: -10, duration: 3.8, ease: "none" }, 0.7);
+    tl.to("#s2-plate", { opacity: 0.15, scale: 0.97, duration: 0.3, ease: "power3.in" }, 4.65);
+    tl.to("#s2-rail", { opacity: 0.15, x: -24, duration: 0.3, ease: "power3.in" }, 4.65);
+    window.__timelines["scene-02-buyers"] = tl;
+  </script>
+</template>

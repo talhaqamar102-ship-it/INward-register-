@@ -1,0 +1,231 @@
+<template>
+  <style>
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 400;
+      src: url("assets/fonts/fira-sans-400.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 600;
+      src: url("assets/fonts/fira-sans-600.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 800;
+      src: url("assets/fonts/fira-sans-800.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Code";
+      font-weight: 500;
+      src: url("assets/fonts/fira-code-500.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Code";
+      font-weight: 700;
+      src: url("assets/fonts/fira-code-700.woff2") format("woff2");
+    }
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background-color: #0b1120;
+      background-image:
+        radial-gradient(circle at 50% 25%, rgba(30, 58, 138, 0.72) 0%, rgba(11, 17, 32, 0.96) 72%),
+        linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+      background-size: 100% 100%, 64px 64px, 64px 64px;
+      font-family: "Fira Sans", sans-serif;
+      color: #f8fafc;
+    }
+    .safe-stage {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      padding: 80px 104px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .brand-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .brand-badge {
+      width: 60px;
+      height: 60px;
+      border-radius: 14px;
+      background: #1e40af;
+      border: 2px solid #60a5fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.35);
+    }
+    .brand-name {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #f8fafc;
+    }
+    .spec-pill {
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #93c5fd;
+      background: rgba(30, 58, 138, 0.55);
+      border: 1.5px solid #3b82f6;
+      border-radius: 999px;
+      padding: 10px 24px;
+    }
+    .hero-block {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      max-width: 1520px;
+    }
+    .eyebrow {
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #38bdf8;
+    }
+    .headline {
+      font-size: 84px;
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+    }
+    .headline-accent {
+      color: #60a5fa;
+    }
+    .subcopy {
+      font-size: 32px;
+      font-weight: 400;
+      line-height: 1.38;
+      color: #cbd5e1;
+      max-width: 1320px;
+    }
+    .pillar-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 28px;
+    }
+    .pillar-card {
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-top-width: 6px;
+      border-radius: 16px;
+      padding: 28px 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.45);
+    }
+    .pillar-card.is-cobalt { border-top-color: #3b82f6; }
+    .pillar-card.is-amber { border-top-color: #f59e0b; }
+    .pillar-card.is-emerald { border-top-color: #22c55e; }
+    .pillar-tag {
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #93c5fd;
+    }
+    .pillar-card.is-amber .pillar-tag { color: #fcd34d; }
+    .pillar-card.is-emerald .pillar-tag { color: #4ade80; }
+    .pillar-title {
+      font-size: 34px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .pillar-desc {
+      font-size: 28px;
+      line-height: 1.35;
+      color: #cbd5e1;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-01-intro" data-width="1920" data-height="1080">
+    <div class="safe-stage">
+      <div id="intro-header-clip" class="clip" data-start="0" data-duration="4.5">
+        <div id="intro-header" class="brand-bar">
+          <div class="brand-lockup">
+            <div class="brand-badge">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                <path d="M2 17l10 5 10-5"></path>
+                <path d="M2 12l10 5 10-5"></path>
+              </svg>
+            </div>
+            <span class="brand-name">Meridian Works MES</span>
+          </div>
+          <span class="spec-pill">SQLITE WAL &bull; ZERO-VARIANCE TRACEABILITY</span>
+        </div>
+      </div>
+
+      <div id="intro-hero-clip" class="clip" data-start="0" data-duration="4.5">
+        <div id="intro-hero" class="hero-block">
+          <span id="intro-eyebrow" class="eyebrow">INDUSTRIAL GLOVES PACKING EXECUTION SYSTEM</span>
+          <h1 id="intro-title" class="headline">
+            One Master Order. <span class="headline-accent">Zero Phantom Pairs.</span>
+          </h1>
+          <p id="intro-sub" class="subcopy">
+            Linking Commercial Buyers, Inward Dock Receipts, and 5-Stage WIP with SQLite integrity.
+          </p>
+        </div>
+      </div>
+
+      <div id="intro-pillars-clip" class="clip" data-start="0.3" data-duration="4.2">
+        <div class="pillar-row">
+          <div id="pillar-1" class="pillar-card is-cobalt">
+            <span class="pillar-tag">01 // COMMAND</span>
+            <span class="pillar-title">Super User Hub</span>
+            <span class="pillar-desc">Buyer QC rules, BOMs &amp; contractor splits</span>
+          </div>
+          <div id="pillar-2" class="pillar-card is-amber">
+            <span class="pillar-tag">02 // INWARD DOCK</span>
+            <span class="pillar-title">GRN Dock Pool</span>
+            <span class="pillar-desc">Size-matrix receipts &amp; FIFO allocation</span>
+          </div>
+          <div id="pillar-3" class="pillar-card is-emerald">
+            <span class="pillar-tag">03 // FLOOR WIP</span>
+            <span class="pillar-title">5-Stage &amp; Final QC</span>
+            <span class="pillar-desc">Gated Material Req &amp; 2-cycle rework</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#intro-header", { y: -20, opacity: 0.9 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, 0);
+    tl.fromTo("#intro-eyebrow", { x: -36, opacity: 0.85 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, 0);
+    tl.fromTo("#intro-title", { scale: 0.97, opacity: 0.95 }, { scale: 1, opacity: 1, duration: 0.5, ease: "expo.out" }, 0);
+    tl.fromTo("#intro-sub", { y: 18, opacity: 0.85 }, { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, 0);
+
+    tl.fromTo("#pillar-1", { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, 0.35);
+    tl.fromTo("#pillar-2", { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, 0.65);
+    tl.fromTo("#pillar-3", { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, 0.95);
+
+    tl.to("#pillar-1", { y: -8, duration: 1.5, ease: "sine.inOut" }, 1.8);
+    tl.to("#pillar-2", { y: -8, duration: 1.5, ease: "sine.inOut" }, 2.0);
+    tl.to("#pillar-3", { y: -8, duration: 1.5, ease: "sine.inOut" }, 2.2);
+
+    tl.to("#intro-hero", { y: -24, opacity: 0.15, duration: 0.3, ease: "power3.in" }, 4.18);
+    tl.to(["#pillar-1", "#pillar-2", "#pillar-3"], { y: -18, opacity: 0.15, duration: 0.28, ease: "power3.in" }, 4.18);
+
+    window.__timelines["scene-01-intro"] = tl;
+  </script>
+</template>

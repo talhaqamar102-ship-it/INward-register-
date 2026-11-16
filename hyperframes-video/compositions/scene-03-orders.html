@@ -1,0 +1,179 @@
+<template>
+  <style>
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 400;
+      src: url("assets/fonts/fira-sans-400.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 600;
+      src: url("assets/fonts/fira-sans-600.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 800;
+      src: url("assets/fonts/fira-sans-800.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Code";
+      font-weight: 700;
+      src: url("assets/fonts/fira-code-700.woff2") format("woff2");
+    }
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: linear-gradient(145deg, #0b1120 0%, #172554 100%);
+      font-family: "Fira Sans", sans-serif;
+      color: #f8fafc;
+    }
+    .stage {
+      width: 100%;
+      height: 100%;
+      padding: 58px 84px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 22px;
+    }
+    .top-band {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 32px;
+    }
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .chip {
+      align-self: flex-start;
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #93c5fd;
+      background: rgba(37, 99, 235, 0.25);
+      border: 1.5px solid #3b82f6;
+      border-radius: 999px;
+      padding: 6px 18px;
+    }
+    .heading {
+      font-size: 52px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+    .size-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .size-badge {
+      background: #0f172a;
+      border: 1.5px solid #475569;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+    .size-badge.is-check {
+      background: #052e16;
+      border-color: #22c55e;
+      color: #86efac;
+    }
+    .plate-wrap {
+      height: 610px;
+      position: relative;
+      border-radius: 18px;
+      border: 3px solid #3b82f6;
+      background: #ffffff;
+      overflow: hidden;
+      box-shadow: 0 26px 65px rgba(0, 0, 0, 0.55);
+    }
+    .plate-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+    }
+    .callout-bar {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+    .callout-item {
+      background: #0f172a;
+      border: 1.5px solid #334155;
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 28px;
+      font-weight: 600;
+      color: #f8fafc;
+    }
+    .callout-val {
+      font-family: "Fira Code", monospace;
+      font-weight: 700;
+      color: #4ade80;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-03-orders" data-width="1920" data-height="1080">
+    <div class="stage">
+      <div id="s3-top-clip" class="clip" data-start="0" data-duration="5">
+        <div id="s3-top" class="top-band">
+          <div class="title-group">
+            <span class="chip">SECTION 01 // MASTER ORDER HUB</span>
+            <h2 class="heading">Size Matrix &amp; Multi-Contractor Split</h2>
+          </div>
+          <div class="size-strip">
+            <span id="s3-sz1" class="size-badge">7/S &ndash; 11/XXL</span>
+            <span id="s3-sz2" class="size-badge is-check">Split Match 100% &#10003;</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="s3-plate-clip" class="clip" data-start="0" data-duration="5">
+        <div id="s3-plate" class="plate-wrap" data-layout-allow-overflow="true">
+          <img id="s3-img" class="plate-img" src="assets/screen-order-split.png" alt="Master Order Contractor Split Form" />
+        </div>
+      </div>
+
+      <div id="s3-foot-clip" class="clip" data-start="0.35" data-duration="4.65">
+        <div class="callout-bar">
+          <div id="s3-c1" class="callout-item">
+            <span>Size Balance</span>
+            <span class="callout-val">0 Unassigned</span>
+          </div>
+          <div id="s3-c2" class="callout-item">
+            <span>Delivery SLA</span>
+            <span class="callout-val">Live Countdown</span>
+          </div>
+          <div id="s3-c3" class="callout-item">
+            <span>Persistence</span>
+            <span class="callout-val">SQLite WAL</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#s3-top", { y: -20, opacity: 0.1 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, 0);
+    tl.fromTo("#s3-plate", { y: 28, scale: 0.96, opacity: 0.1 }, { y: 0, scale: 1, opacity: 1, duration: 0.55, ease: "expo.out" }, 0.08);
+    tl.fromTo("#s3-c1", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 0.55);
+    tl.fromTo("#s3-c2", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 1.15);
+    tl.fromTo("#s3-c3", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 1.75);
+    tl.fromTo("#s3-img", { scale: 1 }, { scale: 1.04, duration: 4.1, ease: "none" }, 0.4);
+    tl.to("#s3-plate", { opacity: 0.15, duration: 0.3, ease: "power3.in" }, 4.65);
+    window.__timelines["scene-03-orders"] = tl;
+  </script>
+</template>

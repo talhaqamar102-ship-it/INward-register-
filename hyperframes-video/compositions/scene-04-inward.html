@@ -1,0 +1,168 @@
+<template>
+  <style>
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 400;
+      src: url("assets/fonts/fira-sans-400.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 600;
+      src: url("assets/fonts/fira-sans-600.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 800;
+      src: url("assets/fonts/fira-sans-800.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Code";
+      font-weight: 700;
+      src: url("assets/fonts/fira-code-700.woff2") format("woff2");
+    }
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: linear-gradient(150deg, #0b1120 0%, #1e1b18 100%);
+      font-family: "Fira Sans", sans-serif;
+      color: #f8fafc;
+    }
+    .stage {
+      width: 100%;
+      height: 100%;
+      padding: 64px 84px;
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      gap: 40px;
+      align-items: center;
+    }
+    .plate-wrap {
+      height: 760px;
+      border-radius: 18px;
+      border: 3px solid #f59e0b;
+      background: #ffffff;
+      overflow: hidden;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+    }
+    .plate-chrome {
+      background: #0f172a;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1.5px solid #451a03;
+      flex-shrink: 0;
+    }
+    .plate-url {
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #fcd34d;
+    }
+    .plate-img {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+    }
+    .info-col {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .chip {
+      align-self: flex-start;
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #fcd34d;
+      background: rgba(217, 119, 6, 0.2);
+      border: 1.5px solid #f59e0b;
+      border-radius: 999px;
+      padding: 6px 18px;
+    }
+    .heading {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+    .lead {
+      font-size: 28px;
+      line-height: 1.38;
+      color: #cbd5e1;
+    }
+    .rule-card {
+      background: #0f172a;
+      border: 1.5px solid #334155;
+      border-left: 6px solid #f59e0b;
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .rule-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: #fde68a;
+    }
+    .rule-sub {
+      font-size: 28px;
+      color: #cbd5e1;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-04-inward" data-width="1920" data-height="1080">
+    <div class="stage">
+      <div id="s4-plate-clip" class="clip" data-start="0" data-duration="5">
+        <div id="s4-plate" class="plate-wrap" data-layout-allow-overflow="true">
+          <div class="plate-chrome">
+            <span class="plate-url">Module 01 &rarr; Inward Receiving</span>
+            <span class="plate-url">GRN DOCK</span>
+          </div>
+          <img id="s4-img" class="plate-img" src="assets/screen-inward-grn.png" alt="Inward Goods Receiving Register Screen" />
+        </div>
+      </div>
+
+      <div id="s4-info-clip" class="clip" data-start="0" data-duration="5">
+        <div id="s4-info" class="info-col">
+          <span class="chip">DOCK GATEWAY</span>
+          <h2 class="heading">Inward GRN &amp; Dock Pool</h2>
+          <p class="lead">Every incoming carton is validated against the Master Order before Floor WIP.</p>
+          <div id="s4-r1" class="rule-card">
+            <span class="rule-title">Order-Locked Article &amp; Shade</span>
+            <span class="rule-sub">Eliminates manual clerk entry drift</span>
+          </div>
+          <div id="s4-r2" class="rule-card">
+            <span class="rule-title">Mandatory Received From</span>
+            <span class="rule-sub">Full carrier custody per GRN slip</span>
+          </div>
+          <div id="s4-r3" class="rule-card">
+            <span class="rule-title">FIFO Multi-GRN Dock Pool</span>
+            <span class="rule-sub">Blocks over-issuance atomically</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#s4-plate", { x: -46, scale: 0.96, opacity: 0.1 }, { x: 0, scale: 1, opacity: 1, duration: 0.55, ease: "expo.out" }, 0);
+    tl.fromTo("#s4-info", { x: 36, opacity: 0.1 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, 0.1);
+    tl.fromTo("#s4-r1", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 0.55);
+    tl.fromTo("#s4-r2", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 1.25);
+    tl.fromTo("#s4-r3", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 1.95);
+    tl.fromTo("#s4-img", { scale: 1 }, { scale: 1.03, duration: 4.1, ease: "none" }, 0.4);
+    tl.to("#s4-plate", { opacity: 0.15, duration: 0.3, ease: "power3.in" }, 4.65);
+    tl.to("#s4-info", { opacity: 0.15, duration: 0.3, ease: "power3.in" }, 4.65);
+    window.__timelines["scene-04-inward"] = tl;
+  </script>
+</template>

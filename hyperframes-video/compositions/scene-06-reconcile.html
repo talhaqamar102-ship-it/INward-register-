@@ -1,0 +1,129 @@
+<template>
+  <style>
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 400;
+      src: url("assets/fonts/fira-sans-400.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 600;
+      src: url("assets/fonts/fira-sans-600.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Sans";
+      font-weight: 800;
+      src: url("assets/fonts/fira-sans-800.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Fira Code";
+      font-weight: 700;
+      src: url("assets/fonts/fira-code-700.woff2") format("woff2");
+    }
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 80%, #052e16 0%, #0b1120 72%);
+      font-family: "Fira Sans", sans-serif;
+      color: #f8fafc;
+    }
+    .stage {
+      width: 100%;
+      height: 100%;
+      padding: 58px 84px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .heading {
+      font-size: 54px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+    .seal {
+      font-family: "Fira Code", monospace;
+      font-size: 36px;
+      font-weight: 700;
+      color: #ffffff;
+      background: #15803d;
+      border: 2px solid #4ade80;
+      border-radius: 14px;
+      padding: 12px 26px;
+      box-shadow: 0 12px 34px rgba(22, 163, 74, 0.45);
+    }
+    .equation-card {
+      background: #0f172a;
+      border: 2px solid #22c55e;
+      border-radius: 14px;
+      padding: 16px 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: "Fira Code", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+    .eq-accent { color: #4ade80; }
+    .plate-wrap {
+      height: 670px;
+      border-radius: 18px;
+      border: 3px solid #22c55e;
+      background: #ffffff;
+      overflow: hidden;
+      box-shadow: 0 26px 65px rgba(0, 0, 0, 0.55);
+    }
+    .plate-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: bottom center;
+      display: block;
+    }
+  </style>
+
+  <div id="root" data-composition-id="scene-06-reconcile" data-width="1920" data-height="1080">
+    <div class="stage">
+      <div id="s6-top-clip" class="clip" data-start="0" data-duration="3.5">
+        <div id="s6-top" class="top-bar">
+          <h2 class="heading">End-to-End Pair Conservation</h2>
+          <div id="s6-seal" class="seal">RECONCILED &#10003; 100%</div>
+        </div>
+      </div>
+
+      <div id="s6-eq-clip" class="clip" data-start="0.2" data-duration="3.3">
+        <div id="s6-eq" class="equation-card">
+          <span>600 Planned</span>
+          <span class="eq-accent">=</span>
+          <span>0 Unreceived + 0 Dock + 190 WIP + 400 Packed + 10 Scrap</span>
+        </div>
+      </div>
+
+      <div id="s6-plate-clip" class="clip" data-start="0" data-duration="3.5">
+        <div id="s6-plate" class="plate-wrap" data-layout-allow-overflow="true">
+          <img id="s6-img" class="plate-img" src="assets/screen-live-tracking.png" alt="Live Tracking Full Order Traceability" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#s6-top", { y: -20, opacity: 0.1 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, 0);
+    tl.fromTo("#s6-eq", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, 0.25);
+    tl.fromTo("#s6-plate", { y: 30, opacity: 0.1 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, 0.1);
+    tl.fromTo("#s6-seal", { scale: 0.94 }, { scale: 1.04, duration: 0.5, ease: "back.out(1.6)" }, 0.75);
+    tl.to("#s6-seal", { scale: 1, duration: 0.4, ease: "power2.out" }, 1.35);
+    tl.fromTo("#s6-img", { scale: 1 }, { scale: 1.03, duration: 3.1, ease: "none" }, 0.3);
+    window.__timelines["scene-06-reconcile"] = tl;
+  </script>
+</template>

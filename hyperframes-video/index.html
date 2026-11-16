@@ -1,0 +1,179 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"productName","type":"string","label":"Product Name","default":"Meridian Works MES"},
+    {"id":"tagline","type":"string","label":"Tagline","default":"Deterministic Gloves Packing & Traceability Execution"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Fira Sans";
+        font-weight: 400;
+        font-style: normal;
+        src: url("assets/fonts/fira-sans-400.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Fira Sans";
+        font-weight: 600;
+        font-style: normal;
+        src: url("assets/fonts/fira-sans-600.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Fira Sans";
+        font-weight: 800;
+        font-style: normal;
+        src: url("assets/fonts/fira-sans-800.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Fira Code";
+        font-weight: 500;
+        font-style: normal;
+        src: url("assets/fonts/fira-code-500.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Fira Code";
+        font-weight: 700;
+        font-style: normal;
+        src: url("assets/fonts/fira-code-700.woff2") format("woff2");
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #0b1120;
+        font-family: "Fira Sans", sans-serif;
+        color: #f8fafc;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #0b1120;
+      }
+      .scene-slot {
+        position: absolute;
+        inset: 0;
+        width: 1920px;
+        height: 1080px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="28"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div
+        id="scene-01-intro"
+        class="clip scene-slot"
+        data-composition-id="scene-01-intro"
+        data-composition-src="compositions/scene-01-intro.html"
+        data-start="0"
+        data-duration="4.5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <div
+        id="scene-02-buyers"
+        class="clip scene-slot"
+        data-composition-id="scene-02-buyers"
+        data-composition-src="compositions/scene-02-buyers.html"
+        data-start="4.5"
+        data-duration="5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <div
+        id="scene-03-orders"
+        class="clip scene-slot"
+        data-composition-id="scene-03-orders"
+        data-composition-src="compositions/scene-03-orders.html"
+        data-start="9.5"
+        data-duration="5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <div
+        id="scene-04-inward"
+        class="clip scene-slot"
+        data-composition-id="scene-04-inward"
+        data-composition-src="compositions/scene-04-inward.html"
+        data-start="14.5"
+        data-duration="5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <div
+        id="scene-05-packing"
+        class="clip scene-slot"
+        data-composition-id="scene-05-packing"
+        data-composition-src="compositions/scene-05-packing.html"
+        data-start="19.5"
+        data-duration="5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <div
+        id="scene-06-reconcile"
+        class="clip scene-slot"
+        data-composition-id="scene-06-reconcile"
+        data-composition-src="compositions/scene-06-reconcile.html"
+        data-start="24.5"
+        data-duration="3.5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <audio
+        id="bgm-track"
+        class="clip"
+        src="assets/bgm-industrial.wav"
+        data-start="0"
+        data-duration="28"
+        data-volume="0.38"
+        data-fade-in="0.6"
+        data-fade-out="1.4"
+        data-track-index="2"
+      ></audio>
+    </div>
+
+    <script>
+      const mainTl = gsap.timeline({ paused: true });
+      window.__timelines["main"] = mainTl;
+      mainTl.seek(0);
+    </script>
+  </body>
+</html>
