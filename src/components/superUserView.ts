@@ -93,6 +93,7 @@ export interface SuperUserRenderContext {
     sizes: SizeBreakdown;
     dueDate: string;
   }>;
+  openRegistryIds?: Record<string, boolean>;
 }
 
 function renderReconciliationBadge(rec: ReconciliationResult): string {
@@ -1782,13 +1783,39 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       </div>
     </section>
 
-    <!-- 7.2: Collapsible Master Registries (Buyers, Articles, Contractors/Makers, Audit Trail) -->
-    <div class="two-column-grid" style="margin-bottom: 14px;">
-      <!-- Collapsible Registry 1: Customer & Buyer Master -->
-      <details class="su-collapsible-registry" open>
+    <!-- 7.2: Collapsible Master Registries (Buyers, Articles, Contractors/Makers, Audit Trail, SQLite WAL, Phased Rollout) -->
+    ${(() => {
+      const isRegOpen = (key: string, defaultOpen = false): boolean =>
+        ctx.openRegistryIds && key in ctx.openRegistryIds
+          ? Boolean(ctx.openRegistryIds[key])
+          : defaultOpen;
+      return `
+    <div class="su-registries-toolbar">
+      <div class="su-registries-toolbar-title">
+        <span>Master Registries &amp; System Administration (Sections 2&ndash;6)</span>
+        <span class="admin-meta-caption">Click any card header to expand full-width or collapse</span>
+      </div>
+      <div class="su-registries-toolbar-actions">
+        <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 11.5px;" data-su-action="toggle-all-registries" data-expanded="true">Expand All Registries</button>
+        <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 11.5px;" data-su-action="toggle-all-registries" data-expanded="false">Collapse All Registries</button>
+      </div>
+    </div>
+
+    <div class="su-registries-grid">
+      <!-- Collapsible Registry 2: Customer & Buyer Master -->
+      <details class="su-collapsible-registry" data-registry-id="buyers" ${isRegOpen('buyers', true) ? 'open' : ''}>
         <summary>
-          <span>2. Customer &amp; Buyer Master Registry (${ov.customers.length} Buyers)</span>
-          <span class="admin-meta-caption">AQL Inspection Rules &bull; Click to Toggle</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">02</span>
+            <span class="su-registry-title-text">2. Customer &amp; Buyer Master Registry (${ov.customers.length} Buyers)</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">AQL Inspection Rules</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div class="su-customer-form-grid">
@@ -1833,11 +1860,20 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </details>
 
-      <!-- Collapsible Registry 2: Glove Product / Article Master -->
-      <details class="su-collapsible-registry" open>
+      <!-- Collapsible Registry 3: Glove Product / Article Master -->
+      <details class="su-collapsible-registry" data-registry-id="articles" ${isRegOpen('articles', true) ? 'open' : ''}>
         <summary>
-          <span>3. Glove Article &amp; Packaging BOM Master (${ov.products.length} Articles)</span>
-          <span class="admin-meta-caption">Per-Pair Accessory Ratios &bull; Click to Toggle</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">03</span>
+            <span class="su-registry-title-text">3. Glove Article &amp; Packaging BOM Master (${ov.products.length} Articles)</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">Per-Pair Accessory Ratios</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div class="su-article-form-grid">
@@ -1887,14 +1923,21 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
         </div>
       </details>
-    </div>
 
-    <div class="two-column-grid" style="margin-bottom: 14px;">
-      <!-- Collapsible Registry 3: Contractors / Makers & PO Dropdowns -->
-      <details class="su-collapsible-registry">
+      <!-- Collapsible Registry 4: Contractors / Makers & PO Dropdowns -->
+      <details class="su-collapsible-registry" data-registry-id="makers_pos" ${isRegOpen('makers_pos', false) ? 'open' : ''}>
         <summary>
-          <span>4. Contractors / Makers (${ctx.dropdownOptions.makers.length}) &amp; PO Registry (${ctx.dropdownOptions.poList.length})</span>
-          <span class="admin-meta-caption">Synchronized across Dock &amp; Alteration Bay</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">04</span>
+            <span class="su-registry-title-text">4. Contractors / Makers (${ctx.dropdownOptions.makers.length}) &amp; PO Registry (${ctx.dropdownOptions.poList.length})</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">Synchronized across Dock &amp; Alteration Bay</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div style="margin-bottom: 12px;">
@@ -1938,14 +1981,20 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </details>
 
-    </div>
-
-    <!-- Collapsible Registry 4: Immutable Audit Trail & SQLite Snapshot Administration (10.3 & 10.5) -->
-    <div class="two-column-grid">
-      <details class="su-collapsible-registry">
+      <!-- Collapsible Registry 5: Immutable Audit Trail -->
+      <details class="su-collapsible-registry" data-registry-id="audit_trail" ${isRegOpen('audit_trail', false) ? 'open' : ''}>
         <summary>
-          <span>5. Immutable Audit Trail Ledger (${auditTrail.length} Recorded Events)</span>
-          <span class="admin-meta-caption">Actor &bull; Timestamp &bull; Before &rarr; After</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">05</span>
+            <span class="su-registry-title-text">5. Immutable Audit Trail Ledger (${auditTrail.length} Recorded Events)</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">Actor &bull; Timestamp &bull; Before &rarr; After</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
@@ -1980,10 +2029,20 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </details>
 
-      <details class="su-collapsible-registry">
+      <!-- Collapsible Registry 6: SQLite WAL Database & Snapshot Administration -->
+      <details class="su-collapsible-registry" data-registry-id="sqlite_wal" ${isRegOpen('sqlite_wal', false) ? 'open' : ''}>
         <summary>
-          <span>6. SQLite WAL Database &amp; Snapshot Administration (${ov.dbHealth.totalTables} Tables &bull; ${totalRows} Rows)</span>
-          <span class="admin-meta-caption">Engine: ${escapeHtml(String(ov.dbHealth.journalMode).toUpperCase())}</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">06</span>
+            <span class="su-registry-title-text">6. SQLite WAL Database &amp; Snapshot Administration (${ov.dbHealth.totalTables} Tables &bull; ${totalRows} Rows)</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">Engine: ${escapeHtml(String(ov.dbHealth.journalMode).toUpperCase())}</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
@@ -2028,14 +2087,22 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
         </div>
       </details>
-    </div>
 
-    <!-- Phased Rollout Record & Active MES Policy Configuration -->
-    <details class="su-collapsible-registry" style="margin-top: 12px;">
-      <summary>
-        <span>Phased Rollout Record (Phase A &bull; Phase B &bull; Phase C) &amp; Active MES Policy Defaults</span>
-        <span class="admin-meta-caption">R1 / 3.8 / 4.6 / 4.7 Policies</span>
-      </summary>
+      <!-- Phased Rollout Record & Active MES Policy Configuration -->
+      <details class="su-collapsible-registry" data-registry-id="phased_rollout" ${isRegOpen('phased_rollout', false) ? 'open' : ''}>
+        <summary>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">POLICY</span>
+            <span class="su-registry-title-text">Phased Rollout Record (Phase A &bull; Phase B &bull; Phase C) &amp; Active MES Policy Defaults</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">R1 / 3.8 / 4.6 / 4.7 Policies</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
+        </summary>
       <div class="su-collapsible-body">
         <div class="table-responsive" style="margin-bottom: 10px;">
           <table class="data-table">
@@ -2064,6 +2131,9 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </div>
     </details>
+    </div>
+      `;
+    })()}
   `;
 }
 

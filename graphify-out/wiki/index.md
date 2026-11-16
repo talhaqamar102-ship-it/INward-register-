@@ -9,4 +9,4 @@ Navigate community articles below instead of grepping raw source files:
 - **[C4: SQLite WAL Database & 17-Table Schema (src/db.js)](community_4.md)** (31 nodes, cohesion `0.58`)
 - **[C5: Automated Verification & DBRE Test Suites (test/)](community_5.md)** (8 nodes, cohesion `0.52`)
 - **[C6: Legacy & Standalone Portals (public/, vanilla/, Program.cs)](community_6.md)** (89 nodes, cohesion `0.7`)
-- **[C7: AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)](community_7.md)** (524 nodes, cohesion `0.74`)
+- **[C7: AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)](community_7.md)** (530 nodes, cohesion `0.74`)

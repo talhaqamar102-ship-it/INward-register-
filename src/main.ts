@@ -287,6 +287,14 @@ const state = {
   adminTrackingPageSize: 10,
   adminHighlightedRefCode: '',
   adminExpandedOrders: {} as Record<string, boolean>,
+  adminOpenRegistries: {
+    buyers: true,
+    articles: true,
+    makers_pos: false,
+    audit_trail: false,
+    sqlite_wal: false,
+    phased_rollout: false
+  } as Record<string, boolean>,
   adminOrderDraft: {
     buyer: '',
     maker: '',
@@ -1666,7 +1674,8 @@ function renderScreenAdmin(): string {
     lastBackupPath: state.lastBackupPath,
     rollupSummary,
     orderDraft: state.adminOrderDraft,
-    orderSplitRows: state.adminOrderSplitRows
+    orderSplitRows: state.adminOrderSplitRows,
+    openRegistryIds: state.adminOpenRegistries
   });
 }
 
@@ -4253,6 +4262,14 @@ function attachAdminHandlers(): void {
         case 'expand-all':
           window.adminSetAllOrdersExpanded(el.dataset.expanded === 'true');
           break;
+        case 'toggle-all-registries': {
+          const isExp = el.dataset.expanded === 'true';
+          for (const key of ['buyers', 'articles', 'makers_pos', 'audit_trail', 'sqlite_wal', 'phased_rollout']) {
+            state.adminOpenRegistries[key] = isExp;
+          }
+          renderApp();
+          break;
+        }
         case 'tracking-page': {
           const page = Number(el.dataset.page);
           if (Number.isFinite(page)) window.adminSetTrackingPage(page);
@@ -4312,6 +4329,15 @@ function attachAdminHandlers(): void {
         case 'add-system-user':
           void window.adminAddSystemUser(el);
           break;
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLDetailsElement>('details.su-collapsible-registry[data-registry-id]').forEach(detailsEl => {
+    detailsEl.addEventListener('toggle', () => {
+      const regId = detailsEl.dataset.registryId;
+      if (regId) {
+        state.adminOpenRegistries[regId] = detailsEl.open;
       }
     });
   });

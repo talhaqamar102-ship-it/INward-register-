@@ -948,4 +948,57 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
 
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('Sections 2-6 Master Registries: expand full-width when open, persist open state after saving, and toggle cleanly', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const gridBox = await page.locator('.su-registries-grid').boundingBox();
+    expect(gridBox).not.toBeNull();
+
+    // Open Section 2 spans full grid width while closed Section 4 stays compact (~half grid width)
+    const buyersCard = page.locator('details.su-collapsible-registry[data-registry-id="buyers"]');
+    const makersCard = page.locator('details.su-collapsible-registry[data-registry-id="makers_pos"]');
+    await expect(buyersCard).toHaveAttribute('open', '');
+    await expect(makersCard).not.toHaveAttribute('open', '');
+
+    const buyersOpenBox = await buyersCard.boundingBox();
+    const makersClosedBox = await makersCard.boundingBox();
+    expect(buyersOpenBox!.width).toBeGreaterThan(gridBox!.width * 0.9);
+    expect(makersClosedBox!.width).toBeLessThan(gridBox!.width * 0.55);
+
+    // Clicking Section 4 summary opens it full width and switches toggle pill to Collapse
+    await makersCard.locator('summary').click();
+    await expect(makersCard).toHaveAttribute('open', '');
+    const makersOpenBox = await makersCard.boundingBox();
+    expect(makersOpenBox!.width).toBeGreaterThan(gridBox!.width * 0.9);
+
+    // Adding a Maker calls renderApp() — Section 4 must stay open
+    await page.fill('#admin-add-maker-input', 'Hall Z Persistent');
+    await page.click('#btn-admin-add-maker');
+    await expect(makersCard).toHaveAttribute('open', '');
+    await expect(makersCard).toContainText('Hall Z Persistent');
+
+    // Collapse All / Expand All toolbar controls operate all 6 registry drawers
+    await page.click('button[data-su-action="toggle-all-registries"][data-expanded="false"]');
+    await expect(page.locator('details.su-collapsible-registry[open]')).toHaveCount(0);
+
+    await page.click('button[data-su-action="toggle-all-registries"][data-expanded="true"]');
+    await expect(page.locator('details.su-collapsible-registry[open]')).toHaveCount(6);
+
+    expect(runtimeErrors).toEqual([]);
+  });
 });
