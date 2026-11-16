@@ -62,7 +62,7 @@ upstream index (all 99 skills) is at
 | `/design-interrogation` | no flags — run directly | Interviews the user about a plan to surface unresolved decisions and edge cases — a thinking tool, not artifacts. |
 | `/api-design` | no flags — run directly | Contract-first API design for `/api/*` endpoints, incl. backward-compatibility checklist and error contracts. |
 | `/domain-driven-design` | agent-loaded | DDD knowledge module; use for packing-hall stage modeling. |
-| `/ui-ux-pro-max` | `<query> [--design-system \| --domain <color\|ux\|chart\|typography\|style>]` | Searchable UI/UX design intelligence engine (`python3 .claude/skills/ui-ux-pro-max/scripts/search.py` / `npm run uupm`). Installed at `.claude/skills/ui-ux-pro-max/SKILL.md` alongside `.claude/skills/{design,design-system,ui-styling,brand,banner-design,slides}`. |
+| `unslop` | see `.agents/skills/unslop/SKILL.md` | UI craft methodology (`heydamir/unslop`, `CC BY 4.0`): audit (`signs.md`), 5-line product direction, Warm/Graphite neutral tokens, and 9 sequential passes ("quiet chrome, one bright moment"). |
 
 ## Docker & infrastructure
 

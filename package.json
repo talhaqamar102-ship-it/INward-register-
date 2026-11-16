@@ -15,9 +15,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "graphify": "tsx scripts/graphify.ts update .",
-    "graphify:query": "tsx scripts/graphify.ts query",
-    "uupm": "python3 .claude/skills/ui-ux-pro-max/scripts/search.py",
-    "uupm:design-system": "python3 .claude/skills/ui-ux-pro-max/scripts/search.py --design-system"
+    "graphify:query": "tsx scripts/graphify.ts query"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

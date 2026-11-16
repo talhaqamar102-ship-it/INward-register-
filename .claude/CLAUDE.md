@@ -47,11 +47,11 @@ This project maintains a persistent whole-project knowledge graph in `graphify-o
 1. **Read Before Edit**: Consult `graphify-out/GRAPH_REPORT.md`, `graphify-out/wiki/index.md`, or run `npm run graphify:query -- "<question>"` (`graphify query "<question>"`) before reading raw files.
 2. **Mandatory Post-Change Update**: Every time code or schema files are modified, the `PostToolUse` (`Edit|Write`) hook and quality gate automatically run `graphify update .` (`npm run graphify`) so `graphify-out/graph.json` and `graphify-out/GRAPH_REPORT.md` stay synchronized with the latest AST and SQLite schema.
 
-## UI/UX Pro Max Design Intelligence Harness (`/ui-ux-pro-max`)
+## unslop Design Craft Harness
 
-Installed locally at `.claude/skills/ui-ux-pro-max/` (plus companion skills `design`, `design-system`, `ui-styling`, `brand`, `banner-design`, `slides`):
-1. **Design System & Domain Search**: Query `.claude/skills/ui-ux-pro-max/scripts/search.py` via `npm run uupm -- "<query>" --domain <color|ux|chart|typography|style>` or `npm run uupm:design-system -- "<query>" -p "Meridian Works MES"`.
-2. **Print vs. Screen Separation**: Shop-floor paper slips (`GRN`, `REQ`, `M-REQ`, `A-REQ`, `@media print`) must remain strictly 100% monochrome black-and-white for thermal/laser printers. Screen dashboards use semantic CSS variables defined in `src/style.css`.
+Installed locally at `.agents/skills/unslop/SKILL.md` (`heydamir/unslop`, `CC BY 4.0`):
+1. **Direction & 9-Pass Craft**: Follow `.agents/skills/unslop/SKILL.md` ("quiet chrome, one bright moment", Warm/Graphite neutral ramps from `references/tokens.md`, sentence-case labels, weights `400`/`500`, and `tabular-nums`).
+2. **Print vs. Screen Separation**: Shop-floor paper slips (`GRN`, `REQ`, `M-REQ`, `A-REQ`, `@media print`) must remain strictly 100% monochrome black-and-white for thermal/laser printers. Screen dashboards use CSS variables defined in `src/style.css`.
 
 ## Workflow
 

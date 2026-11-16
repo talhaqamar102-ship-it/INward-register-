@@ -7,7 +7,7 @@ Cohesion Score: `0.69` • Total Nodes: 89
 - **showToast()** (`fn:vanilla/app.js:showToast`) — `vanilla/app.js:L113-L126` (degree: 58)
 - **renderApp()** (`fn:vanilla/app.js:renderApp`) — `vanilla/app.js:L865-L882` (degree: 46)
 - **public/app-packing.js** (`file:public/app-packing.js`) — `public/app-packing.js:L1` (degree: 32)
-- **vanilla/app.js** (`file:vanilla/app.js`) — `vanilla/app.js:L1` (degree: 26)
+- **vanilla/app.js** (`file:vanilla/app.js`) — `vanilla/app.js:L1` (degree: 25)
 - **openModal()** (`fn:vanilla/app.js:openModal`) — `vanilla/app.js:L128-L137` (degree: 20)
 - **public/app-store.js** (`file:public/app-store.js`) — `public/app-store.js:L1` (degree: 19)
 - **loadActiveBatchDetails()** (`fn:public/app-packing.js:loadActiveBatchDetails`) — `public/app-packing.js:L78-L162` (degree: 19)
