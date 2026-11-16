@@ -94,6 +94,14 @@ export interface SuperUserRenderContext {
     dueDate: string;
   }>;
   openRegistryIds?: Record<string, boolean>;
+  buyerSearch?: string;
+  buyerFilter?: 'ALL' | 'RANDOM' | 'THOROUGH';
+  buyerEditDraft?: {
+    id: string;
+    name: string;
+    country: string;
+    inspectionPreference: string;
+  } | null;
 }
 
 function renderReconciliationBadge(rec: ReconciliationResult): string {
@@ -1792,10 +1800,89 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       return `
     ${(() => {
       const buyersList = Array.isArray(ov.customers) ? ov.customers : [];
+      const productsList = Array.isArray(ov.products) ? ov.products : [];
+      const ordersList = Array.isArray(ctx.pendingOrders) ? ctx.pendingOrders : [];
       const thoroughBuyerCount = buyersList.filter(
         (c: any) => String(c.inspection_preference || '').toUpperCase() === 'THOROUGH'
       ).length;
       const randomBuyerCount = buyersList.length - thoroughBuyerCount;
+      const thoroughSharePct = buyersList.length > 0 ? Math.round((thoroughBuyerCount / buyersList.length) * 100) : 0;
+      const uniqueCountriesCount = new Set(
+        buyersList
+          .map((c: any) => String(c.country || '').trim().toLowerCase())
+          .filter(Boolean)
+      ).size;
+
+      const buyerMetricsMap = new Map<string, { articles: string[]; orderCount: number; plannedPairs: number }>();
+      for (const c of buyersList) {
+        const cid = String(c.id || '');
+        const cnameLower = String(c.name || '').trim().toLowerCase();
+        const linkedArticles = productsList
+          .filter(
+            (p: any) =>
+              (cid && String(p.customer_id || '') === cid) ||
+              (cnameLower && String(p.customer_name || '').trim().toLowerCase() === cnameLower)
+          )
+          .map((p: any) => String(p.name || p.id || '').trim())
+          .filter(Boolean);
+        const linkedOrders = ordersList.filter(
+          o => cnameLower && String(o.buyer || '').trim().toLowerCase() === cnameLower
+        );
+        const plannedPairs = linkedOrders.reduce(
+          (sum, o) => sum + (o.totalQty || calculateSizeTotal(o.sizes || {}) || 0),
+          0
+        );
+        buyerMetricsMap.set(cid || cnameLower, {
+          articles: linkedArticles,
+          orderCount: linkedOrders.length,
+          plannedPairs
+        });
+      }
+
+      const linkedArticlesTotal = productsList.filter((p: any) =>
+        buyersList.some(
+          (c: any) =>
+            String(c.id || '') === String(p.customer_id || '') ||
+            String(c.name || '').trim().toLowerCase() === String(p.customer_name || '').trim().toLowerCase()
+        )
+      ).length;
+      const buyerOrdersList = ordersList.filter(o =>
+        buyersList.some(
+          (c: any) => String(c.name || '').trim().toLowerCase() === String(o.buyer || '').trim().toLowerCase()
+        )
+      );
+      const buyerOrderPairs = buyerOrdersList.reduce(
+        (sum, o) => sum + (o.totalQty || calculateSizeTotal(o.sizes || {}) || 0),
+        0
+      );
+
+      const buyerSearchQuery = String(ctx.buyerSearch || '').trim().toLowerCase();
+      const buyerFilter = ctx.buyerFilter || 'ALL';
+      const filteredBuyers = buyersList.filter((c: any) => {
+        const pref = String(c.inspection_preference || 'RANDOM').toUpperCase() === 'THOROUGH' ? 'THOROUGH' : 'RANDOM';
+        if (buyerFilter !== 'ALL' && pref !== buyerFilter) return false;
+        if (!buyerSearchQuery) return true;
+        const cid = String(c.id || '');
+        const cnameLower = String(c.name || '').trim().toLowerCase();
+        const metrics = buyerMetricsMap.get(cid || cnameLower);
+        const haystack = [
+          c.id,
+          c.name,
+          c.country,
+          pref,
+          ...(metrics?.articles || [])
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(buyerSearchQuery);
+      });
+
+      const editDraft = ctx.buyerEditDraft || null;
+      const isEditingBuyer = Boolean(editDraft && editDraft.id);
+      const draftName = editDraft?.name ?? '';
+      const draftCountry = editDraft ? editDraft.country : 'United Kingdom';
+      const draftPref = String(editDraft?.inspectionPreference || 'RANDOM').toUpperCase() === 'THOROUGH' ? 'THOROUGH' : 'RANDOM';
+
       return `
     <div class="su-registries-toolbar">
       <div class="su-registries-toolbar-title">
@@ -1815,17 +1902,17 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
     </div>
 
     <div class="su-registries-grid">
-      <!-- Collapsible Registry 2: Customer & Buyer Master (UI/UX Pro Max) -->
+      <!-- Collapsible Registry 2: Flagship UI/UX Pro Max Workbench -->
       <details class="su-collapsible-registry su-uupm-buyer-registry" data-registry-id="buyers" ${isRegOpen('buyers', true) ? 'open' : ''}>
-        <summary>
+        <summary class="su-uupm-hero-summary">
           <span class="su-registry-summary-main">
             <span class="su-registry-step-badge">02</span>
             <span class="su-uupm-header-icon" aria-hidden="true">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
             </span>
             <span class="su-uupm-title-block">
               <span class="su-registry-title-text">2. Customer &amp; Buyer Master Registry (${buyersList.length} Buyers)</span>
-              <span class="su-uupm-subtitle">Commercial buyer accounts, export destinations &amp; default QC sampling gates</span>
+              <span class="su-uupm-subtitle">Export Buyer Governance &bull; AQL Sampling Gates &bull; Live BOM &amp; Order Telemetry</span>
             </span>
           </span>
           <span class="su-registry-summary-meta">
@@ -1843,117 +1930,290 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             </span>
           </span>
         </summary>
+
         <div class="su-collapsible-body su-uupm-buyer-body">
-          <div class="su-uupm-form-card">
-            <div class="su-uupm-form-card-header">
-              <span class="su-uupm-form-heading">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
-                <span>Register New Customer / Buyer Account</span>
-              </span>
-              <span class="su-uupm-master-chip">SQLite Master &bull; Auto-ID</span>
+          <!-- Tier 1: Bento Telemetry Strip -->
+          <div class="su-uupm-bento-grid">
+            <div class="su-uupm-bento-card is-primary">
+              <div class="su-uupm-bento-top">
+                <span class="su-uupm-bento-label">Active Buyer Accounts</span>
+                <span class="su-uupm-bento-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                </span>
+              </div>
+              <div class="su-uupm-bento-value">${buyersList.length}</div>
+              <div class="su-uupm-bento-foot">${uniqueCountriesCount} export ${uniqueCountriesCount === 1 ? 'market' : 'markets'} configured</div>
             </div>
-            <div class="su-customer-form-grid">
-              <div class="form-group">
-                <label for="admin-cust-name">Customer Name <span class="su-required-mark" aria-hidden="true">*</span></label>
-                <input type="text" id="admin-cust-name" class="form-input" placeholder="e.g. Alpine Tactical" required aria-required="true" aria-describedby="hint-admin-cust-name" />
-                <span class="su-uupm-field-hint" id="hint-admin-cust-name">Buyer name linked to Master Orders &amp; Articles</span>
+
+            <div class="su-uupm-bento-card is-cyan">
+              <div class="su-uupm-bento-top">
+                <span class="su-uupm-bento-label">Linked Glove Articles</span>
+                <span class="su-uupm-bento-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                </span>
               </div>
-              <div class="form-group">
-                <label for="admin-cust-country">Destination Country</label>
-                <input type="text" id="admin-cust-country" class="form-input" placeholder="e.g. Germany" value="United Kingdom" aria-describedby="hint-admin-cust-country" />
-                <span class="su-uupm-field-hint" id="hint-admin-cust-country">Export market printed on dispatch manifests</span>
+              <div class="su-uupm-bento-value">${linkedArticlesTotal}</div>
+              <div class="su-uupm-bento-foot">Packaging BOM specs tied to buyers</div>
+            </div>
+
+            <div class="su-uupm-bento-card is-emerald">
+              <div class="su-uupm-bento-top">
+                <span class="su-uupm-bento-label">Active Buyer Orders</span>
+                <span class="su-uupm-bento-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                </span>
               </div>
-              <div class="form-group">
-                <label for="admin-cust-pref">QC Inspection Protocol</label>
-                <select id="admin-cust-pref" class="form-select" aria-describedby="hint-admin-cust-pref">
-                  <option value="RANDOM">RANDOM (AQL 1.5)</option>
-                  <option value="THOROUGH">THOROUGH (100%)</option>
-                </select>
-                <span class="su-uupm-field-hint" id="hint-admin-cust-pref">Controls Stage 5 Final QC release sampling gate</span>
+              <div class="su-uupm-bento-value">${buyerOrdersList.length}</div>
+              <div class="su-uupm-bento-foot">${buyerOrderPairs.toLocaleString()} Prs total planned demand</div>
+            </div>
+
+            <div class="su-uupm-bento-card is-amber">
+              <div class="su-uupm-bento-top">
+                <span class="su-uupm-bento-label">100% Thorough QC Share</span>
+                <span class="su-uupm-bento-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                </span>
               </div>
-              <button type="button" class="btn-primary su-uupm-save-buyer-btn" id="btn-admin-save-customer">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                <span>Save Buyer</span>
-              </button>
+              <div class="su-uupm-bento-value">${thoroughSharePct}%</div>
+              <div class="su-uupm-bento-meter" title="${thoroughBuyerCount} Thorough (100%) vs ${randomBuyerCount} Random (AQL 1.5)">
+                <span class="su-uupm-meter-fill" style="width: ${thoroughSharePct}%;"></span>
+              </div>
+              <div class="su-uupm-bento-foot">${thoroughBuyerCount} strict 100% &bull; ${randomBuyerCount} AQL 1.5</div>
             </div>
           </div>
 
-          <div class="su-uupm-table-card">
-            <div class="su-uupm-table-header">
-              <div class="su-uupm-table-heading">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="9" y1="4" x2="9" y2="20"></line></svg>
-                <span>Active Buyer Directory</span>
-                <span class="su-uupm-count-chip">${buyersList.length} Accounts</span>
+          <!-- Tier 2: Asymmetric 2-Column Split Workbench -->
+          <div class="su-uupm-workbench">
+            <!-- Left Dock: Buyer Onboarding & Edit Panel -->
+            <aside class="su-uupm-dock-card ${isEditingBuyer ? 'is-editing' : ''}">
+              <div class="su-uupm-dock-header">
+                <div class="su-uupm-dock-title-wrap">
+                  <span class="su-uupm-dock-eyebrow">${isEditingBuyer ? 'Editing Account' : 'Onboarding Dock'}</span>
+                  <h4 class="su-uupm-dock-title">${isEditingBuyer ? escapeHtml(editDraft!.id) : 'New Customer / Buyer'}</h4>
+                </div>
+                ${
+                  isEditingBuyer
+                    ? `<button type="button" class="su-uupm-dock-reset-btn" data-su-action="clear-buyer-edit">Cancel Edit</button>`
+                    : `<span class="su-uupm-master-chip">Auto-ID</span>`
+                }
               </div>
-              <div class="su-uupm-legend" aria-label="QC Protocol Legend">
-                <span class="admin-meta-caption">Protocol Key:</span>
-                <span class="su-uupm-protocol-badge is-random">RANDOM &bull; AQL 1.5</span>
-                <span class="su-uupm-protocol-badge is-thorough">THOROUGH &bull; 100% QC</span>
+
+              <div class="su-uupm-dock-body">
+                <div class="su-customer-form-grid">
+                  <div class="form-group">
+                    <label for="admin-cust-name">Customer Name <span class="su-required-mark" aria-hidden="true">*</span></label>
+                    <input type="text" id="admin-cust-name" class="form-input" placeholder="e.g. Alpine Tactical" value="${escapeHtml(draftName)}" required aria-required="true" aria-describedby="hint-admin-cust-name" />
+                    <span class="su-uupm-field-hint" id="hint-admin-cust-name">Linked across Orders &amp; Article BOMs</span>
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-cust-country">Destination Country</label>
+                    <input type="text" id="admin-cust-country" class="form-input" placeholder="e.g. Germany" value="${escapeHtml(draftCountry)}" aria-describedby="hint-admin-cust-country" />
+                    <span class="su-uupm-field-hint" id="hint-admin-cust-country">Printed on final export manifests</span>
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-cust-pref">QC Inspection Protocol</label>
+                    <select id="admin-cust-pref" class="form-select" aria-describedby="hint-admin-cust-pref">
+                      <option value="RANDOM" ${draftPref === 'RANDOM' ? 'selected' : ''}>RANDOM (AQL 1.5)</option>
+                      <option value="THOROUGH" ${draftPref === 'THOROUGH' ? 'selected' : ''}>THOROUGH (100%)</option>
+                    </select>
+                    <span class="su-uupm-field-hint" id="hint-admin-cust-pref">Enforced at Stage 5 Final QC release</span>
+                  </div>
+                  <button type="button" class="btn-primary su-uupm-save-buyer-btn" id="btn-admin-save-customer">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    <span>${isEditingBuyer ? 'Update Buyer Account' : 'Save Buyer'}</span>
+                  </button>
+                </div>
+
+                <div class="su-uupm-rule-callout">
+                  <div class="su-uupm-rule-title">Stage 5 Inspection Impact</div>
+                  <div class="su-uupm-rule-row">
+                    <span class="su-uupm-rule-dot is-random" aria-hidden="true"></span>
+                    <span><strong>RANDOM (AQL 1.5):</strong> Statistical lot sample gate</span>
+                  </div>
+                  <div class="su-uupm-rule-row">
+                    <span class="su-uupm-rule-dot is-thorough" aria-hidden="true"></span>
+                    <span><strong>THOROUGH (100%):</strong> Full piece-by-piece verification</span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="table-responsive su-uupm-table-scroll">
-              <table class="data-table su-uupm-buyer-table">
-                <thead>
-                  <tr>
-                    <th>Customer ID</th>
-                    <th>Customer / Buyer Name</th>
-                    <th>Destination Country</th>
-                    <th class="text-center">QC Protocol</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${
-                    buyersList.length === 0
-                      ? '<tr><td colspan="4" class="table-empty-cell">No buyers registered yet. Use the form above to add your first customer account.</td></tr>'
-                      : buyersList
-                          .map((c: any) => {
-                            const rawPref = String(c.inspection_preference || 'RANDOM').toUpperCase();
-                            const isThorough = rawPref === 'THOROUGH';
-                            const initials =
-                              String(c.name || '')
-                                .trim()
-                                .split(/\s+/)
-                                .slice(0, 2)
-                                .map((part: string) => part[0] || '')
-                                .join('')
-                                .toUpperCase() || 'BY';
-                            return `
+            </aside>
+
+            <!-- Right Panel: Un-Cropped Enriched Master Directory -->
+            <div class="su-uupm-directory-card">
+              <div class="su-uupm-dir-toolbar">
+                <div class="su-uupm-dir-search-wrap">
+                  <svg class="su-uupm-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input
+                    type="search"
+                    id="admin-cust-search"
+                    class="form-input su-uupm-search-input"
+                    placeholder="Filter buyers by name, ID, market, or article SKU..."
+                    value="${escapeHtml(ctx.buyerSearch || '')}"
+                    aria-label="Filter buyer directory"
+                  />
+                </div>
+                <div class="su-uupm-filter-pills" role="group" aria-label="Filter by QC Inspection Protocol">
+                  <button
+                    type="button"
+                    id="btn-buyer-filter-ALL"
+                    class="su-uupm-filter-btn ${buyerFilter === 'ALL' ? 'is-active' : ''}"
+                    data-su-action="filter-buyers"
+                    data-buyer-filter="ALL"
+                    aria-pressed="${buyerFilter === 'ALL'}"
+                  >
+                    All (${buyersList.length})
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-buyer-filter-RANDOM"
+                    class="su-uupm-filter-btn is-random ${buyerFilter === 'RANDOM' ? 'is-active' : ''}"
+                    data-su-action="filter-buyers"
+                    data-buyer-filter="RANDOM"
+                    aria-pressed="${buyerFilter === 'RANDOM'}"
+                  >
+                    Random (${randomBuyerCount})
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-buyer-filter-THOROUGH"
+                    class="su-uupm-filter-btn is-thorough ${buyerFilter === 'THOROUGH' ? 'is-active' : ''}"
+                    data-su-action="filter-buyers"
+                    data-buyer-filter="THOROUGH"
+                    aria-pressed="${buyerFilter === 'THOROUGH'}"
+                  >
+                    Thorough (${thoroughBuyerCount})
+                  </button>
+                </div>
+              </div>
+
+              <div class="table-responsive su-uupm-table-scroll">
+                <table class="data-table su-uupm-buyer-table">
+                  <thead>
                     <tr>
-                      <td><span class="su-uupm-id-chip">${escapeHtml(c.id)}</span></td>
-                      <td>
-                        <div class="su-uupm-buyer-cell">
-                          <span class="su-uupm-avatar ${isThorough ? 'is-thorough' : 'is-random'}" aria-hidden="true">${escapeHtml(initials)}</span>
-                          <span class="su-uupm-buyer-meta">
-                            <span class="su-uupm-buyer-name">${escapeHtml(c.name)}</span>
-                            <span class="su-uupm-buyer-sub">${isThorough ? 'Strict 100% Piece Inspection' : 'Standard AQL 1.5 Lot Sampling'}</span>
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <span class="su-uupm-country-pill">
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                          <span>${escapeHtml(c.country || '---')}</span>
-                        </span>
-                      </td>
-                      <td class="text-center">
-                        ${
-                          isThorough
-                            ? `<span class="status-pill su-uupm-protocol-badge is-thorough">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
-                                <span>THOROUGH &bull; 100% QC</span>
-                              </span>`
-                            : `<span class="status-pill su-uupm-protocol-badge is-random">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
-                                <span>RANDOM &bull; AQL 1.5</span>
-                              </span>`
-                        }
-                      </td>
-                    </tr>`;
-                          })
-                          .join('')
-                  }
-                </tbody>
-              </table>
+                      <th>Customer / Buyer &amp; Market</th>
+                      <th>Linked BOMs &amp; Orders</th>
+                      <th class="text-center">QC Protocol</th>
+                      <th class="text-right">Quick Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${
+                      filteredBuyers.length === 0
+                        ? `<tr><td colspan="4" class="table-empty-cell">${
+                            buyersList.length === 0
+                              ? 'No buyers registered yet. Use the Onboarding Dock to add your first customer account.'
+                              : 'No buyer accounts match your current search or protocol filter.'
+                          }</td></tr>`
+                        : filteredBuyers
+                            .map((c: any) => {
+                              const cid = String(c.id || '');
+                              const cname = String(c.name || '');
+                              const cnameLower = cname.trim().toLowerCase();
+                              const rawPref = String(c.inspection_preference || 'RANDOM').toUpperCase();
+                              const isThorough = rawPref === 'THOROUGH';
+                              const isSelectedForEdit = Boolean(editDraft && editDraft.id === cid);
+                              const initials =
+                                cname
+                                  .trim()
+                                  .split(/\s+/)
+                                  .slice(0, 2)
+                                  .map((part: string) => part[0] || '')
+                                  .join('')
+                                  .toUpperCase() || 'BY';
+                              const metrics = buyerMetricsMap.get(cid || cnameLower) || {
+                                articles: [],
+                                orderCount: 0,
+                                plannedPairs: 0
+                              };
+                              const visibleArticles = metrics.articles.slice(0, 2);
+                              const extraArticles = metrics.articles.length - visibleArticles.length;
+                              return `
+                      <tr class="${isSelectedForEdit ? 'su-uupm-row-selected' : ''}" data-buyer-row-id="${escapeHtml(cid)}">
+                        <td>
+                          <div class="su-uupm-buyer-cell">
+                            <span class="su-uupm-avatar ${isThorough ? 'is-thorough' : 'is-random'}" aria-hidden="true">${escapeHtml(initials)}</span>
+                            <span class="su-uupm-buyer-meta">
+                              <span class="su-uupm-buyer-name">${escapeHtml(cname)}</span>
+                              <span class="su-uupm-buyer-subrow">
+                                <span class="su-uupm-id-chip">${escapeHtml(cid)}</span>
+                                <span class="su-uupm-country-pill">
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                                  <span>${escapeHtml(c.country || '---')}</span>
+                                </span>
+                              </span>
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <div class="su-uupm-catalog-demand-stack">
+                            ${
+                              metrics.articles.length === 0
+                                ? '<span class="su-uupm-muted-dash">No BOMs linked</span>'
+                                : `<div class="su-uupm-article-chips">
+                                    ${visibleArticles.map(art => `<span class="su-uupm-article-chip">${escapeHtml(art)}</span>`).join('')}
+                                    ${extraArticles > 0 ? `<span class="su-uupm-article-more">+${extraArticles}</span>` : ''}
+                                  </div>`
+                            }
+                            <div class="su-uupm-demand-inline">
+                              ${
+                                metrics.orderCount === 0
+                                  ? '<span class="su-uupm-muted-dash">0 active orders</span>'
+                                  : `<strong>${metrics.orderCount} ${metrics.orderCount === 1 ? 'Order' : 'Orders'}</strong> &middot; <span class="su-uupm-demand-pairs">${metrics.plannedPairs.toLocaleString()} Prs</span>`
+                              }
+                            </div>
+                          </div>
+                        </td>
+                        <td class="text-center">
+                          ${
+                            isThorough
+                              ? `<span class="status-pill su-uupm-protocol-badge is-thorough">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                                  <span>THOROUGH &bull; 100%</span>
+                                </span>`
+                              : `<span class="status-pill su-uupm-protocol-badge is-random">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+                                  <span>RANDOM &bull; AQL 1.5</span>
+                                </span>`
+                          }
+                        </td>
+                        <td class="text-right">
+                          <div class="su-uupm-row-btns">
+                            <button
+                              type="button"
+                              class="su-uupm-row-btn is-flip"
+                              data-su-action="toggle-buyer-qc"
+                              data-buyer-id="${escapeHtml(cid)}"
+                              title="Switch QC protocol between RANDOM and THOROUGH"
+                            >
+                              Flip QC
+                            </button>
+                            <button
+                              type="button"
+                              class="su-uupm-row-btn is-edit"
+                              data-su-action="edit-buyer"
+                              data-buyer-id="${escapeHtml(cid)}"
+                              title="Load buyer into Onboarding Dock to edit"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              class="su-uupm-row-btn is-order"
+                              data-su-action="prefill-buyer-order"
+                              data-buyer-name="${escapeHtml(cname)}"
+                              title="Create Master Order for this buyer"
+                            >
+                              + Order
+                            </button>
+                          </div>
+                        </td>
+                      </tr>`;
+                            })
+                            .join('')
+                    }
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

@@ -1076,6 +1076,10 @@
       "dom:#admin-cust-pref",
       "dom:#hint-admin-cust-pref",
       "dom:#btn-admin-save-customer",
+      "dom:#admin-cust-search",
+      "dom:#btn-buyer-filter-ALL",
+      "dom:#btn-buyer-filter-RANDOM",
+      "dom:#btn-buyer-filter-THOROUGH",
       "dom:#articles",
       "dom:#admin-prod-name",
       "dom:#admin-prod-cust",
@@ -1130,7 +1134,18 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 325
+      "degree": 326
+    },
+    {
+      "id": "file:src/components/superUserView.ts",
+      "label": "src/components/superUserView.ts",
+      "kind": "file",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 93
     },
     {
       "id": "file:src/utils/requisitionLogic.ts",
@@ -1142,17 +1157,6 @@
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 92
-    },
-    {
-      "id": "file:src/components/superUserView.ts",
-      "label": "src/components/superUserView.ts",
-      "kind": "file",
-      "file_type": "code",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L1",
-      "community": 7,
-      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 89
     },
     {
       "id": "file:src/routes/api.js",
@@ -1182,7 +1186,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4172-L4864",
+      "source_location": "L4178-L4954",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 53
@@ -1248,7 +1252,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2998-L3600",
+      "source_location": "L3004-L3606",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 36

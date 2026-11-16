@@ -994,6 +994,7 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     expect(colorDiff.expandAllBg).not.toBe(colorDiff.collapseAllBg);
     expect(colorDiff.randomBadgeBg).not.toBe('');
 
+    await page.fill('#admin-cust-name', '');
     await page.fill('#admin-cust-name', 'Nordic Safety GmbH');
     await page.fill('#admin-cust-country', 'Germany');
     await page.selectOption('#admin-cust-pref', 'THOROUGH');
@@ -1002,6 +1003,30 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     const thoroughBadge = buyersCard.locator('.su-uupm-buyer-table .su-uupm-protocol-badge.is-thorough').first();
     await expect(thoroughBadge).toBeVisible();
     await expect(thoroughBadge).toContainText('THOROUGH');
+
+    // Verify no horizontal overflow inside Directory table at 1440px (all columns + actions visible)
+    const dirOverflow = await buyersCard.locator('.su-uupm-table-scroll').evaluate(
+      el => el.scrollWidth > el.clientWidth + 1
+    );
+    expect(dirOverflow).toBe(false);
+
+    // Interactive Workbench: segmented QC filter + search + one-click Flip QC + Edit + prefill Order
+    await page.click('#btn-buyer-filter-THOROUGH');
+    await expect(buyersCard.locator('.su-uupm-buyer-table tbody')).not.toContainText('RANDOM • AQL 1.5');
+    await page.fill('#admin-cust-search', 'Nordic Safety');
+    await expect(buyersCard.locator('.su-uupm-buyer-table tbody tr')).toHaveCount(1);
+    await buyersCard.locator('button[data-su-action="toggle-buyer-qc"]').first().click();
+    await expect(buyersCard).toContainText('No buyer accounts match your current search or protocol filter.');
+    await page.click('#btn-buyer-filter-ALL');
+    const nordicRow = buyersCard.locator('.su-uupm-buyer-table tbody tr', { hasText: 'Nordic Safety GmbH' });
+    await expect(nordicRow).toContainText('RANDOM');
+    await page.fill('#admin-cust-search', '');
+
+    await nordicRow.locator('button[data-su-action="edit-buyer"]').click();
+    await expect(page.locator('#admin-cust-name')).toHaveValue('Nordic Safety GmbH');
+    await expect(buyersCard.locator('.su-uupm-dock-card')).toHaveClass(/is-editing/);
+    await page.click('button[data-su-action="clear-buyer-edit"]');
+    await expect(buyersCard.locator('.su-uupm-dock-card')).not.toHaveClass(/is-editing/);
 
     // Clicking Section 4 summary opens it full width and switches toggle pill to Collapse
     await makersCard.locator('summary').click();

@@ -295,6 +295,9 @@ const state = {
     sqlite_wal: false,
     phased_rollout: false
   } as Record<string, boolean>,
+  adminBuyerSearch: '',
+  adminBuyerFilter: 'ALL' as 'ALL' | 'RANDOM' | 'THOROUGH',
+  adminBuyerEditDraft: null as { id: string; name: string; country: string; inspectionPreference: string } | null,
   adminOrderDraft: {
     buyer: '',
     maker: '',
@@ -1675,7 +1678,10 @@ function renderScreenAdmin(): string {
     rollupSummary,
     orderDraft: state.adminOrderDraft,
     orderSplitRows: state.adminOrderSplitRows,
-    openRegistryIds: state.adminOpenRegistries
+    openRegistryIds: state.adminOpenRegistries,
+    buyerSearch: state.adminBuyerSearch,
+    buyerFilter: state.adminBuyerFilter,
+    buyerEditDraft: state.adminBuyerEditDraft
   });
 }
 
@@ -4270,6 +4276,81 @@ function attachAdminHandlers(): void {
           renderApp();
           break;
         }
+        case 'filter-buyers': {
+          const nextFilter = el.dataset.buyerFilter as 'ALL' | 'RANDOM' | 'THOROUGH' | undefined;
+          if (nextFilter) {
+            state.adminBuyerFilter = nextFilter;
+            renderApp();
+          }
+          break;
+        }
+        case 'edit-buyer': {
+          const buyerId = el.dataset.buyerId;
+          const buyer = (state.adminOverview?.customers || []).find((c: any) => String(c.id) === String(buyerId));
+          if (buyer) {
+            state.adminBuyerEditDraft = {
+              id: String(buyer.id),
+              name: String(buyer.name || ''),
+              country: String(buyer.country || 'United Kingdom'),
+              inspectionPreference: String(buyer.inspection_preference || 'RANDOM').toUpperCase() === 'THOROUGH' ? 'THOROUGH' : 'RANDOM'
+            };
+            renderApp();
+            const nameInput = document.getElementById('admin-cust-name') as HTMLInputElement | null;
+            nameInput?.focus();
+            nameInput?.select();
+          }
+          break;
+        }
+        case 'clear-buyer-edit':
+          state.adminBuyerEditDraft = null;
+          renderApp();
+          break;
+        case 'toggle-buyer-qc': {
+          const buyerId = el.dataset.buyerId;
+          const buyer = (state.adminOverview?.customers || []).find((c: any) => String(c.id) === String(buyerId));
+          if (buyer) {
+            const currentPref = String(buyer.inspection_preference || 'RANDOM').toUpperCase();
+            const nextPref = currentPref === 'THOROUGH' ? 'RANDOM' : 'THOROUGH';
+            void runAdminAction(`admin:flip-buyer-qc:${buyerId}`, el, async () => {
+              try {
+                const res = await fetch('/api/admin/master/customer', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    id: buyer.id,
+                    name: buyer.name,
+                    country: buyer.country || 'United Kingdom',
+                    inspectionPreference: nextPref
+                  })
+                });
+                const json = await res.json();
+                if (!res.ok || !json.success) {
+                  showToast(json.error || 'Could not update buyer QC protocol.');
+                  return;
+                }
+                showToast(`${buyer.name} QC protocol switched to ${nextPref}.`);
+                await syncBackendData();
+              } catch (err) {
+                console.warn(err);
+                showToast('Could not update buyer QC protocol.');
+              }
+            });
+          }
+          break;
+        }
+        case 'prefill-buyer-order': {
+          const buyerName = el.dataset.buyerName;
+          if (buyerName) {
+            syncAdminOrderDraftFromDom();
+            state.adminOrderDraft.buyer = buyerName;
+            renderApp();
+            const buyerSelect = document.getElementById('admin-pending-order-buyer') as HTMLSelectElement | null;
+            buyerSelect?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            buyerSelect?.focus();
+            showToast(`Pre-selected buyer "${buyerName}" in Master Order Creation.`);
+          }
+          break;
+        }
         case 'tracking-page': {
           const page = Number(el.dataset.page);
           if (Number.isFinite(page)) window.adminSetTrackingPage(page);
@@ -4363,6 +4444,13 @@ function attachAdminHandlers(): void {
         window.adminSetTrackingMakerFilter(val);
       }
     });
+  });
+
+  // Customer & Buyer Master Search
+  const custSearchInput = document.getElementById('admin-cust-search') as HTMLInputElement | null;
+  custSearchInput?.addEventListener('input', () => {
+    state.adminBuyerSearch = custSearchInput.value;
+    renderApp();
   });
 
   // Live Tracking Search & Status Filter
@@ -4716,6 +4804,7 @@ function attachAdminHandlers(): void {
     const name = nameEl?.value?.trim() || '';
     const country = (document.getElementById('admin-cust-country') as HTMLInputElement)?.value?.trim();
     const inspectionPreference = (document.getElementById('admin-cust-pref') as HTMLSelectElement)?.value;
+    const editId = state.adminBuyerEditDraft?.id;
 
     const errors = validateCustomerMasterInputs({ name });
     if (applyFieldValidationErrors([[nameEl, errors.name]])) {
@@ -4728,7 +4817,7 @@ function attachAdminHandlers(): void {
         const res = await fetch('/api/admin/master/customer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, country, inspectionPreference })
+          body: JSON.stringify({ id: editId, name, country, inspectionPreference })
         });
         const json = await res.json();
         if (!res.ok || !json.success) {
@@ -4736,10 +4825,11 @@ function attachAdminHandlers(): void {
           showToast(json.error || 'Buyer could not be saved.');
           return;
         }
+        state.adminBuyerEditDraft = null;
         if (!state.dropdownOptions.customers.includes(name)) {
           state.dropdownOptions.customers.push(name);
         }
-        showToast(`Saved "${name}" to SQLite Master.`);
+        showToast(`${editId ? 'Updated' : 'Saved'} "${name}" in SQLite Master.`);
         await syncBackendData();
       } catch (err) {
         console.warn(err);
