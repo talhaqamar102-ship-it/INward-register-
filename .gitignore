@@ -23,6 +23,6 @@ playwright-report/
 .playwright-tmp/
 
 # HyperFrames video workspace runtime cache & dependencies
-hyperframes-video/node_modules/
-hyperframes-video/.hyperframes/
-hyperframes-video/*.mp4
+archive/hyperframes-video/node_modules/
+archive/hyperframes-video/.hyperframes/
+archive/hyperframes-video/*.mp4

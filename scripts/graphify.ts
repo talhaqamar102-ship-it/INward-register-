@@ -64,6 +64,7 @@ const IGNORED_DIRS = new Set([
   'node_modules',
   '.git',
   'dist',
+  'archive',
   'graphify-out',
   '.playwright-cli',
   'data'

@@ -23,6 +23,7 @@ test-results
 e2e
 .agents
 .aistudio
+archive
 .gemini
 graphify-out
 .graphify_*.json

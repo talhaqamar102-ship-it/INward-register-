@@ -36,7 +36,6 @@ COPY --from=builder /app/dist ./dist
 COPY server.ts ./
 COPY tsconfig.json ./
 COPY src/ ./src/
-COPY vanilla/ ./vanilla/
 COPY public/ ./public/
 
 # Create persistent directory for SQLite database & backups
