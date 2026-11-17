@@ -1041,45 +1041,15 @@
       "dom:#btn-admin-add-pending-order",
       "dom:#buyers",
       "dom:#admin-cust-name",
-      "dom:#hint-admin-cust-name",
       "dom:#admin-cust-country",
-      "dom:#hint-admin-cust-country",
       "dom:#admin-cust-pref",
-      "dom:#hint-admin-cust-pref",
       "dom:#btn-admin-save-customer",
-      "dom:#admin-cust-search",
-      "dom:#btn-buyer-filter-ALL",
-      "dom:#btn-buyer-filter-RANDOM",
-      "dom:#btn-buyer-filter-THOROUGH",
       "dom:#articles",
-      "dom:#su-unslop-bom-preview",
-      "dom:#su-unslop-preview-id",
-      "dom:#su-unslop-preview-name",
-      "dom:#su-unslop-preview-buyer",
-      "dom:#su-unslop-preview-stencil",
-      "dom:#su-unslop-preview-stickers-vis",
-      "dom:#su-unslop-pair-label-count",
-      "dom:#su-unslop-carton-stencil",
-      "dom:#su-unslop-batch-calc",
-      "dom:#su-unslop-calc-cartons-badge",
-      "dom:#su-unslop-calc-cartons",
-      "dom:#su-unslop-calc-polybags",
-      "dom:#su-unslop-calc-silica",
-      "dom:#su-unslop-calc-stickers",
-      "dom:#admin-prod-edit-id",
-      "dom:#su-unslop-form-title",
-      "dom:#su-unslop-mode-tag",
-      "dom:#btn-admin-reset-product",
       "dom:#admin-prod-name",
       "dom:#admin-prod-cust",
       "dom:#admin-prod-stickers",
       "dom:#admin-prod-carton",
       "dom:#btn-admin-save-product",
-      "dom:#su-unslop-visible-count",
-      "dom:#admin-prod-search",
-      "dom:#admin-prod-buyer-filter",
-      "dom:#su-unslop-articles-table",
-      "dom:#su-unslop-empty-state",
       "dom:#makers_pos",
       "dom:#admin-add-maker-input",
       "dom:#btn-admin-add-maker",
@@ -1109,11 +1079,11 @@
     ]
   },
   "cohesion": {
-    "0": 0.71,
+    "0": 0.72,
     "1": 0.63,
     "2": 0.6,
     "3": 0.61,
-    "4": 0.57,
+    "4": 0.58,
     "5": 0.52,
     "6": 0.69,
     "7": 0.75
@@ -1128,18 +1098,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 335
-    },
-    {
-      "id": "file:src/components/superUserView.ts",
-      "label": "src/components/superUserView.ts",
-      "kind": "file",
-      "file_type": "code",
-      "source_file": "src/components/superUserView.ts",
-      "source_location": "L1",
-      "community": 7,
-      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 116
+      "degree": 325
     },
     {
       "id": "file:src/utils/requisitionLogic.ts",
@@ -1151,6 +1110,17 @@
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 92
+    },
+    {
+      "id": "file:src/components/superUserView.ts",
+      "label": "src/components/superUserView.ts",
+      "kind": "file",
+      "file_type": "code",
+      "source_file": "src/components/superUserView.ts",
+      "source_location": "L1",
+      "community": 7,
+      "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
+      "degree": 86
     },
     {
       "id": "file:src/routes/api.js",
@@ -1180,10 +1150,10 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4178-L5213",
+      "source_location": "L4172-L4864",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 54
+      "degree": 53
     },
     {
       "id": "class:src/services/packingService.js:PackingService",
@@ -1238,7 +1208,7 @@
       "source_location": "L153",
       "community": 4,
       "community_label": "SQLite WAL Database & 17-Table Schema (src/db.js)",
-      "degree": 40
+      "degree": 38
     },
     {
       "id": "fn:src/main.ts:attachPackingHandlers",
@@ -1246,7 +1216,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3004-L3606",
+      "source_location": "L2998-L3600",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 36

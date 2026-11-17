@@ -599,65 +599,6 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     expect(runtimeErrors).toEqual([]);
   });
 
-  test('Section 3 unslop Article & BOM Master updates physical carton blueprint live and filters ledger cleanly', async ({ page }) => {
-    const runtimeErrors: string[] = [];
-    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        runtimeErrors.push(`console.error: ${msg.text()}`);
-      }
-    });
-    page.on('response', res => {
-      if (res.status() >= 500) {
-        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
-      }
-    });
-
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await authenticateAsSuperUser(page);
-    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
-
-    const section3 = page.locator('details.su-unslop-articles-registry[data-registry-id="articles"]');
-    await expect(section3).toBeVisible();
-    await expect(section3).toHaveAttribute('open', '');
-    await expect(page.locator('#su-unslop-bom-preview')).toBeVisible();
-
-    const rows = page.locator('#su-unslop-articles-table .su-unslop-article-row');
-    const rowCount = await rows.count();
-    expect(rowCount).toBeGreaterThan(2);
-
-    // Click the second row to inspect it and verify the blueprint + 1,000-pair batch math + form sync live
-    const secondRow = rows.nth(1);
-    const secondName = (await secondRow.getAttribute('data-product-name')) || '';
-    const secondCarton = Math.max(1, Number((await secondRow.getAttribute('data-carton')) || 50));
-    await secondRow.click();
-
-    await expect(secondRow).toHaveClass(/is-selected/);
-    await expect(page.locator('#su-unslop-preview-name')).toHaveText(secondName);
-    await expect(page.locator('#admin-prod-name')).toHaveValue(secondName);
-    await expect(page.locator('#su-unslop-calc-cartons')).toHaveText(Math.ceil(1000 / secondCarton).toLocaleString());
-
-    // Live edit carton density and verify instant blueprint update
-    await page.fill('#admin-prod-carton', '25');
-    await expect(page.locator('#su-unslop-carton-stencil')).toHaveText('25 prs/ctn');
-    await expect(page.locator('#su-unslop-calc-cartons')).toHaveText('40');
-
-    // Clear selection restores new spec mode
-    await page.click('#btn-admin-reset-product');
-    await expect(page.locator('#su-unslop-form-title')).toHaveText('New article specification');
-    await expect(page.locator('#btn-admin-reset-product')).toBeHidden();
-
-    // Live search filter reduces visible rows
-    await page.fill('#admin-prod-search', secondName);
-    const visibleAfterSearch = await page
-      .locator('#su-unslop-articles-table .su-unslop-article-row:not([hidden])')
-      .count();
-    expect(visibleAfterSearch).toBeGreaterThanOrEqual(1);
-    expect(visibleAfterSearch).toBeLessThanOrEqual(rowCount);
-
-    expect(runtimeErrors).toEqual([]);
-  });
-
   test('Inward Register locks article & colour from order and requires Received From', async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
@@ -1038,54 +979,6 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     const makersClosedBox = await makersCard.boundingBox();
     expect(buyersOpenBox!.width).toBeGreaterThan(gridBox!.width * 0.9);
     expect(makersClosedBox!.width).toBeLessThan(gridBox!.width * 0.55);
-
-    // UI/UX Pro Max Section 2 semantic color recognition & Buyer creation check
-    const colorDiff = await page.evaluate(() => {
-      const saveBuyerBg = getComputedStyle(document.getElementById('btn-admin-save-customer')!).backgroundColor;
-      const issueOrderBg = getComputedStyle(document.getElementById('btn-admin-add-pending-order')!).backgroundColor;
-      const expandAllBg = getComputedStyle(document.querySelector('.su-btn-expand-all')!).backgroundColor;
-      const collapseAllBg = getComputedStyle(document.querySelector('.su-btn-collapse-all')!).backgroundColor;
-      const randomBadge = document.querySelector('.su-uupm-buyer-table .su-uupm-protocol-badge.is-random');
-      const randomBadgeBg = randomBadge ? getComputedStyle(randomBadge).backgroundColor : '';
-      return { saveBuyerBg, issueOrderBg, expandAllBg, collapseAllBg, randomBadgeBg };
-    });
-    expect(colorDiff.saveBuyerBg).not.toBe(colorDiff.issueOrderBg);
-    expect(colorDiff.expandAllBg).not.toBe(colorDiff.collapseAllBg);
-    expect(colorDiff.randomBadgeBg).not.toBe('');
-
-    await page.fill('#admin-cust-name', '');
-    await page.fill('#admin-cust-name', 'Nordic Safety GmbH');
-    await page.fill('#admin-cust-country', 'Germany');
-    await page.selectOption('#admin-cust-pref', 'THOROUGH');
-    await page.click('#btn-admin-save-customer');
-    await expect(buyersCard).toContainText('Nordic Safety GmbH');
-    const thoroughBadge = buyersCard.locator('.su-uupm-buyer-table .su-uupm-protocol-badge.is-thorough').first();
-    await expect(thoroughBadge).toBeVisible();
-    await expect(thoroughBadge).toContainText('THOROUGH');
-
-    // Verify no horizontal overflow inside Directory table at 1440px (all columns + actions visible)
-    const dirOverflow = await buyersCard.locator('.su-uupm-table-scroll').evaluate(
-      el => el.scrollWidth > el.clientWidth + 1
-    );
-    expect(dirOverflow).toBe(false);
-
-    // Interactive Workbench: segmented QC filter + search + one-click Flip QC + Edit + prefill Order
-    await page.click('#btn-buyer-filter-THOROUGH');
-    await expect(buyersCard.locator('.su-uupm-buyer-table tbody')).not.toContainText('RANDOM • AQL 1.5');
-    await page.fill('#admin-cust-search', 'Nordic Safety');
-    await expect(buyersCard.locator('.su-uupm-buyer-table tbody tr')).toHaveCount(1);
-    await buyersCard.locator('button[data-su-action="toggle-buyer-qc"]').first().click();
-    await expect(buyersCard).toContainText('No buyer accounts match your current search or protocol filter.');
-    await page.click('#btn-buyer-filter-ALL');
-    const nordicRow = buyersCard.locator('.su-uupm-buyer-table tbody tr', { hasText: 'Nordic Safety GmbH' });
-    await expect(nordicRow).toContainText('RANDOM');
-    await page.fill('#admin-cust-search', '');
-
-    await nordicRow.locator('button[data-su-action="edit-buyer"]').click();
-    await expect(page.locator('#admin-cust-name')).toHaveValue('Nordic Safety GmbH');
-    await expect(buyersCard.locator('.su-uupm-dock-card')).toHaveClass(/is-editing/);
-    await page.click('button[data-su-action="clear-buyer-edit"]');
-    await expect(buyersCard.locator('.su-uupm-dock-card')).not.toHaveClass(/is-editing/);
 
     // Clicking Section 4 summary opens it full width and switches toggle pill to Collapse
     await makersCard.locator('summary').click();

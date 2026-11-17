@@ -94,14 +94,6 @@ export interface SuperUserRenderContext {
     dueDate: string;
   }>;
   openRegistryIds?: Record<string, boolean>;
-  buyerSearch?: string;
-  buyerFilter?: 'ALL' | 'RANDOM' | 'THOROUGH';
-  buyerEditDraft?: {
-    id: string;
-    name: string;
-    country: string;
-    inspectionPreference: string;
-  } | null;
 }
 
 function renderReconciliationBadge(rec: ReconciliationResult): string {
@@ -1798,759 +1790,139 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           ? Boolean(ctx.openRegistryIds[key])
           : defaultOpen;
       return `
-    ${(() => {
-      const buyersList = Array.isArray(ov.customers) ? ov.customers : [];
-      const productsList = Array.isArray(ov.products) ? ov.products : [];
-      const ordersList = Array.isArray(ctx.pendingOrders) ? ctx.pendingOrders : [];
-      const thoroughBuyerCount = buyersList.filter(
-        (c: any) => String(c.inspection_preference || '').toUpperCase() === 'THOROUGH'
-      ).length;
-      const randomBuyerCount = buyersList.length - thoroughBuyerCount;
-      const thoroughSharePct = buyersList.length > 0 ? Math.round((thoroughBuyerCount / buyersList.length) * 100) : 0;
-      const uniqueCountriesCount = new Set(
-        buyersList
-          .map((c: any) => String(c.country || '').trim().toLowerCase())
-          .filter(Boolean)
-      ).size;
-
-      const buyerMetricsMap = new Map<string, { articles: string[]; orderCount: number; plannedPairs: number }>();
-      for (const c of buyersList) {
-        const cid = String(c.id || '');
-        const cnameLower = String(c.name || '').trim().toLowerCase();
-        const linkedArticles = productsList
-          .filter(
-            (p: any) =>
-              (cid && String(p.customer_id || '') === cid) ||
-              (cnameLower && String(p.customer_name || '').trim().toLowerCase() === cnameLower)
-          )
-          .map((p: any) => String(p.name || p.id || '').trim())
-          .filter(Boolean);
-        const linkedOrders = ordersList.filter(
-          o => cnameLower && String(o.buyer || '').trim().toLowerCase() === cnameLower
-        );
-        const plannedPairs = linkedOrders.reduce(
-          (sum, o) => sum + (o.totalQty || calculateSizeTotal(o.sizes || {}) || 0),
-          0
-        );
-        buyerMetricsMap.set(cid || cnameLower, {
-          articles: linkedArticles,
-          orderCount: linkedOrders.length,
-          plannedPairs
-        });
-      }
-
-      const linkedArticlesTotal = productsList.filter((p: any) =>
-        buyersList.some(
-          (c: any) =>
-            String(c.id || '') === String(p.customer_id || '') ||
-            String(c.name || '').trim().toLowerCase() === String(p.customer_name || '').trim().toLowerCase()
-        )
-      ).length;
-      const buyerOrdersList = ordersList.filter(o =>
-        buyersList.some(
-          (c: any) => String(c.name || '').trim().toLowerCase() === String(o.buyer || '').trim().toLowerCase()
-        )
-      );
-      const buyerOrderPairs = buyerOrdersList.reduce(
-        (sum, o) => sum + (o.totalQty || calculateSizeTotal(o.sizes || {}) || 0),
-        0
-      );
-
-      const buyerSearchQuery = String(ctx.buyerSearch || '').trim().toLowerCase();
-      const buyerFilter = ctx.buyerFilter || 'ALL';
-      const filteredBuyers = buyersList.filter((c: any) => {
-        const pref = String(c.inspection_preference || 'RANDOM').toUpperCase() === 'THOROUGH' ? 'THOROUGH' : 'RANDOM';
-        if (buyerFilter !== 'ALL' && pref !== buyerFilter) return false;
-        if (!buyerSearchQuery) return true;
-        const cid = String(c.id || '');
-        const cnameLower = String(c.name || '').trim().toLowerCase();
-        const metrics = buyerMetricsMap.get(cid || cnameLower);
-        const haystack = [
-          c.id,
-          c.name,
-          c.country,
-          pref,
-          ...(metrics?.articles || [])
-        ]
-          .join(' ')
-          .toLowerCase();
-        return haystack.includes(buyerSearchQuery);
-      });
-
-      const editDraft = ctx.buyerEditDraft || null;
-      const isEditingBuyer = Boolean(editDraft && editDraft.id);
-      const draftName = editDraft?.name ?? '';
-      const draftCountry = editDraft ? editDraft.country : 'United Kingdom';
-      const draftPref = String(editDraft?.inspectionPreference || 'RANDOM').toUpperCase() === 'THOROUGH' ? 'THOROUGH' : 'RANDOM';
-
-      return `
     <div class="su-registries-toolbar">
       <div class="su-registries-toolbar-title">
         <span>Master Registries &amp; System Administration (Sections 2&ndash;6)</span>
         <span class="admin-meta-caption">Click any card header to expand full-width or collapse</span>
       </div>
       <div class="su-registries-toolbar-actions">
-        <button type="button" class="btn-outline su-btn-expand-all" data-su-action="toggle-all-registries" data-expanded="true">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
-          <span>Expand All Registries</span>
-        </button>
-        <button type="button" class="btn-outline su-btn-collapse-all" data-su-action="toggle-all-registries" data-expanded="false">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg>
-          <span>Collapse All Registries</span>
-        </button>
+        <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 11.5px;" data-su-action="toggle-all-registries" data-expanded="true">Expand All Registries</button>
+        <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 11.5px;" data-su-action="toggle-all-registries" data-expanded="false">Collapse All Registries</button>
       </div>
     </div>
 
     <div class="su-registries-grid">
-      <!-- Collapsible Registry 2: Flagship UI/UX Pro Max Workbench -->
-      <details class="su-collapsible-registry su-uupm-buyer-registry" data-registry-id="buyers" ${isRegOpen('buyers', true) ? 'open' : ''}>
-        <summary class="su-uupm-hero-summary">
+      <!-- Collapsible Registry 2: Customer & Buyer Master -->
+      <details class="su-collapsible-registry" data-registry-id="buyers" ${isRegOpen('buyers', true) ? 'open' : ''}>
+        <summary>
           <span class="su-registry-summary-main">
             <span class="su-registry-step-badge">02</span>
-            <span class="su-uupm-header-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-            </span>
-            <span class="su-uupm-title-block">
-              <span class="su-registry-title-text">2. Customer &amp; Buyer Master Registry (${buyersList.length} Buyers)</span>
-              <span class="su-uupm-subtitle">Export Buyer Governance &bull; AQL Sampling Gates &bull; Live BOM &amp; Order Telemetry</span>
-            </span>
+            <span class="su-registry-title-text">2. Customer &amp; Buyer Master Registry (${ov.customers.length} Buyers)</span>
           </span>
           <span class="su-registry-summary-meta">
-            <span class="su-uupm-kpi-pill is-random" title="Buyers using AQL 1.5 Random Sampling">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
-              <span>${randomBuyerCount} Random (AQL 1.5)</span>
-            </span>
-            <span class="su-uupm-kpi-pill is-thorough" title="Buyers requiring 100% Thorough Inspection">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
-              <span>${thoroughBuyerCount} Thorough (100%)</span>
-            </span>
+            <span class="admin-meta-caption">AQL Inspection Rules</span>
             <span class="su-registry-toggle-pill" aria-hidden="true">
               <span class="su-toggle-when-closed">Expand &#9662;</span>
               <span class="su-toggle-when-open">Collapse &#9652;</span>
             </span>
           </span>
         </summary>
-
-        <div class="su-collapsible-body su-uupm-buyer-body">
-          <!-- Tier 1: Bento Telemetry Strip -->
-          <div class="su-uupm-bento-grid">
-            <div class="su-uupm-bento-card is-primary">
-              <div class="su-uupm-bento-top">
-                <span class="su-uupm-bento-label">Active Buyer Accounts</span>
-                <span class="su-uupm-bento-icon" aria-hidden="true">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                </span>
-              </div>
-              <div class="su-uupm-bento-value">${buyersList.length}</div>
-              <div class="su-uupm-bento-foot">${uniqueCountriesCount} export ${uniqueCountriesCount === 1 ? 'market' : 'markets'} configured</div>
+        <div class="su-collapsible-body">
+          <div class="su-customer-form-grid">
+            <div class="form-group">
+              <label for="admin-cust-name">Customer Name</label>
+              <input type="text" id="admin-cust-name" class="form-input" placeholder="e.g. Alpine Tactical" />
             </div>
-
-            <div class="su-uupm-bento-card is-cyan">
-              <div class="su-uupm-bento-top">
-                <span class="su-uupm-bento-label">Linked Glove Articles</span>
-                <span class="su-uupm-bento-icon" aria-hidden="true">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                </span>
-              </div>
-              <div class="su-uupm-bento-value">${linkedArticlesTotal}</div>
-              <div class="su-uupm-bento-foot">Packaging BOM specs tied to buyers</div>
+            <div class="form-group">
+              <label for="admin-cust-country">Destination Country</label>
+              <input type="text" id="admin-cust-country" class="form-input" placeholder="e.g. Germany" value="United Kingdom" />
             </div>
-
-            <div class="su-uupm-bento-card is-emerald">
-              <div class="su-uupm-bento-top">
-                <span class="su-uupm-bento-label">Active Buyer Orders</span>
-                <span class="su-uupm-bento-icon" aria-hidden="true">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                </span>
-              </div>
-              <div class="su-uupm-bento-value">${buyerOrdersList.length}</div>
-              <div class="su-uupm-bento-foot">${buyerOrderPairs.toLocaleString()} Prs total planned demand</div>
+            <div class="form-group">
+              <label for="admin-cust-pref">QC Inspection Protocol</label>
+              <select id="admin-cust-pref" class="form-select">
+                <option value="RANDOM">RANDOM (AQL 1.5)</option>
+                <option value="THOROUGH">THOROUGH (100%)</option>
+              </select>
             </div>
-
-            <div class="su-uupm-bento-card is-amber">
-              <div class="su-uupm-bento-top">
-                <span class="su-uupm-bento-label">100% Thorough QC Share</span>
-                <span class="su-uupm-bento-icon" aria-hidden="true">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
-                </span>
-              </div>
-              <div class="su-uupm-bento-value">${thoroughSharePct}%</div>
-              <div class="su-uupm-bento-meter" title="${thoroughBuyerCount} Thorough (100%) vs ${randomBuyerCount} Random (AQL 1.5)">
-                <span class="su-uupm-meter-fill" style="width: ${thoroughSharePct}%;"></span>
-              </div>
-              <div class="su-uupm-bento-foot">${thoroughBuyerCount} strict 100% &bull; ${randomBuyerCount} AQL 1.5</div>
-            </div>
+            <button type="button" class="btn-primary" id="btn-admin-save-customer">Save Buyer</button>
           </div>
-
-          <!-- Tier 2: Asymmetric 2-Column Split Workbench -->
-          <div class="su-uupm-workbench">
-            <!-- Left Dock: Buyer Onboarding & Edit Panel -->
-            <aside class="su-uupm-dock-card ${isEditingBuyer ? 'is-editing' : ''}">
-              <div class="su-uupm-dock-header">
-                <div class="su-uupm-dock-title-wrap">
-                  <span class="su-uupm-dock-eyebrow">${isEditingBuyer ? 'Editing Account' : 'Onboarding Dock'}</span>
-                  <h4 class="su-uupm-dock-title">${isEditingBuyer ? escapeHtml(editDraft!.id) : 'New Customer / Buyer'}</h4>
-                </div>
-                ${
-                  isEditingBuyer
-                    ? `<button type="button" class="su-uupm-dock-reset-btn" data-su-action="clear-buyer-edit">Cancel Edit</button>`
-                    : `<span class="su-uupm-master-chip">Auto-ID</span>`
-                }
-              </div>
-
-              <div class="su-uupm-dock-body">
-                <div class="su-customer-form-grid">
-                  <div class="form-group">
-                    <label for="admin-cust-name">Customer Name <span class="su-required-mark" aria-hidden="true">*</span></label>
-                    <input type="text" id="admin-cust-name" class="form-input" placeholder="e.g. Alpine Tactical" value="${escapeHtml(draftName)}" required aria-required="true" aria-describedby="hint-admin-cust-name" />
-                    <span class="su-uupm-field-hint" id="hint-admin-cust-name">Linked across Orders &amp; Article BOMs</span>
-                  </div>
-                  <div class="form-group">
-                    <label for="admin-cust-country">Destination Country</label>
-                    <input type="text" id="admin-cust-country" class="form-input" placeholder="e.g. Germany" value="${escapeHtml(draftCountry)}" aria-describedby="hint-admin-cust-country" />
-                    <span class="su-uupm-field-hint" id="hint-admin-cust-country">Printed on final export manifests</span>
-                  </div>
-                  <div class="form-group">
-                    <label for="admin-cust-pref">QC Inspection Protocol</label>
-                    <select id="admin-cust-pref" class="form-select" aria-describedby="hint-admin-cust-pref">
-                      <option value="RANDOM" ${draftPref === 'RANDOM' ? 'selected' : ''}>RANDOM (AQL 1.5)</option>
-                      <option value="THOROUGH" ${draftPref === 'THOROUGH' ? 'selected' : ''}>THOROUGH (100%)</option>
-                    </select>
-                    <span class="su-uupm-field-hint" id="hint-admin-cust-pref">Enforced at Stage 5 Final QC release</span>
-                  </div>
-                  <button type="button" class="btn-primary su-uupm-save-buyer-btn" id="btn-admin-save-customer">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                    <span>${isEditingBuyer ? 'Update Buyer Account' : 'Save Buyer'}</span>
-                  </button>
-                </div>
-
-                <div class="su-uupm-rule-callout">
-                  <div class="su-uupm-rule-title">Stage 5 Inspection Impact</div>
-                  <div class="su-uupm-rule-row">
-                    <span class="su-uupm-rule-dot is-random" aria-hidden="true"></span>
-                    <span><strong>RANDOM (AQL 1.5):</strong> Statistical lot sample gate</span>
-                  </div>
-                  <div class="su-uupm-rule-row">
-                    <span class="su-uupm-rule-dot is-thorough" aria-hidden="true"></span>
-                    <span><strong>THOROUGH (100%):</strong> Full piece-by-piece verification</span>
-                  </div>
-                </div>
-              </div>
-            </aside>
-
-            <!-- Right Panel: Un-Cropped Enriched Master Directory -->
-            <div class="su-uupm-directory-card">
-              <div class="su-uupm-dir-toolbar">
-                <div class="su-uupm-dir-search-wrap">
-                  <svg class="su-uupm-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                  <input
-                    type="search"
-                    id="admin-cust-search"
-                    class="form-input su-uupm-search-input"
-                    placeholder="Filter buyers by name, ID, market, or article SKU..."
-                    value="${escapeHtml(ctx.buyerSearch || '')}"
-                    aria-label="Filter buyer directory"
-                  />
-                </div>
-                <div class="su-uupm-filter-pills" role="group" aria-label="Filter by QC Inspection Protocol">
-                  <button
-                    type="button"
-                    id="btn-buyer-filter-ALL"
-                    class="su-uupm-filter-btn ${buyerFilter === 'ALL' ? 'is-active' : ''}"
-                    data-su-action="filter-buyers"
-                    data-buyer-filter="ALL"
-                    aria-pressed="${buyerFilter === 'ALL'}"
-                  >
-                    All (${buyersList.length})
-                  </button>
-                  <button
-                    type="button"
-                    id="btn-buyer-filter-RANDOM"
-                    class="su-uupm-filter-btn is-random ${buyerFilter === 'RANDOM' ? 'is-active' : ''}"
-                    data-su-action="filter-buyers"
-                    data-buyer-filter="RANDOM"
-                    aria-pressed="${buyerFilter === 'RANDOM'}"
-                  >
-                    Random (${randomBuyerCount})
-                  </button>
-                  <button
-                    type="button"
-                    id="btn-buyer-filter-THOROUGH"
-                    class="su-uupm-filter-btn is-thorough ${buyerFilter === 'THOROUGH' ? 'is-active' : ''}"
-                    data-su-action="filter-buyers"
-                    data-buyer-filter="THOROUGH"
-                    aria-pressed="${buyerFilter === 'THOROUGH'}"
-                  >
-                    Thorough (${thoroughBuyerCount})
-                  </button>
-                </div>
-              </div>
-
-              <div class="table-responsive su-uupm-table-scroll">
-                <table class="data-table su-uupm-buyer-table">
-                  <thead>
-                    <tr>
-                      <th>Customer / Buyer &amp; Market</th>
-                      <th>Linked BOMs &amp; Orders</th>
-                      <th class="text-center">QC Protocol</th>
-                      <th class="text-right">Quick Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${
-                      filteredBuyers.length === 0
-                        ? `<tr><td colspan="4" class="table-empty-cell">${
-                            buyersList.length === 0
-                              ? 'No buyers registered yet. Use the Onboarding Dock to add your first customer account.'
-                              : 'No buyer accounts match your current search or protocol filter.'
-                          }</td></tr>`
-                        : filteredBuyers
-                            .map((c: any) => {
-                              const cid = String(c.id || '');
-                              const cname = String(c.name || '');
-                              const cnameLower = cname.trim().toLowerCase();
-                              const rawPref = String(c.inspection_preference || 'RANDOM').toUpperCase();
-                              const isThorough = rawPref === 'THOROUGH';
-                              const isSelectedForEdit = Boolean(editDraft && editDraft.id === cid);
-                              const initials =
-                                cname
-                                  .trim()
-                                  .split(/\s+/)
-                                  .slice(0, 2)
-                                  .map((part: string) => part[0] || '')
-                                  .join('')
-                                  .toUpperCase() || 'BY';
-                              const metrics = buyerMetricsMap.get(cid || cnameLower) || {
-                                articles: [],
-                                orderCount: 0,
-                                plannedPairs: 0
-                              };
-                              const visibleArticles = metrics.articles.slice(0, 2);
-                              const extraArticles = metrics.articles.length - visibleArticles.length;
-                              return `
-                      <tr class="${isSelectedForEdit ? 'su-uupm-row-selected' : ''}" data-buyer-row-id="${escapeHtml(cid)}">
-                        <td>
-                          <div class="su-uupm-buyer-cell">
-                            <span class="su-uupm-avatar ${isThorough ? 'is-thorough' : 'is-random'}" aria-hidden="true">${escapeHtml(initials)}</span>
-                            <span class="su-uupm-buyer-meta">
-                              <span class="su-uupm-buyer-name">${escapeHtml(cname)}</span>
-                              <span class="su-uupm-buyer-subrow">
-                                <span class="su-uupm-id-chip">${escapeHtml(cid)}</span>
-                                <span class="su-uupm-country-pill">
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                                  <span>${escapeHtml(c.country || '---')}</span>
-                                </span>
-                              </span>
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <div class="su-uupm-catalog-demand-stack">
-                            ${
-                              metrics.articles.length === 0
-                                ? '<span class="su-uupm-muted-dash">No BOMs linked</span>'
-                                : `<div class="su-uupm-article-chips">
-                                    ${visibleArticles.map(art => `<span class="su-uupm-article-chip">${escapeHtml(art)}</span>`).join('')}
-                                    ${extraArticles > 0 ? `<span class="su-uupm-article-more">+${extraArticles}</span>` : ''}
-                                  </div>`
-                            }
-                            <div class="su-uupm-demand-inline">
-                              ${
-                                metrics.orderCount === 0
-                                  ? '<span class="su-uupm-muted-dash">0 active orders</span>'
-                                  : `<strong>${metrics.orderCount} ${metrics.orderCount === 1 ? 'Order' : 'Orders'}</strong> &middot; <span class="su-uupm-demand-pairs">${metrics.plannedPairs.toLocaleString()} Prs</span>`
-                              }
-                            </div>
-                          </div>
-                        </td>
-                        <td class="text-center">
-                          ${
-                            isThorough
-                              ? `<span class="status-pill su-uupm-protocol-badge is-thorough">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
-                                  <span>THOROUGH &bull; 100%</span>
-                                </span>`
-                              : `<span class="status-pill su-uupm-protocol-badge is-random">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
-                                  <span>RANDOM &bull; AQL 1.5</span>
-                                </span>`
-                          }
-                        </td>
-                        <td class="text-right">
-                          <div class="su-uupm-row-btns">
-                            <button
-                              type="button"
-                              class="su-uupm-row-btn is-flip"
-                              data-su-action="toggle-buyer-qc"
-                              data-buyer-id="${escapeHtml(cid)}"
-                              title="Switch QC protocol between RANDOM and THOROUGH"
-                            >
-                              Flip QC
-                            </button>
-                            <button
-                              type="button"
-                              class="su-uupm-row-btn is-edit"
-                              data-su-action="edit-buyer"
-                              data-buyer-id="${escapeHtml(cid)}"
-                              title="Load buyer into Onboarding Dock to edit"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              class="su-uupm-row-btn is-order"
-                              data-su-action="prefill-buyer-order"
-                              data-buyer-name="${escapeHtml(cname)}"
-                              title="Create Master Order for this buyer"
-                            >
-                              + Order
-                            </button>
-                          </div>
-                        </td>
-                      </tr>`;
-                            })
-                            .join('')
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
+            <table class="data-table">
+              <thead>
+                <tr><th>Customer ID</th><th>Customer Name</th><th>Country</th><th class="text-center">QC Protocol</th></tr>
+              </thead>
+              <tbody>
+                ${ov.customers
+                  .map(
+                    (c: any) => `
+                  <tr>
+                    <td class="font-bold">${escapeHtml(c.id)}</td>
+                    <td>${escapeHtml(c.name)}</td>
+                    <td>${escapeHtml(c.country || '---')}</td>
+                    <td class="text-center"><span class="status-pill">${escapeHtml(c.inspection_preference)}</span></td>
+                  </tr>
+                `
+                  )
+                  .join('')}
+              </tbody>
+            </table>
           </div>
         </div>
-      </details>`;
-    })()}
+      </details>
 
-      <!-- Collapsible Registry 3: Glove Article & Packaging BOM Master (Crafted with heydamir/unslop) -->
-      ${(() => {
-        const productsList = Array.isArray(ov.products) ? ov.products : [];
-        const customersList = Array.isArray(ov.customers) ? ov.customers : [];
-        const cartonCounts = productsList.map((p: any) => Math.max(1, Number(p.pairs_per_carton || 50)));
-        const stickerCounts = productsList.map((p: any) => Math.max(1, Number(p.stickers_per_pair || 2)));
-        const minCarton = cartonCounts.length ? Math.min(...cartonCounts) : 50;
-        const maxCarton = cartonCounts.length ? Math.max(...cartonCounts) : 50;
-        const avgCarton = cartonCounts.length
-          ? Math.round(cartonCounts.reduce((acc: number, v: number) => acc + v, 0) / cartonCounts.length)
-          : 50;
-        const sortedCartons = [...cartonCounts].sort((a, b) => a - b);
-        const medianCarton = sortedCartons.length ? sortedCartons[Math.floor(sortedCartons.length / 2)] : 50;
-        const minStickers = stickerCounts.length ? Math.min(...stickerCounts) : 2;
-        const maxStickers = stickerCounts.length ? Math.max(...stickerCounts) : 2;
-        const uniqueBuyers = new Set(productsList.map((p: any) => p.customer_id).filter(Boolean)).size;
-
-        const leadProduct = productsList[0] || {
-          id: 'GLV-SPEC',
-          name: 'Standard Work Glove',
-          customer_id: customersList[0]?.id || '',
-          customer_name: customersList[0]?.name || 'Buyer account',
-          polybag_per_pair: 1,
-          silica_gel_per_pair: 1,
-          stickers_per_pair: 2,
-          pairs_per_carton: 50
-        };
-        const leadPolybag = Math.max(1, Number(leadProduct.polybag_per_pair || 1));
-        const leadSilica = Math.max(1, Number(leadProduct.silica_gel_per_pair || 1));
-        const leadStickers = Math.max(1, Number(leadProduct.stickers_per_pair || 2));
-        const leadCarton = Math.max(1, Number(leadProduct.pairs_per_carton || 50));
-        const batchPairs = 1000;
-        const leadBatchCartons = Math.ceil(batchPairs / leadCarton);
-        const leadBatchPolybags = batchPairs * leadPolybag;
-        const leadBatchSilica = batchPairs * leadSilica;
-        const leadBatchStickers = batchPairs * leadStickers;
-        const stickerTagCount = Math.min(4, leadStickers);
-
-        return `
-      <details class="su-collapsible-registry su-unslop-articles-registry" data-registry-id="articles" ${isRegOpen('articles', true) ? 'open' : ''}>
-        <summary class="su-unslop-summary">
+      <!-- Collapsible Registry 3: Glove Product / Article Master -->
+      <details class="su-collapsible-registry" data-registry-id="articles" ${isRegOpen('articles', true) ? 'open' : ''}>
+        <summary>
           <span class="su-registry-summary-main">
-            <span class="su-unslop-index-mark">03</span>
-            <span class="su-unslop-summary-copy">
-              <span class="su-registry-title-text">3. Glove Article &amp; Packaging BOM Master (${productsList.length} Articles)</span>
-              <span class="su-unslop-subtitle">Per-pair polybag, silica sachet, barcode sticker, and export carton specifications</span>
-            </span>
+            <span class="su-registry-step-badge">03</span>
+            <span class="su-registry-title-text">3. Glove Article &amp; Packaging BOM Master (${ov.products.length} Articles)</span>
           </span>
           <span class="su-registry-summary-meta">
-            <span class="su-unslop-summary-readout">${productsList.length} specs · ${uniqueBuyers} buyers · median ${medianCarton} prs/ctn</span>
-            <span class="su-registry-toggle-pill su-unslop-toggle-pill" aria-hidden="true">
+            <span class="admin-meta-caption">Per-Pair Accessory Ratios</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
               <span class="su-toggle-when-closed">Expand &#9662;</span>
               <span class="su-toggle-when-open">Collapse &#9652;</span>
             </span>
           </span>
         </summary>
-
-        <div class="su-collapsible-body su-unslop-body">
-          <!-- Asymmetric Spec Ledger Header (Quiet chrome, size + tabular hierarchy, zero equal bento cards) -->
-          <div class="su-unslop-ledger-strip">
-            <div class="su-unslop-ledger-lead">
-              <span class="su-unslop-meta-label">Catalog specification</span>
-              <div class="su-unslop-ledger-value">${productsList.length} glove articles across ${uniqueBuyers} buyer accounts</div>
-              <span class="su-unslop-meta-note">Average pack density ${avgCarton} pairs per export carton · click any row below to inspect its carton kit</span>
+        <div class="su-collapsible-body">
+          <div class="su-article-form-grid">
+            <div class="form-group">
+              <label for="admin-prod-name">Article Name</label>
+              <input type="text" id="admin-prod-name" class="form-input" placeholder="e.g. Stealth Pro V2" />
             </div>
-            <div class="su-unslop-ledger-cell">
-              <span class="su-unslop-meta-label">Pair unit ratio</span>
-              <div class="su-unslop-ledger-figure">1 : 1 : ${minStickers === maxStickers ? minStickers : `${minStickers}–${maxStickers}`}</div>
-              <span class="su-unslop-meta-note">Polybag · silica gel · barcode labels</span>
+            <div class="form-group">
+              <label for="admin-prod-cust">Buyer</label>
+              <select id="admin-prod-cust" class="form-select">
+                ${ov.customers.map((c: any) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
+              </select>
             </div>
-            <div class="su-unslop-ledger-cell">
-              <span class="su-unslop-meta-label">Master carton span</span>
-              <div class="su-unslop-ledger-figure is-accent">${minCarton === maxCarton ? `${minCarton} pairs` : `${minCarton}–${maxCarton} pairs`}</div>
-              <span class="su-unslop-meta-note">${Math.ceil(batchPairs / maxCarton)} to ${Math.ceil(batchPairs / minCarton)} cartons per 1,000 pairs</span>
+            <div class="form-group">
+              <label for="admin-prod-stickers">Stickers/Pr</label>
+              <input type="number" id="admin-prod-stickers" class="form-input" value="2" min="1" />
             </div>
+            <div class="form-group">
+              <label for="admin-prod-carton">Pairs/Ctn</label>
+              <input type="number" id="admin-prod-carton" class="form-input" value="50" min="1" />
+            </div>
+            <button type="button" class="btn-primary" id="btn-admin-save-product">Save Article</button>
           </div>
-
-          <div class="su-unslop-workbench">
-            <!-- Left Craft Column: Physical Carton & Pair Kit Blueprint + Spec Form -->
-            <div class="su-unslop-left-col">
-              <!-- The One Bright Moment: Live Physical Carton & 1-Pair Polybag Kit Object Preview -->
-              <section class="su-unslop-object-stage" id="su-unslop-bom-preview" aria-label="Physical master carton and pair pack specification preview">
-                <div class="su-unslop-stage-head">
-                  <div class="su-unslop-stage-id-block">
-                    <span class="su-unslop-meta-label">Pack blueprint · <span id="su-unslop-preview-id">${escapeHtml(leadProduct.id)}</span></span>
-                    <h4 class="su-unslop-stage-title" id="su-unslop-preview-name">${escapeHtml(leadProduct.name)}</h4>
-                    <span class="su-unslop-stage-buyer" id="su-unslop-preview-buyer">${escapeHtml(leadProduct.customer_name || leadProduct.customer_id)}</span>
-                  </div>
-                  <span class="su-unslop-stencil-keycap is-lead" id="su-unslop-preview-stencil">${leadPolybag}P · ${leadSilica}S · ${leadStickers}L → ${leadCarton}/ctn</span>
-                </div>
-
-                <div class="su-unslop-studio-scene">
-                  <!-- Physical Object 1: 1-Pair Clear Polybag Unit -->
-                  <div class="su-unslop-polybag-unit">
-                    <div class="su-unslop-polybag-pouch">
-                      <span class="su-unslop-polybag-seal">Peel seal · 1 pair</span>
-                      <div class="su-unslop-glove-diagram" aria-hidden="true">
-                        <svg width="58" height="58" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M18 52V33c0-3 2-5 4-5v-10a2.5 2.5 0 0 1 5 0v12h2V12a2.5 2.5 0 0 1 5 0v18h2V13a2.5 2.5 0 0 1 5 0v17h2V18a2.5 2.5 0 0 1 5 0v18l2.5-3.5a2.5 2.5 0 0 1 4.1 2.8L46 47c-1.4 2.8-3.8 5-7.5 5H18Z"></path>
-                          <path d="M18 45h22"></path>
-                          <path d="M23 32h18"></path>
-                        </svg>
-                      </div>
-                      <div class="su-unslop-polybag-inserts">
-                        <span class="su-unslop-silica-sachet">
-                          <span class="su-unslop-sachet-dot" aria-hidden="true"></span>
-                          <span>${leadSilica}× silica</span>
-                        </span>
-                        <div class="su-unslop-barcode-stack" id="su-unslop-preview-stickers-vis">
-                          ${Array.from({ length: stickerTagCount }, (_, i) => `
-                            <span class="su-unslop-barcode-tag">
-                              <span class="su-unslop-barcode-bars" aria-hidden="true"></span>
-                              <span>Tag ${i + 1}</span>
-                            </span>
-                          `).join('')}
-                        </div>
-                      </div>
-                    </div>
-                    <span class="su-unslop-object-caption">1 pair sleeve · <span id="su-unslop-pair-label-count">${leadStickers}</span> ${leadStickers === 1 ? 'sticker' : 'stickers'}</span>
-                  </div>
-
-                  <!-- Physical Object 2: Master Corrugated Export Carton -->
-                  <div class="su-unslop-carton-unit">
-                    <div class="su-unslop-carton-box">
-                      <div class="su-unslop-carton-top">
-                        <span class="su-unslop-carton-tape"></span>
-                      </div>
-                      <div class="su-unslop-carton-front">
-                        <div class="su-unslop-carton-stencil-mark">
-                          <span class="su-unslop-stencil-kicker">Export master</span>
-                          <span class="su-unslop-stencil-figure" id="su-unslop-carton-stencil">${leadCarton} prs/ctn</span>
-                        </div>
-                        <div class="su-unslop-carton-flutes" aria-hidden="true">
-                          <span></span><span></span><span></span><span></span>
-                        </div>
-                      </div>
-                    </div>
-                    <span class="su-unslop-object-caption">Corrugated case · 5-ply</span>
-                  </div>
-                </div>
-
-                <!-- Live 1,000-Pair Batch Consumption Strip -->
-                <div class="su-unslop-batch-calc" id="su-unslop-batch-calc">
-                  <div class="su-unslop-batch-head">
-                    <span>Consumables for 1,000-pair run</span>
-                    <span class="su-unslop-batch-highlight"><span id="su-unslop-calc-cartons-badge">${leadBatchCartons}</span> export cartons</span>
-                  </div>
-                  <div class="su-unslop-batch-grid">
-                    <div class="su-unslop-batch-metric">
-                      <span class="su-unslop-batch-num is-accent" id="su-unslop-calc-cartons">${leadBatchCartons}</span>
-                      <span class="su-unslop-batch-unit">Cartons</span>
-                    </div>
-                    <div class="su-unslop-batch-metric">
-                      <span class="su-unslop-batch-num" id="su-unslop-calc-polybags">${leadBatchPolybags.toLocaleString()}</span>
-                      <span class="su-unslop-batch-unit">Polybags</span>
-                    </div>
-                    <div class="su-unslop-batch-metric">
-                      <span class="su-unslop-batch-num" id="su-unslop-calc-silica">${leadBatchSilica.toLocaleString()}</span>
-                      <span class="su-unslop-batch-unit">Silica gel</span>
-                    </div>
-                    <div class="su-unslop-batch-metric">
-                      <span class="su-unslop-batch-num" id="su-unslop-calc-stickers">${leadBatchStickers.toLocaleString()}</span>
-                      <span class="su-unslop-batch-unit">Stickers</span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Editor Panel (Hidden edit-id kept outside .su-article-form-grid so layout checks inspect visible controls only) -->
-              <div class="su-unslop-form-card">
-                <input type="hidden" id="admin-prod-edit-id" value="" data-polybag="1" data-silica="1" />
-                <div class="su-unslop-form-head">
-                  <div>
-                    <h4 class="su-unslop-form-title" id="su-unslop-form-title">New article specification</h4>
-                    <span class="su-unslop-meta-note">Saved specifications sync immediately to Order Creation and Stage 1 BOMs</span>
-                  </div>
-                  <div class="su-unslop-form-head-actions">
-                    <span class="su-unslop-stencil-keycap" id="su-unslop-mode-tag">New spec</span>
-                    <button type="button" id="btn-admin-reset-product" class="su-unslop-ghost-btn" hidden>Clear selection</button>
-                  </div>
-                </div>
-
-                <div class="su-article-form-grid">
-                  <div class="form-group">
-                    <label for="admin-prod-name">Article name</label>
-                    <input type="text" id="admin-prod-name" class="form-input" placeholder="e.g. Stealth Pro V2" />
-                  </div>
-                  <div class="form-group">
-                    <label for="admin-prod-cust">Buyer account</label>
-                    <select id="admin-prod-cust" class="form-select">
-                      ${customersList.map((c: any) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label for="admin-prod-stickers">Stickers per pair</label>
-                    <input type="number" id="admin-prod-stickers" class="form-input" value="2" min="1" />
-                  </div>
-                  <div class="form-group">
-                    <label for="admin-prod-carton">Pairs per carton</label>
-                    <input type="number" id="admin-prod-carton" class="form-input" value="50" min="1" />
-                  </div>
-                  <button type="button" class="btn-primary" id="btn-admin-save-product">Save article specification</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right Craft Panel: Full 16-Article Specification Ledger -->
-            <div class="su-unslop-catalog-card">
-              <div class="su-unslop-toolbar">
-                <div class="su-unslop-toolbar-top">
-                  <div>
-                    <h4 class="su-unslop-catalog-title">Article specification ledger</h4>
-                    <span class="su-unslop-meta-note">Ratio keycaps follow polybag · silica · barcode label · export carton order</span>
-                  </div>
-                  <span class="su-unslop-visible-count" id="su-unslop-visible-count">${productsList.length} of ${productsList.length} articles</span>
-                </div>
-
-                <div class="su-unslop-filter-row">
-                  <div class="su-unslop-search-wrap">
-                    <svg class="su-unslop-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <input
-                      type="search"
-                      id="admin-prod-search"
-                      class="form-input su-unslop-search-input"
-                      placeholder="Search article or SKU"
-                      aria-label="Search article specifications"
-                    />
-                  </div>
-                  <select id="admin-prod-buyer-filter" class="form-select su-unslop-buyer-select" aria-label="Filter articles by buyer">
-                    <option value="ALL">All buyers (${customersList.length})</option>
-                    ${customersList.map((c: any) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
-                  </select>
-                  <div class="su-unslop-density-filters" role="group" aria-label="Filter by carton density">
-                    <button type="button" class="su-unslop-density-btn is-active" data-density-filter="all" aria-pressed="true">All</button>
-                    <button type="button" class="su-unslop-density-btn" data-density-filter="compact" aria-pressed="false">&le;40/ctn</button>
-                    <button type="button" class="su-unslop-density-btn" data-density-filter="standard" aria-pressed="false">50/ctn</button>
-                    <button type="button" class="su-unslop-density-btn" data-density-filter="bulk" aria-pressed="false">&ge;60/ctn</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="table-responsive su-unslop-table-scroll">
-                <table class="data-table su-unslop-table" id="su-unslop-articles-table">
-                  <thead>
-                    <tr>
-                      <th>Code</th>
-                      <th>Article and buyer</th>
-                      <th>Pair kit formula</th>
-                      <th>Carton density</th>
-                      <th class="text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${productsList
-                      .map((p: any, idx: number) => {
-                        const poly = Math.max(1, Number(p.polybag_per_pair || 1));
-                        const sil = Math.max(1, Number(p.silica_gel_per_pair || 1));
-                        const stk = Math.max(1, Number(p.stickers_per_pair || 2));
-                        const ctn = Math.max(1, Number(p.pairs_per_carton || 50));
-                        const ctnsPer1k = Math.ceil(1000 / ctn);
-                        const densityPct = Math.max(12, Math.min(100, Math.round((ctn / Math.max(1, maxCarton)) * 100)));
-                        const buyerName = String(p.customer_name || p.customer_id || '');
-                        return `
-                      <tr
-                        class="su-unslop-article-row ${idx === 0 ? 'is-selected' : ''}"
-                        tabindex="0"
-                        data-product-id="${escapeHtml(p.id)}"
-                        data-product-name="${escapeHtml(p.name)}"
-                        data-customer-id="${escapeHtml(p.customer_id)}"
-                        data-customer-name="${escapeHtml(buyerName)}"
-                        data-polybag="${poly}"
-                        data-silica="${sil}"
-                        data-stickers="${stk}"
-                        data-carton="${ctn}"
-                      >
-                        <td class="su-unslop-sku-cell">
-                          <span class="su-unslop-sku">${escapeHtml(p.id)}</span>
-                        </td>
-                        <td>
-                          <div class="su-unslop-article-name">${escapeHtml(p.name)}</div>
-                          <div class="su-unslop-buyer-sub">${escapeHtml(buyerName)}</div>
-                        </td>
-                        <td>
-                          <div class="su-unslop-formula-cell">
-                            <span class="su-unslop-stencil-keycap">${poly}P · ${sil}S · ${stk}L</span>
-                            <span class="su-unslop-formula-sub">${poly} bag, ${sil} silica, ${stk} ${stk === 1 ? 'label' : 'labels'}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div class="su-unslop-density-cell">
-                            <div class="su-unslop-density-meta">
-                              <span class="su-unslop-density-prs">${ctn} prs/ctn</span>
-                              <span class="su-unslop-ctns-per-1k">${ctnsPer1k} ctns / 1k</span>
-                            </div>
-                            <div class="su-unslop-density-track" aria-hidden="true">
-                              <div class="su-unslop-density-fill" style="width: ${densityPct}%"></div>
-                            </div>
-                          </div>
-                        </td>
-                        <td class="text-right">
-                          <div class="su-unslop-row-actions">
-                            <button
-                              type="button"
-                              class="su-unslop-row-btn btn-unslop-inspect-article"
-                              data-product-id="${escapeHtml(p.id)}"
-                              aria-label="Inspect and edit ${escapeHtml(p.name)}"
-                            >Inspect</button>
-                            <button
-                              type="button"
-                              class="su-unslop-row-btn is-order btn-unslop-order-article"
-                              data-product-name="${escapeHtml(p.name)}"
-                              data-customer-name="${escapeHtml(buyerName)}"
-                              aria-label="Use ${escapeHtml(p.name)} in Master Order Creation"
-                            >To order</button>
-                          </div>
-                        </td>
-                      </tr>
-                    `;
-                      })
-                      .join('')}
-                  </tbody>
-                </table>
-              </div>
-              <div class="su-unslop-empty-state" id="su-unslop-empty-state" hidden>
-                No glove article matches that filter
-              </div>
-            </div>
+          <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
+            <table class="data-table">
+              <thead>
+                <tr><th>Product ID</th><th>Article</th><th>Buyer</th><th class="text-right">Polybag</th><th class="text-right">Silica</th><th class="text-right">Stickers</th><th class="text-right">Prs/Ctn</th></tr>
+              </thead>
+              <tbody>
+                ${ov.products
+                  .map(
+                    (p: any) => `
+                  <tr>
+                    <td class="font-bold">${escapeHtml(p.id)}</td>
+                    <td class="font-bold">${escapeHtml(p.name)}</td>
+                    <td>${escapeHtml(p.customer_name || p.customer_id)}</td>
+                    <td class="text-right">${p.polybag_per_pair}</td>
+                    <td class="text-right">${p.silica_gel_per_pair}</td>
+                    <td class="text-right">${p.stickers_per_pair}</td>
+                    <td class="text-right font-bold">${p.pairs_per_carton}</td>
+                  </tr>
+                `
+                  )
+                  .join('')}
+              </tbody>
+            </table>
           </div>
         </div>
-      </details>`;
-      })()}
+      </details>
 
       <!-- Collapsible Registry 4: Contractors / Makers & PO Dropdowns -->
       <details class="su-collapsible-registry" data-registry-id="makers_pos" ${isRegOpen('makers_pos', false) ? 'open' : ''}>

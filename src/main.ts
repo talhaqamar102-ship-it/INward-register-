@@ -295,9 +295,6 @@ const state = {
     sqlite_wal: false,
     phased_rollout: false
   } as Record<string, boolean>,
-  adminBuyerSearch: '',
-  adminBuyerFilter: 'ALL' as 'ALL' | 'RANDOM' | 'THOROUGH',
-  adminBuyerEditDraft: null as { id: string; name: string; country: string; inspectionPreference: string } | null,
   adminOrderDraft: {
     buyer: '',
     maker: '',
@@ -1678,10 +1675,7 @@ function renderScreenAdmin(): string {
     rollupSummary,
     orderDraft: state.adminOrderDraft,
     orderSplitRows: state.adminOrderSplitRows,
-    openRegistryIds: state.adminOpenRegistries,
-    buyerSearch: state.adminBuyerSearch,
-    buyerFilter: state.adminBuyerFilter,
-    buyerEditDraft: state.adminBuyerEditDraft
+    openRegistryIds: state.adminOpenRegistries
   });
 }
 
@@ -4276,81 +4270,6 @@ function attachAdminHandlers(): void {
           renderApp();
           break;
         }
-        case 'filter-buyers': {
-          const nextFilter = el.dataset.buyerFilter as 'ALL' | 'RANDOM' | 'THOROUGH' | undefined;
-          if (nextFilter) {
-            state.adminBuyerFilter = nextFilter;
-            renderApp();
-          }
-          break;
-        }
-        case 'edit-buyer': {
-          const buyerId = el.dataset.buyerId;
-          const buyer = (state.adminOverview?.customers || []).find((c: any) => String(c.id) === String(buyerId));
-          if (buyer) {
-            state.adminBuyerEditDraft = {
-              id: String(buyer.id),
-              name: String(buyer.name || ''),
-              country: String(buyer.country || 'United Kingdom'),
-              inspectionPreference: String(buyer.inspection_preference || 'RANDOM').toUpperCase() === 'THOROUGH' ? 'THOROUGH' : 'RANDOM'
-            };
-            renderApp();
-            const nameInput = document.getElementById('admin-cust-name') as HTMLInputElement | null;
-            nameInput?.focus();
-            nameInput?.select();
-          }
-          break;
-        }
-        case 'clear-buyer-edit':
-          state.adminBuyerEditDraft = null;
-          renderApp();
-          break;
-        case 'toggle-buyer-qc': {
-          const buyerId = el.dataset.buyerId;
-          const buyer = (state.adminOverview?.customers || []).find((c: any) => String(c.id) === String(buyerId));
-          if (buyer) {
-            const currentPref = String(buyer.inspection_preference || 'RANDOM').toUpperCase();
-            const nextPref = currentPref === 'THOROUGH' ? 'RANDOM' : 'THOROUGH';
-            void runAdminAction(`admin:flip-buyer-qc:${buyerId}`, el, async () => {
-              try {
-                const res = await fetch('/api/admin/master/customer', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    id: buyer.id,
-                    name: buyer.name,
-                    country: buyer.country || 'United Kingdom',
-                    inspectionPreference: nextPref
-                  })
-                });
-                const json = await res.json();
-                if (!res.ok || !json.success) {
-                  showToast(json.error || 'Could not update buyer QC protocol.');
-                  return;
-                }
-                showToast(`${buyer.name} QC protocol switched to ${nextPref}.`);
-                await syncBackendData();
-              } catch (err) {
-                console.warn(err);
-                showToast('Could not update buyer QC protocol.');
-              }
-            });
-          }
-          break;
-        }
-        case 'prefill-buyer-order': {
-          const buyerName = el.dataset.buyerName;
-          if (buyerName) {
-            syncAdminOrderDraftFromDom();
-            state.adminOrderDraft.buyer = buyerName;
-            renderApp();
-            const buyerSelect = document.getElementById('admin-pending-order-buyer') as HTMLSelectElement | null;
-            buyerSelect?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            buyerSelect?.focus();
-            showToast(`Pre-selected buyer "${buyerName}" in Master Order Creation.`);
-          }
-          break;
-        }
         case 'tracking-page': {
           const page = Number(el.dataset.page);
           if (Number.isFinite(page)) window.adminSetTrackingPage(page);
@@ -4444,13 +4363,6 @@ function attachAdminHandlers(): void {
         window.adminSetTrackingMakerFilter(val);
       }
     });
-  });
-
-  // Customer & Buyer Master Search
-  const custSearchInput = document.getElementById('admin-cust-search') as HTMLInputElement | null;
-  custSearchInput?.addEventListener('input', () => {
-    state.adminBuyerSearch = custSearchInput.value;
-    renderApp();
   });
 
   // Live Tracking Search & Status Filter
@@ -4804,7 +4716,6 @@ function attachAdminHandlers(): void {
     const name = nameEl?.value?.trim() || '';
     const country = (document.getElementById('admin-cust-country') as HTMLInputElement)?.value?.trim();
     const inspectionPreference = (document.getElementById('admin-cust-pref') as HTMLSelectElement)?.value;
-    const editId = state.adminBuyerEditDraft?.id;
 
     const errors = validateCustomerMasterInputs({ name });
     if (applyFieldValidationErrors([[nameEl, errors.name]])) {
@@ -4817,7 +4728,7 @@ function attachAdminHandlers(): void {
         const res = await fetch('/api/admin/master/customer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editId, name, country, inspectionPreference })
+          body: JSON.stringify({ name, country, inspectionPreference })
         });
         const json = await res.json();
         if (!res.ok || !json.success) {
@@ -4825,11 +4736,10 @@ function attachAdminHandlers(): void {
           showToast(json.error || 'Buyer could not be saved.');
           return;
         }
-        state.adminBuyerEditDraft = null;
         if (!state.dropdownOptions.customers.includes(name)) {
           state.dropdownOptions.customers.push(name);
         }
-        showToast(`${editId ? 'Updated' : 'Saved'} "${name}" in SQLite Master.`);
+        showToast(`Saved "${name}" to SQLite Master.`);
         await syncBackendData();
       } catch (err) {
         console.warn(err);
@@ -4838,261 +4748,10 @@ function attachAdminHandlers(): void {
     });
   });
 
-  const applyUnslopArticlePreview = (spec: {
-    id: string;
-    name: string;
-    buyerName: string;
-    polybag: number;
-    silica: number;
-    stickers: number;
-    carton: number;
-  }) => {
-    const poly = Math.max(1, Math.round(spec.polybag || 1));
-    const sil = Math.max(1, Math.round(spec.silica || 1));
-    const stk = Math.max(1, Math.round(spec.stickers || 2));
-    const ctn = Math.max(1, Math.round(spec.carton || 50));
-    const batchPairs = 1000;
-    const cartonsNeeded = Math.ceil(batchPairs / ctn);
-
-    const setText = (elId: string, val: string) => {
-      const node = document.getElementById(elId);
-      if (node) node.textContent = val;
-    };
-
-    setText('su-unslop-preview-id', spec.id || 'GLV-SPEC');
-    setText('su-unslop-preview-name', spec.name || 'New article specification');
-    setText('su-unslop-preview-buyer', spec.buyerName || 'Buyer account');
-    setText('su-unslop-preview-stencil', `${poly}P · ${sil}S · ${stk}L → ${ctn}/ctn`);
-    setText('su-unslop-carton-stencil', `${ctn} prs/ctn`);
-    setText('su-unslop-pair-label-count', `${stk}`);
-    setText('su-unslop-calc-cartons-badge', cartonsNeeded.toLocaleString());
-    setText('su-unslop-calc-cartons', cartonsNeeded.toLocaleString());
-    setText('su-unslop-calc-polybags', (batchPairs * poly).toLocaleString());
-    setText('su-unslop-calc-silica', (batchPairs * sil).toLocaleString());
-    setText('su-unslop-calc-stickers', (batchPairs * stk).toLocaleString());
-
-    const stickerHost = document.getElementById('su-unslop-preview-stickers-vis');
-    if (stickerHost) {
-      stickerHost.replaceChildren();
-      const visualCount = Math.min(4, stk);
-      for (let i = 0; i < visualCount; i += 1) {
-        const tag = document.createElement('span');
-        tag.className = 'su-unslop-barcode-tag';
-        const bars = document.createElement('span');
-        bars.className = 'su-unslop-barcode-bars';
-        bars.setAttribute('aria-hidden', 'true');
-        const label = document.createElement('span');
-        label.textContent = `Tag ${i + 1}`;
-        tag.appendChild(bars);
-        tag.appendChild(label);
-        stickerHost.appendChild(tag);
-      }
-    }
-  };
-
-  const syncUnslopPreviewFromForm = () => {
-    const editEl = document.getElementById('admin-prod-edit-id') as HTMLInputElement | null;
-    const nameEl = document.getElementById('admin-prod-name') as HTMLInputElement | null;
-    const custEl = document.getElementById('admin-prod-cust') as HTMLSelectElement | null;
-    const stickersEl = document.getElementById('admin-prod-stickers') as HTMLInputElement | null;
-    const cartonEl = document.getElementById('admin-prod-carton') as HTMLInputElement | null;
-    const buyerLabel = custEl?.selectedOptions?.[0]?.textContent?.trim() || 'Buyer account';
-
-    applyUnslopArticlePreview({
-      id: editEl?.value?.trim() || 'DRAFT',
-      name: nameEl?.value?.trim() || 'New article draft',
-      buyerName: buyerLabel,
-      polybag: Number(editEl?.dataset.polybag || 1),
-      silica: Number(editEl?.dataset.silica || 1),
-      stickers: Number(stickersEl?.value || 2),
-      carton: Number(cartonEl?.value || 50)
-    });
-  };
-
-  const inspectUnslopArticleRow = (row: HTMLElement, focusName = false) => {
-    document.querySelectorAll('#su-unslop-articles-table .su-unslop-article-row').forEach((tr) => {
-      tr.classList.toggle('is-selected', tr === row);
-    });
-
-    const editEl = document.getElementById('admin-prod-edit-id') as HTMLInputElement | null;
-    const nameEl = document.getElementById('admin-prod-name') as HTMLInputElement | null;
-    const custEl = document.getElementById('admin-prod-cust') as HTMLSelectElement | null;
-    const stickersEl = document.getElementById('admin-prod-stickers') as HTMLInputElement | null;
-    const cartonEl = document.getElementById('admin-prod-carton') as HTMLInputElement | null;
-    const resetBtn = document.getElementById('btn-admin-reset-product') as HTMLButtonElement | null;
-    const saveBtn = document.getElementById('btn-admin-save-product') as HTMLButtonElement | null;
-    const titleEl = document.getElementById('su-unslop-form-title');
-    const modeTagEl = document.getElementById('su-unslop-mode-tag');
-
-    const prodId = row.dataset.productId || '';
-    const prodName = row.dataset.productName || '';
-    const custId = row.dataset.customerId || '';
-    const custName = row.dataset.customerName || custId;
-    const polybag = Number(row.dataset.polybag || 1);
-    const silica = Number(row.dataset.silica || 1);
-    const stickers = Number(row.dataset.stickers || 2);
-    const carton = Number(row.dataset.carton || 50);
-
-    if (editEl) {
-      editEl.value = prodId;
-      editEl.dataset.polybag = String(polybag);
-      editEl.dataset.silica = String(silica);
-    }
-    if (nameEl) nameEl.value = prodName;
-    if (custEl && custId) custEl.value = custId;
-    if (stickersEl) stickersEl.value = String(stickers);
-    if (cartonEl) cartonEl.value = String(carton);
-    if (titleEl) titleEl.textContent = 'Edit article specification';
-    if (modeTagEl) modeTagEl.textContent = prodId || 'Editing';
-    if (saveBtn) saveBtn.textContent = 'Update article specification';
-    if (resetBtn) resetBtn.hidden = false;
-
-    applyUnslopArticlePreview({
-      id: prodId,
-      name: prodName,
-      buyerName: custName,
-      polybag,
-      silica,
-      stickers,
-      carton
-    });
-
-    if (focusName) nameEl?.focus();
-  };
-
-  const filterUnslopArticleLedger = () => {
-    const query = ((document.getElementById('admin-prod-search') as HTMLInputElement | null)?.value || '')
-      .trim()
-      .toLowerCase();
-    const buyerFilter =
-      (document.getElementById('admin-prod-buyer-filter') as HTMLSelectElement | null)?.value || 'ALL';
-    const activeDensity =
-      document.querySelector<HTMLElement>('.su-unslop-density-btn.is-active')?.dataset.densityFilter || 'all';
-    const rows = Array.from(
-      document.querySelectorAll<HTMLElement>('#su-unslop-articles-table .su-unslop-article-row')
-    );
-
-    let visibleCount = 0;
-    rows.forEach((row) => {
-      const id = (row.dataset.productId || '').toLowerCase();
-      const name = (row.dataset.productName || '').toLowerCase();
-      const buyerId = row.dataset.customerId || '';
-      const buyerName = (row.dataset.customerName || '').toLowerCase();
-      const carton = Number(row.dataset.carton || 50);
-
-      const matchesQuery = !query || id.includes(query) || name.includes(query) || buyerName.includes(query);
-      const matchesBuyer = buyerFilter === 'ALL' || buyerId === buyerFilter;
-      const matchesDensity =
-        activeDensity === 'all' ||
-        (activeDensity === 'compact' && carton <= 40) ||
-        (activeDensity === 'standard' && carton > 40 && carton < 60) ||
-        (activeDensity === 'bulk' && carton >= 60);
-
-      const visible = matchesQuery && matchesBuyer && matchesDensity;
-      row.hidden = !visible;
-      if (visible) visibleCount += 1;
-    });
-
-    const countEl = document.getElementById('su-unslop-visible-count');
-    if (countEl) countEl.textContent = `${visibleCount} of ${rows.length} articles`;
-    const emptyEl = document.getElementById('su-unslop-empty-state');
-    if (emptyEl) emptyEl.hidden = visibleCount > 0 || rows.length === 0;
-  };
-
-  ['admin-prod-name', 'admin-prod-cust', 'admin-prod-stickers', 'admin-prod-carton'].forEach((id) => {
-    const el = document.getElementById(id);
-    const evt = el?.tagName === 'SELECT' ? 'change' : 'input';
-    el?.addEventListener(evt, syncUnslopPreviewFromForm);
-  });
-
-  document.getElementById('admin-prod-search')?.addEventListener('input', filterUnslopArticleLedger);
-  document.getElementById('admin-prod-buyer-filter')?.addEventListener('change', filterUnslopArticleLedger);
-  document.querySelectorAll<HTMLButtonElement>('.su-unslop-density-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll<HTMLButtonElement>('.su-unslop-density-btn').forEach((peer) => {
-        const active = peer === btn;
-        peer.classList.toggle('is-active', active);
-        peer.setAttribute('aria-pressed', String(active));
-      });
-      filterUnslopArticleLedger();
-    });
-  });
-
-  document.querySelectorAll<HTMLElement>('#su-unslop-articles-table .su-unslop-article-row').forEach((row) => {
-    row.addEventListener('click', (ev) => {
-      const target = ev.target as HTMLElement | null;
-      if (target?.closest('.btn-unslop-order-article')) return;
-      inspectUnslopArticleRow(row, Boolean(target?.closest('.btn-unslop-inspect-article')));
-    });
-    row.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter' || ev.key === ' ') {
-        const target = ev.target as HTMLElement | null;
-        if (target?.closest('button')) return;
-        ev.preventDefault();
-        inspectUnslopArticleRow(row, false);
-      }
-    });
-  });
-
-  document.querySelectorAll<HTMLButtonElement>('.btn-unslop-order-article').forEach((btn) => {
-    btn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const customerName = btn.dataset.customerName || '';
-      const productName = btn.dataset.productName || '';
-      const buyerSel = document.getElementById('admin-pending-order-buyer') as HTMLSelectElement | null;
-      const articleSel = document.getElementById('admin-pending-order-article') as HTMLSelectElement | null;
-      if (buyerSel && customerName) {
-        if (!Array.from(buyerSel.options).some((opt) => opt.value === customerName)) {
-          buyerSel.add(new Option(customerName, customerName));
-        }
-        buyerSel.value = customerName;
-        buyerSel.dispatchEvent(new Event('change'));
-      }
-      if (articleSel && productName) {
-        if (!Array.from(articleSel.options).some((opt) => opt.value === productName)) {
-          articleSel.add(new Option(productName, productName));
-        }
-        articleSel.value = productName;
-        articleSel.dispatchEvent(new Event('change'));
-      }
-      document.querySelector('.su-order-form-grid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      showToast(`Order Creation pre-filled for "${productName}".`);
-    });
-  });
-
-  document.getElementById('btn-admin-reset-product')?.addEventListener('click', () => {
-    const editEl = document.getElementById('admin-prod-edit-id') as HTMLInputElement | null;
-    const nameEl = document.getElementById('admin-prod-name') as HTMLInputElement | null;
-    const stickersEl = document.getElementById('admin-prod-stickers') as HTMLInputElement | null;
-    const cartonEl = document.getElementById('admin-prod-carton') as HTMLInputElement | null;
-    const resetBtn = document.getElementById('btn-admin-reset-product') as HTMLButtonElement | null;
-    const saveBtn = document.getElementById('btn-admin-save-product') as HTMLButtonElement | null;
-    const titleEl = document.getElementById('su-unslop-form-title');
-    const modeTagEl = document.getElementById('su-unslop-mode-tag');
-
-    if (editEl) {
-      editEl.value = '';
-      editEl.dataset.polybag = '1';
-      editEl.dataset.silica = '1';
-    }
-    if (nameEl) nameEl.value = '';
-    if (stickersEl) stickersEl.value = '2';
-    if (cartonEl) cartonEl.value = '50';
-    if (titleEl) titleEl.textContent = 'New article specification';
-    if (modeTagEl) modeTagEl.textContent = 'New spec';
-    if (saveBtn) saveBtn.textContent = 'Save article specification';
-    if (resetBtn) resetBtn.hidden = true;
-    syncUnslopPreviewFromForm();
-  });
-
   document.getElementById('btn-admin-save-product')?.addEventListener('click', (e) => {
-    const editEl = document.getElementById('admin-prod-edit-id') as HTMLInputElement | null;
     const nameEl = document.getElementById('admin-prod-name') as HTMLInputElement | null;
     const stickersEl = document.getElementById('admin-prod-stickers') as HTMLInputElement | null;
     const cartonEl = document.getElementById('admin-prod-carton') as HTMLInputElement | null;
-    const editId = editEl?.value?.trim() || undefined;
-    const polybagPerPair = Number(editEl?.dataset.polybag || 1);
-    const silicaGelPerPair = Number(editEl?.dataset.silica || 1);
     const name = nameEl?.value?.trim() || '';
     const customerId = (document.getElementById('admin-prod-cust') as HTMLSelectElement)?.value;
     const stickersPerPair = Number(stickersEl?.value || 2);
@@ -5113,15 +4772,7 @@ function attachAdminHandlers(): void {
         const res = await fetch('/api/admin/master/product', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: editId,
-            name,
-            customerId: customerId || 'CUST-01',
-            polybagPerPair,
-            silicaGelPerPair,
-            stickersPerPair,
-            pairsPerCarton
-          })
+          body: JSON.stringify({ name, customerId: customerId || 'CUST-01', stickersPerPair, pairsPerCarton })
         });
         const json = await res.json();
         if (!res.ok || !json.success) {
@@ -5132,7 +4783,7 @@ function attachAdminHandlers(): void {
         if (!state.dropdownOptions.articles.includes(name)) {
           state.dropdownOptions.articles.push(name);
         }
-        showToast(`${editId ? 'Updated' : 'Saved'} "${name}" in SQLite Products Master.`);
+        showToast(`Article "${name}" saved to SQLite Products Master & Dropdowns.`);
         await syncBackendData();
       } catch (err) {
         console.warn(err);

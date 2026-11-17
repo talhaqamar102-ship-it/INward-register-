@@ -1708,10 +1708,6 @@ test('Phase 4.4: Customer Master and Article/BOM Master forms use responsive CSS
 
   assert.ok(html.includes('class="su-customer-form-grid"'), 'Customer Master form uses .su-customer-form-grid');
   assert.ok(html.includes('class="su-article-form-grid"'), 'Article & BOM Master form uses .su-article-form-grid');
-  assert.ok(html.includes('su-unslop-articles-registry'), 'Section 3 uses heydamir/unslop Warm/Graphite registry layout');
-  assert.ok(html.includes('id="su-unslop-bom-preview"'), 'Section 3 renders physical carton & pair blueprint');
-  assert.ok(html.includes('id="admin-prod-search"'), 'Section 3 renders live article search');
-  assert.ok(html.includes('1P · 1S · 2L'), 'Section 3 renders monospace BOM stencil keycap signature');
   assert.doesNotMatch(
     html,
     /grid-template-columns:\s*(?:1\.1fr|1\.2fr)/,
