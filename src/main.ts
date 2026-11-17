@@ -1,5 +1,5 @@
 /**
- * Meridian Works - Factory ERP & QA Management Portal
+ * Hammad Industries - Factory ERP & QA Management Portal
  * Tech Stack: Pure Vanilla HTML5 / CSS / JavaScript (Zero External Libraries)
  * Clean Real Data Entry Mode: All mockup details removed; unified Requisition with M/A prefixes.
  */
@@ -21,7 +21,9 @@ import {
   determineOrderActiveStage,
   canExecuteStage5CartonPacking,
   computeWipRolledYieldPct,
+  isMaterialRequisitionIssuedForStage4,
   isPackingAwaitingFinalQc,
+  isStage3ClearedForMaterialReq,
   formatBatchSequence,
   isReqAwaitingFinalQc,
   buildSuperUserOrderRollups,
@@ -39,6 +41,8 @@ import {
   ConfirmDialogHtmlOptions,
   buildConfirmDialogHtml,
   validatePendingOrderInputs,
+  validateContractorAllocations,
+  computeDeliveryCountdown,
   validateCustomerMasterInputs,
   validateProductMasterInputs,
   validateSystemUserInputs,
@@ -62,6 +66,8 @@ interface GRNRecord {
   pendingOrderId: string;
   maker: string;
   article: string;
+  color?: string;
+  receivedFrom?: string;
   rcvdPairs: number;
   sizes: SizeBreakdown;
   status: string;
@@ -103,7 +109,7 @@ interface GrnRemainingCaps {
 }
 
 const DEFAULT_REQ_NUMBER = 'REQ-0001';
-const SAVED_TAILORS_STORAGE_KEY = 'meridian-works-saved-tailors';
+const SAVED_TAILORS_STORAGE_KEY = 'hammad-industries-saved-tailors';
 
 /** Build a blank REQ-0001 Packing Hall WIP state without stale order/article/size fields. */
 function createEmptyPackingWipState() {
@@ -128,7 +134,7 @@ function createEmptyPackingWipState() {
     mreqNo: getMaterialReqNumber(DEFAULT_REQ_NUMBER),
     altReqNo: getAlterationReqNumber(DEFAULT_REQ_NUMBER),
     mreqQty: '0 Sets',
-    mreqStatus: 'Ready',
+    mreqStatus: 'Pending Stage 3',
     stage4In: 0,
     stage4Passed: 0,
     stage4Pending: 0,
@@ -191,11 +197,13 @@ const state = {
     { id: 'chk-5', title: 'Master Carton 5-Drop Impact Test', details: 'ISTA drop standard compliance verification', passed: false }
   ],
 
-  // Form input clean states (Front person only enters received pairs + selects Pending Order)
+  // Form input clean states (Front person only enters received pairs + Received From + selects Pending Order)
   grnForm: {
     pendingOrderId: '',
     maker: '',
     article: '',
+    color: '',
+    receivedFrom: '',
     rcvdPairs: '',
     sizes: createEmptySizes()
   },
@@ -279,6 +287,24 @@ const state = {
   adminTrackingPageSize: 10,
   adminHighlightedRefCode: '',
   adminExpandedOrders: {} as Record<string, boolean>,
+  adminOpenRegistries: {
+    buyers: true,
+    articles: true,
+    makers_pos: false,
+    audit_trail: false,
+    sqlite_wal: false,
+    phased_rollout: false
+  } as Record<string, boolean>,
+  adminOrderDraft: {
+    buyer: '',
+    maker: '',
+    po: '',
+    article: '',
+    color: '',
+    dueDate: '',
+    sizes: createEmptySizes()
+  },
+  adminOrderSplitRows: [] as Array<{ maker: string; sizes: SizeBreakdown; dueDate: string }>,
   systemUsers: [] as SystemUserRecord[],
   auditTrail: [] as AuditTrailEntry[],
   lastBackupPath: '',
@@ -297,16 +323,32 @@ const state = {
   }
 };
 
-function getGrnRemainingCaps(orderId: string): GrnRemainingCaps | null {
+function getGrnRemainingCaps(orderId: string, maker?: string): GrnRemainingCaps | null {
   const order = state.pendingOrders.find(candidate => candidate.orderId === orderId);
   if (!order?.sizes) return null;
-  const plannedTotal = STANDARD_GLOVE_SIZES.reduce((sum, size) => sum + Number(order.sizes?.[size] || 0), 0);
-  if (plannedTotal <= 0) return null;
+  const orderPlannedTotal = STANDARD_GLOVE_SIZES.reduce((sum, size) => sum + Number(order.sizes?.[size] || 0), 0);
+  if (orderPlannedTotal <= 0) return null;
+
+  const allocs = order.contractorAllocations || [];
+  const trimmedMaker = String(maker || '').trim().toLowerCase();
+  const matchedAlloc = allocs.length > 0
+    ? (trimmedMaker
+        ? allocs.find(a => a.maker.trim().toLowerCase() === trimmedMaker)
+        : (allocs.length === 1 ? allocs[0] : undefined))
+    : undefined;
+
+  const targetSizes = matchedAlloc?.sizes || order.sizes;
+  const targetPlannedTotal = matchedAlloc
+    ? STANDARD_GLOVE_SIZES.reduce((sum, size) => sum + Number(matchedAlloc.sizes?.[size] || 0), 0)
+    : orderPlannedTotal;
 
   const receivedBySize = createEmptySizes();
   let receivedTotal = 0;
   for (const grn of state.grnList) {
     if (grn.pendingOrderId !== orderId || grn.isVoided || grn.status.toUpperCase() === 'VOIDED') continue;
+    if (matchedAlloc && String(grn.maker || '').trim().toLowerCase() !== matchedAlloc.maker.trim().toLowerCase()) {
+      continue;
+    }
     receivedTotal += Math.max(0, Number(grn.rcvdPairs) || 0);
     for (const size of STANDARD_GLOVE_SIZES) {
       receivedBySize[size] += Math.max(0, Number(grn.sizes?.[size]) || 0);
@@ -315,12 +357,12 @@ function getGrnRemainingCaps(orderId: string): GrnRemainingCaps | null {
 
   const sizeRemaining = {} as Record<StandardSizeKey, number>;
   for (const size of STANDARD_GLOVE_SIZES) {
-    sizeRemaining[size] = Math.max(0, Number(order.sizes[size] || 0) - receivedBySize[size]);
+    sizeRemaining[size] = Math.max(0, Number(targetSizes[size] || 0) - receivedBySize[size]);
   }
 
   return {
     sizeRemaining,
-    totalRemaining: Math.max(0, plannedTotal - receivedTotal)
+    totalRemaining: Math.max(0, targetPlannedTotal - receivedTotal)
   };
 }
 
@@ -875,14 +917,14 @@ function stationName(role: SystemUserRecord['role']): string {
 
 function renderAuthScreen(): string {
   if (state.authMode === 'checking') {
-    return '<main class="auth-screen"><section class="auth-card"><h1>Meridian Works MES</h1><p>Checking sign-in status…</p></section></main>';
+    return '<main class="auth-screen"><section class="auth-card"><h1>Hammad Industries MES</h1><p>Checking sign-in status…</p></section></main>';
   }
 
   if (state.authMode === 'error') {
     return `
       <main class="auth-screen">
         <section class="auth-card" aria-labelledby="auth-title">
-          <h1 id="auth-title">Meridian Works MES</h1>
+          <h1 id="auth-title">Hammad Industries MES</h1>
           <p class="auth-error" role="alert">${escapeHtml(state.authError)}</p>
           <button type="button" class="btn-primary" id="btn-auth-retry">Try Again</button>
         </section>
@@ -894,7 +936,7 @@ function renderAuthScreen(): string {
   return `
     <main class="auth-screen">
       <section class="auth-card" aria-labelledby="auth-title">
-        <div class="auth-brand">${LOGO_SVG}<span>MERIDIAN WORKS</span></div>
+        <div class="auth-brand">${LOGO_SVG}<span>HAMMAD INDUSTRIES</span></div>
         <h1 id="auth-title">${isSetup ? 'Create the first Super User' : 'Sign in to your station'}</h1>
         <p>${isSetup
           ? 'Set up the initial administrator account. This one-time step unlocks user and station management.'
@@ -942,9 +984,9 @@ function renderModuleSwitcher(): string {
   return `
     <header class="module-switcher-bar">
       <a href="#main-content" class="skip-to-content">Skip to main content</a>
-      <div class="header-brand" title="Meridian Works">
+      <div class="header-brand" title="Hammad Industries">
         ${LOGO_SVG}
-        <span class="brand-title">MERIDIAN WORKS</span>
+        <span class="brand-title">HAMMAD INDUSTRIES</span>
       </div>
       <div class="module-switcher-left">
         <span class="station-label">${escapeHtml(stationName(viewingOtherScreen
@@ -1008,7 +1050,9 @@ function renderScreenGRN(): string {
     .filter(row => !row.isVoided && row.status.toUpperCase() !== 'VOIDED')
     .reduce((acc, row) => acc + row.rcvdPairs, 0);
   const currentSizeTotal = calculateSizeTotal(state.grnForm.sizes);
-  const grnCaps = getGrnRemainingCaps(state.grnForm.pendingOrderId);
+  const selectedGrnOrder = state.pendingOrders.find(o => o.orderId === state.grnForm.pendingOrderId);
+  const orderAllocations = selectedGrnOrder?.contractorAllocations || [];
+  const grnCaps = getGrnRemainingCaps(state.grnForm.pendingOrderId, state.grnForm.maker);
   const wip = state.packingWip;
   const baseReq = normalizeBaseReqNumber(wip.selectedBatch);
   const mReq = getMaterialReqNumber(baseReq);
@@ -1054,23 +1098,36 @@ function renderScreenGRN(): string {
               }).join('')}
             </select>
           </div>
-          <div class="form-group" style="flex: 1.4;">
-            <label for="grn-maker">Maker / Contractor</label>
-            <select id="grn-maker" class="form-select">
-              <option value="">-- Select Maker / Contractor --</option>
-              ${state.dropdownOptions.makers.map(m => `<option value="${m}" ${state.grnForm.maker === m ? 'selected' : ''}>${m}</option>`).join('')}
+          <div class="form-group" style="flex: 1.5;">
+            <label for="grn-maker">
+              Maker / Contractor ${orderAllocations.length > 1 ? `(${orderAllocations.length} Split)` : (selectedGrnOrder ? '(Locked)' : '')}
+            </label>
+            <select id="grn-maker" class="form-select" ${selectedGrnOrder && orderAllocations.length === 1 ? 'disabled title="Only one contractor is allocated to this order."' : ''}>
+              ${
+                selectedGrnOrder && orderAllocations.length > 0
+                  ? `${orderAllocations.length > 1 ? '<option value="">-- Choose Allocated Contractor --</option>' : ''}${orderAllocations.map(alloc => {
+                      const bal = alloc.remainingPairs ?? Math.max(0, alloc.totalQty - Number(alloc.receivedPairs || 0));
+                      return `<option value="${escapeHtml(alloc.maker)}" ${state.grnForm.maker === alloc.maker ? 'selected' : ''}>${escapeHtml(alloc.maker)} (Plan: ${alloc.totalQty} | Rcvd: ${Number(alloc.receivedPairs || 0)} | Bal: ${bal} Prs)</option>`;
+                    }).join('')}`
+                  : `<option value="">-- Select Maker / Contractor --</option>${state.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${state.grnForm.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}`
+              }
             </select>
           </div>
-          <div class="form-group" style="flex: 1.4;">
-            <label for="grn-article">Article</label>
-            <select id="grn-article" class="form-select">
-              <option value="">-- Select Article --</option>
-              ${state.dropdownOptions.articles.map(a => `<option value="${a}" ${state.grnForm.article === a ? 'selected' : ''}>${a}</option>`).join('')}
-            </select>
+          <div class="form-group" style="flex: 1.2;">
+            <label for="grn-article">Article / Model ${state.grnForm.pendingOrderId ? '(Locked)' : ''}</label>
+            <input type="text" id="grn-article" class="form-input" placeholder="Auto-locked from order" value="${escapeHtml(state.grnForm.article)}" readonly aria-readonly="true" />
           </div>
           <div class="form-group" style="flex: 1;">
+            <label for="grn-color">Colour / Shade ${state.grnForm.pendingOrderId ? '(Locked)' : ''}</label>
+            <input type="text" id="grn-color" class="form-input" placeholder="Locked from order" value="${escapeHtml(state.grnForm.color)}" readonly aria-readonly="true" />
+          </div>
+          <div class="form-group" style="flex: 1.3;">
+            <label for="grn-received-from">Received From (Name) <span class="su-required-mark" aria-hidden="true">*</span></label>
+            <input type="text" id="grn-received-from" class="form-input" placeholder="Person name who delivered goods" value="${escapeHtml(state.grnForm.receivedFrom)}" required aria-required="true" />
+          </div>
+          <div class="form-group" style="flex: 0.9;">
             <label for="grn-rcvd-pairs">Received Pairs</label>
-            <input type="number" id="grn-rcvd-pairs" class="form-input" placeholder="0" value="${state.grnForm.rcvdPairs}" readonly />
+            <input type="number" id="grn-rcvd-pairs" class="form-input" placeholder="0" value="${escapeHtml(state.grnForm.rcvdPairs)}" readonly aria-readonly="true" />
           </div>
         </div>
 
@@ -1111,6 +1168,15 @@ function renderScreenGRN(): string {
               ? formatGrnRemainingCaps(grnCaps, state.grnForm.sizes)
               : 'No matching pending-order size cap available; received quantities are unrestricted.'}
           </div>
+          ${selectedGrnOrder?.dueDate ? (() => {
+            const allocForDue = orderAllocations.find(a => a.maker.trim().toLowerCase() === state.grnForm.maker.trim().toLowerCase());
+            const effectiveDue = allocForDue?.dueDate || selectedGrnOrder.dueDate;
+            const cd = computeDeliveryCountdown({ dueDate: effectiveDue, createdAt: selectedGrnOrder.createdAt });
+            return `
+            <div id="grn-delivery-timeline" style="font-size: 11.5px; color: var(--ink-800); margin-top: 4px; font-weight: 600;">
+              Target Delivery: <strong>${escapeHtml(cd.dueDate)}</strong> (${escapeHtml(cd.badgeText)})
+            </div>`;
+          })() : ''}
         </div>
 
         <div class="form-action-row" style="justify-content: flex-end;">
@@ -1181,7 +1247,8 @@ function renderScreenGRN(): string {
                 <th>Date</th>
                 <th>Parent Order #</th>
                 <th>Maker / Contractor</th>
-                <th>Article</th>
+                <th>Received From</th>
+                <th>Article / Colour</th>
                 <th class="text-center">7/S</th>
                 <th class="text-center">8/M</th>
                 <th class="text-center">9/L</th>
@@ -1195,17 +1262,18 @@ function renderScreenGRN(): string {
             <tbody>
               ${state.grnList.length === 0 ? `
                 <tr>
-                  <td colspan="13" class="text-center" style="padding: 32px 16px; color: var(--ink-500); font-size: 13px;">
-                    No records found in Inward Register. Select a Pending Order (or Maker &amp; Article) and enter Received Size Breakdown Allocation above, then click <strong>Print Receiving Slip</strong>.
+                  <td colspan="14" class="text-center" style="padding: 32px 16px; color: var(--ink-500); font-size: 13px;">
+                    No records found in Inward Register. Select a Pending Order, enter Received From (person name) and size quantities above, then click <strong>Print Receiving Slip</strong>.
                   </td>
                 </tr>
               ` : state.grnList.map(row => `
                 <tr>
                   <td class="text-center font-bold" style="font-family: var(--font-mono);">${row.grnCode || formatBatchSequence('GRN', row.sr)}</td>
-                  <td>${row.date}</td>
-                  <td class="font-bold">${row.pendingOrderId || '---'}</td>
-                  <td>${row.maker}</td>
-                  <td class="font-bold">${row.article}</td>
+                  <td>${escapeHtml(row.date)}</td>
+                  <td class="font-bold">${escapeHtml(row.pendingOrderId || '---')}</td>
+                  <td>${escapeHtml(row.maker)}</td>
+                  <td>${escapeHtml(row.receivedFrom || row.maker || '---')}</td>
+                  <td class="font-bold">${escapeHtml(row.article)}${row.color ? ` <span style="font-weight: 500; color: var(--ink-600);">(${escapeHtml(row.color)})</span>` : ''}</td>
                   <td class="text-center">${(row.sizes?.['7'] ?? 0).toLocaleString()}</td>
                   <td class="text-center">${(row.sizes?.['8'] ?? 0).toLocaleString()}</td>
                   <td class="text-center">${(row.sizes?.['9'] ?? 0).toLocaleString()}</td>
@@ -1214,7 +1282,7 @@ function renderScreenGRN(): string {
                   <td class="text-right font-bold">${row.rcvdPairs.toLocaleString()}</td>
                   <td class="text-center">
                     <span class="status-pill status-pill-neutral">
-                      ${row.status}
+                      ${escapeHtml(row.status)}
                     </span>
                   </td>
                   <td class="text-center">
@@ -1600,10 +1668,14 @@ function renderScreenAdmin(): string {
       poList: state.dropdownOptions.poList
     },
     systemUsers: state.systemUsers,
+    currentUserId: state.currentUser?.userId,
     auditTrail: state.auditTrail,
     adminOverview: state.adminOverview,
     lastBackupPath: state.lastBackupPath,
-    rollupSummary
+    rollupSummary,
+    orderDraft: state.adminOrderDraft,
+    orderSplitRows: state.adminOrderSplitRows,
+    openRegistryIds: state.adminOpenRegistries
   });
 }
 
@@ -1881,6 +1953,8 @@ function attachEventHandlers(): void {
       pendingOrderId: '',
       maker: '',
       article: '',
+      color: '',
+      receivedFrom: '',
       rcvdPairs: '',
       sizes: createEmptySizes()
     };
@@ -1914,7 +1988,7 @@ function attachEventHandlers(): void {
   document.getElementById('modal-close-x')?.addEventListener('click', closeModal);
   document.getElementById('modal-btn-close')?.addEventListener('click', closeModal);
   document.getElementById('modal-btn-print')?.addEventListener('click', () => {
-    const title = document.getElementById('modal-title')?.textContent || 'Meridian Works Document';
+    const title = document.getElementById('modal-title')?.textContent || 'Hammad Industries Document';
     const preview = document.getElementById('doc-preview-container');
     const content = preview ? preview.innerHTML : (document.getElementById('modal-body')?.innerHTML || '');
     printDocument(title, content);
@@ -1975,13 +2049,16 @@ function attachEventHandlers(): void {
 function attachGRNHandlers(): void {
   const pendingOrderSelect = document.getElementById('grn-pending-order') as HTMLSelectElement;
   const makerSelect = document.getElementById('grn-maker') as HTMLSelectElement;
-  const articleSelect = document.getElementById('grn-article') as HTMLSelectElement;
+  const articleInput = document.getElementById('grn-article') as HTMLInputElement;
+  const colorInput = document.getElementById('grn-color') as HTMLInputElement;
+  const receivedFromInput = document.getElementById('grn-received-from') as HTMLInputElement;
   const rcvdPairsInput = document.getElementById('grn-rcvd-pairs') as HTMLInputElement;
   const totalDisplay = document.getElementById('grn-size-total-display');
   const capsDisplay = document.getElementById('grn-size-caps');
 
   function syncSizesAndReceived(changedInput?: HTMLInputElement) {
-    const caps = getGrnRemainingCaps(state.grnForm.pendingOrderId);
+    const activeMaker = makerSelect?.value || state.grnForm.maker;
+    const caps = getGrnRemainingCaps(state.grnForm.pendingOrderId, activeMaker);
     const sizeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('.grn-size-val'));
     const sizes: SizeBreakdown = createEmptySizes();
     sizeInputs.forEach(inp => {
@@ -2053,7 +2130,11 @@ function attachGRNHandlers(): void {
     const val = pendingOrderSelect.value;
     state.grnForm.pendingOrderId = val;
     if (!val) {
-      syncSizesAndReceived();
+      state.grnForm.maker = '';
+      state.grnForm.article = '';
+      state.grnForm.color = '';
+      state.grnForm.receivedFrom = '';
+      renderApp();
       return;
     }
     const filled = applyPendingOrderSelection(state.pendingOrders, val);
@@ -2065,18 +2146,30 @@ function attachGRNHandlers(): void {
     state.grnForm.pendingOrderId = filled.pendingOrderId;
     state.grnForm.maker = filled.maker;
     state.grnForm.article = filled.article;
-    if (makerSelect) makerSelect.value = filled.maker;
-    if (articleSelect) articleSelect.value = filled.article;
+    state.grnForm.color = filled.color || 'Standard';
+    if (!state.grnForm.receivedFrom?.trim() || state.grnForm.receivedFrom.endsWith(' Representative')) {
+      state.grnForm.receivedFrom = filled.maker ? `${filled.maker} Representative` : '';
+    }
 
-    syncSizesAndReceived();
-    showToast(`Pending Order ${filled.pendingOrderId} selected: Auto-filled Maker (${filled.maker}) and Article (${filled.article}).`);
+    renderApp();
+    showToast(
+      filled.contractorAllocations && filled.contractorAllocations.length > 1
+        ? `Order ${filled.pendingOrderId} selected (${filled.contractorAllocations.length} contractors): Choose delivering contractor, Received From & quantities.`
+        : `Order ${filled.pendingOrderId} selected: Locked Article (${filled.article}) & Colour (${state.grnForm.color}).`
+    );
   });
 
   makerSelect?.addEventListener('change', () => {
     state.grnForm.maker = makerSelect.value;
+    if (!state.grnForm.receivedFrom?.trim() || state.grnForm.receivedFrom.endsWith(' Representative')) {
+      state.grnForm.receivedFrom = state.grnForm.maker ? `${state.grnForm.maker} Representative` : '';
+      if (receivedFromInput) receivedFromInput.value = state.grnForm.receivedFrom;
+    }
+    syncSizesAndReceived();
   });
-  articleSelect?.addEventListener('change', () => {
-    state.grnForm.article = articleSelect.value;
+  receivedFromInput?.addEventListener('input', () => {
+    state.grnForm.receivedFrom = receivedFromInput.value;
+    applyFieldValidationErrors([[receivedFromInput, receivedFromInput.value.trim() ? '' : 'Enter who goods were received from.']]);
   });
 
   document.querySelectorAll('.grn-size-val').forEach(inp => {
@@ -2089,6 +2182,8 @@ function attachGRNHandlers(): void {
       pendingOrderId: '',
       maker: '',
       article: '',
+      color: '',
+      receivedFrom: '',
       rcvdPairs: '',
       sizes: createEmptySizes()
     };
@@ -2096,28 +2191,41 @@ function attachGRNHandlers(): void {
     showToast('Inward form and size breakdown cleared.');
   });
 
-  // Inward Register Person records & prints the received goods slip (No PO, No Order Qty)
+  // Inward Register Person records & prints the received goods slip (Order-locked Article/Colour + Received From + Quantities)
   document.getElementById('btn-print-grn-slip')?.addEventListener('click', async () => {
     syncSizesAndReceived();
     const formPendingOrder = pendingOrderSelect?.value || state.grnForm.pendingOrderId;
     const formMaker = makerSelect?.value || state.grnForm.maker;
-    const formArt = articleSelect?.value || state.grnForm.article;
+    const formArt = articleInput?.value || state.grnForm.article;
+    const formColor = colorInput?.value || state.grnForm.color || 'Standard';
+    const formReceivedFrom = (receivedFromInput?.value ?? state.grnForm.receivedFrom ?? '').trim();
     const sizeTotal = calculateSizeTotal(state.grnForm.sizes);
     const rcvdPairs = Math.max(0, parseInt(rcvdPairsInput?.value || '0', 10) || sizeTotal);
-    const caps = getGrnRemainingCaps(formPendingOrder);
+    const caps = getGrnRemainingCaps(formPendingOrder, formMaker);
     if (caps && (
       rcvdPairs > caps.totalRemaining ||
       STANDARD_GLOVE_SIZES.some(size => Number(state.grnForm.sizes[size] || 0) > caps.sizeRemaining[size])
     )) {
-      showToast('Received quantities exceed the selected pending order’s remaining size or total cap.');
+      showToast('Received quantities exceed the selected contractor allocation remaining size or total cap.');
       return;
     }
 
     if (formPendingOrder || formMaker || formArt || rcvdPairs > 0) {
+      if (formPendingOrder && !formMaker) {
+        applyFieldValidationErrors([[makerSelect, 'Choose the delivering contractor for this order.']]);
+        showToast('Choose which allocated contractor delivered these goods.');
+        return;
+      }
+      if (!formReceivedFrom) {
+        applyFieldValidationErrors([[receivedFromInput, 'Enter the person name goods were received from.']]);
+        showToast('Enter the person name in Received From.');
+        return;
+      }
       const entryPendingOrder = formPendingOrder || 'ORD-INWARD';
       const selectedOrder = state.pendingOrders.find(order => order.orderId === entryPendingOrder);
       const entryMaker = formMaker || '---';
-      const entryArticle = formArt || '---';
+      const entryArticle = selectedOrder?.article || formArt || '---';
+      const entryColor = selectedOrder?.color || formColor || 'Standard';
       const entrySizes = { ...state.grnForm.sizes };
       const newSr = state.grnList.length + 1;
       const newGrnCode = formatBatchSequence('GRN', newSr);
@@ -2133,6 +2241,9 @@ function attachGRNHandlers(): void {
             customerName: selectedOrder?.buyer || 'Standard',
             makerContractor: entryMaker,
             articleName: entryArticle,
+            colorShade: entryColor,
+            receivedFrom: formReceivedFrom,
+            strictInwardEntry: true,
             orderQty: selectedOrder
               ? STANDARD_GLOVE_SIZES.reduce((sum, sizeCode) => sum + Number(selectedOrder.sizes?.[sizeCode] || 0), 0)
               : rcvdPairs,
@@ -2168,6 +2279,8 @@ function attachGRNHandlers(): void {
         pendingOrderId: persistedOrderId,
         maker: savedReceiving?.maker_contractor || entryMaker,
         article: savedReceiving?.article_name || entryArticle,
+        color: savedReceiving?.color_shade || entryColor,
+        receivedFrom: savedReceiving?.received_from || formReceivedFrom,
         rcvdPairs: Number(savedReceiving?.rcvd_pairs || rcvdPairs),
         sizes: entrySizes,
         status: 'Received'
@@ -2187,10 +2300,25 @@ function attachGRNHandlers(): void {
               Number(selectedOrder.receivedSizes[size] || 0) + Number(entrySizes[size] || 0);
           }
         }
+        if (selectedOrder.contractorAllocations?.length) {
+          const alloc = selectedOrder.contractorAllocations.find(
+            a => a.maker.trim().toLowerCase() === entryMaker.trim().toLowerCase()
+          );
+          if (alloc) {
+            alloc.receivedPairs = Number(alloc.receivedPairs || 0) + addedPairs;
+            alloc.remainingPairs = Math.max(0, alloc.totalQty - alloc.receivedPairs);
+            alloc.receivedSizes = alloc.receivedSizes || createEmptySizes();
+            alloc.remainingSizes = alloc.remainingSizes || { ...alloc.sizes };
+            for (const size of STANDARD_GLOVE_SIZES) {
+              alloc.receivedSizes[size] = Number(alloc.receivedSizes[size] || 0) + Number(entrySizes[size] || 0);
+              alloc.remainingSizes[size] = Math.max(0, Number(alloc.sizes[size] || 0) - Number(alloc.receivedSizes[size] || 0));
+            }
+          }
+        }
       }
 
-      if (!state.packingWip.article && formArt) {
-        state.packingWip.article = formArt;
+      if (!state.packingWip.article && entryArticle) {
+        state.packingWip.article = entryArticle;
       }
       if (!state.packingWip.parentOrderId && persistedOrderId) {
         state.packingWip.parentOrderId = persistedOrderId;
@@ -2200,7 +2328,9 @@ function attachGRNHandlers(): void {
     const latest = state.grnList[0];
     const pendingOrderId = formPendingOrder || latest?.pendingOrderId || '---';
     const maker = formMaker || latest?.maker || '---';
-    const article = formArt || latest?.article || '---';
+    const article = latest?.article || formArt || '---';
+    const color = latest?.color || formColor || 'Standard';
+    const receivedFrom = formReceivedFrom || latest?.receivedFrom || maker || '---';
     const sizes = calculateSizeTotal(state.grnForm.sizes) > 0
       ? state.grnForm.sizes
       : (latest?.sizes || createEmptySizes());
@@ -2213,6 +2343,8 @@ function attachGRNHandlers(): void {
       pendingOrderId,
       maker,
       article,
+      color,
+      receivedFrom,
       rcvdPairs: finalRcvd,
       sizes
     });
@@ -2282,7 +2414,7 @@ function attachGRNHandlers(): void {
         } else {
           state.packingWip.issueStatus = 'Issued by Inward Register';
           state.packingWip.stage1In = evalIssue.askingPairs;
-          state.packingWip.mreqQty = `${evalIssue.askingPairs} Sets`;
+          state.packingWip.mreqQty = '0 Sets';
           if (!state.packingWip.parentOrderId && targetOrderId) {
             state.packingWip.parentOrderId = targetOrderId;
           }
@@ -2310,7 +2442,7 @@ function attachGRNHandlers(): void {
       state.issuedPairsTotal += evalIssue.askingPairs;
       state.packingWip.issueStatus = 'Issued by Inward Register';
       state.packingWip.stage1In = evalIssue.askingPairs;
-      state.packingWip.mreqQty = `${evalIssue.askingPairs} Sets`;
+      state.packingWip.mreqQty = '0 Sets';
       saveCurrentOrderWipState();
     }
 
@@ -2353,7 +2485,7 @@ function attachGRNHandlers(): void {
     const docHtml = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; DAILY INWARD GOODS REGISTER SUMMARY</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; DAILY INWARD GOODS REGISTER SUMMARY</h2>
           <p style="margin: 3px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             Dock #1 Store Receiving Master Sheet &bull; Date: 31-10-2026
           </p>
@@ -2565,7 +2697,7 @@ function attachRepairHandlers(): void {
     const docHtml = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; DAILY DEFECT &amp; ALTERATION SUMMARY LOG</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; DAILY DEFECT &amp; ALTERATION SUMMARY LOG</h2>
           <p style="margin: 3px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             Alteration &amp; Repair Bay #2 (${defaultAltId}) &bull; Date: 31-10-2026
           </p>
@@ -2614,7 +2746,7 @@ function attachQCHandlers(): void {
     const docHtml = `
       <div style="border: 2px solid var(--ink-950); padding: 20px; font-family: monospace; background: var(--white);">
         <div style="text-align: center; border-bottom: 2px solid var(--ink-950); padding-bottom: 10px; margin-bottom: 14px;">
-          <div style="font-size: 19px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; EXPORT MASTER CARTON</div>
+          <div style="font-size: 19px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; EXPORT MASTER CARTON</div>
           <div style="font-size: 11px; color: var(--ink-600);">INTERNATIONAL EXPORT SHIPPING LABEL &bull; THERMAL DIRECT / A4</div>
         </div>
         <div class="printable-meta-grid" style="font-size: 12.5px;">
@@ -2802,8 +2934,8 @@ function mapServerRequisitionToWip(requisition: any): typeof state.packingWip & 
     mreqNo: getMaterialReqNumber(reqNumber),
     matReqNumber: requisition.materialReq?.mat_req_number || '',
     altReqNo: getAlterationReqNumber(reqNumber),
-    mreqQty: `${stage3Passed || plannedQty} Sets`,
-    mreqStatus: requisition.materialReq?.status || (Number(wip.step4_materials_issued || 0) === 1 ? 'ISSUED' : 'Ready'),
+    mreqQty: `${stage3Passed} Sets`,
+    mreqStatus: requisition.materialReq?.status || (Number(wip.step4_materials_issued || 0) === 1 ? 'ISSUED' : (stage3Passed > 0 ? 'Ready' : 'Pending Stage 3')),
     stage4In,
     stage4Passed,
     stage4Pending: Math.max(0, stage4In - stage4Passed),
@@ -2826,23 +2958,10 @@ function mapServerRequisitionToWip(requisition: any): typeof state.packingWip & 
   } as any;
 }
 
-function buildCurrentPackingRequisitionSlip(): string {
-  const wip = state.packingWip;
-  const reqNumber = normalizeBaseReqNumber(wip.selectedBatch);
-  return buildPackingRequisitionSlipHtml({
-    reqNo: reqNumber,
-    date: '31-10-2026',
-    article: wip.article || '---',
-    sizes: wip.sizes,
-    totalPairs: wip.plannedQty,
-    issueStatus: wip.issueStatus
-  });
-}
-
 function buildCurrentMaterialRequisitionSlip(): string {
   const wip = state.packingWip;
   const reqNumber = normalizeBaseReqNumber(wip.selectedBatch);
-  const pairs = wip.stage3Passed || wip.plannedQty || calculateSizeTotal(wip.sizes);
+  const pairs = Math.max(0, Number(wip.stage3Passed || 0));
   return buildMaterialRequisitionSlipHtml({
     mreqNo: getMaterialReqNumber(reqNumber),
     reqNo: reqNumber,
@@ -3151,11 +3270,14 @@ function attachPackingHandlers(): void {
           recordStageDefects('Stage 3 (Matching)', defects, 'Mismatch / Unpaired Gloves');
           state.packingWip.mreqNo = getMaterialReqNumber(state.packingWip.selectedBatch);
           state.packingWip.altReqNo = getAlterationReqNumber(state.packingWip.selectedBatch);
-          state.packingWip.mreqQty = `${good} Sets`;
+          state.packingWip.mreqQty = `${state.packingWip.stage3Passed} Sets`;
+          if (state.packingWip.mreqStatus !== 'ISSUED') {
+            state.packingWip.mreqStatus = 'Ready';
+          }
           saveCurrentOrderWipState();
         }
         closeModal();
-        showToast(`${good} pairs matched. Material Requisition ${state.packingWip.mreqNo} updated.`);
+        showToast(`${good} pairs matched in Stage 3. Material Requisition is now unlocked.`);
         renderApp();
       } finally {
         step3InFlight = false;
@@ -3166,6 +3288,10 @@ function attachPackingHandlers(): void {
 
   let mreqInFlight = false;
   document.getElementById('btn-wip-generate-mreq-slip')?.addEventListener('click', async (event) => {
+    if (!isStage3ClearedForMaterialReq(state.packingWip)) {
+      showToast('Material Requisition is locked until Stage 3 (Pair Matching) is cleared.');
+      return;
+    }
     if (mreqInFlight) return;
     const btn = event.currentTarget as HTMLButtonElement | null;
     mreqInFlight = true;
@@ -3216,6 +3342,10 @@ function attachPackingHandlers(): void {
           showToast('Failed to save or issue Material Requisition.');
           return;
         }
+      } else {
+        state.packingWip.mreqStatus = 'ISSUED';
+        saveCurrentOrderWipState();
+        renderApp();
       }
 
       openModal(`Material Requisition Slip — ${mreqId}`, buildCurrentMaterialRequisitionSlip(), true);
@@ -3226,12 +3356,20 @@ function attachPackingHandlers(): void {
   });
 
   document.getElementById('btn-wip-print-mreq-slip')?.addEventListener('click', () => {
+    if (!isStage3ClearedForMaterialReq(state.packingWip)) {
+      showToast('Material Requisition can only be printed after Stage 3 (Pair Matching) is cleared.');
+      return;
+    }
     const mreqId = getMaterialReqNumber(state.packingWip.selectedBatch);
     printDocument(`Material Requisition Slip — ${mreqId}`, buildCurrentMaterialRequisitionSlip());
   });
 
   // Stage 4 Modal
   document.getElementById('btn-wip-step4')?.addEventListener('click', () => {
+    if (!isMaterialRequisitionIssuedForStage4(state.packingWip)) {
+      showToast('Stage 4 locked: Clear Stage 3 and generate the Material Requisition slip first.');
+      return;
+    }
     const available = Math.max(0, state.packingWip.stage4In - state.packingWip.stage4Passed);
     if (available <= 0) {
       if (isPackingAwaitingFinalQc(state.packingWip)) {
@@ -3418,15 +3556,6 @@ function attachPackingHandlers(): void {
     openNewRequisitionModal();
   });
 
-  document.getElementById('btn-wip-print-req')?.addEventListener('click', () => {
-    const reqNumber = normalizeBaseReqNumber(state.packingWip.selectedBatch);
-    if (!state.persistedReqNumbers.includes(reqNumber)) {
-      showToast('Save this requisition before printing it.');
-      return;
-    }
-    printDocument(`Packing Hall Requisition Slip — ${reqNumber}`, buildCurrentPackingRequisitionSlip());
-  });
-
   // Shift log export
   document.getElementById('btn-wip-export-shift')?.addEventListener('click', () => {
     exportTableToCSV('Packing_Hall_Shift_Execution_Log.csv', [
@@ -3460,7 +3589,7 @@ function attachPackingHandlers(): void {
     }
     openDocumentCenterModal('carton');
     const preview = document.getElementById('doc-preview-container');
-    if (preview) printDocument('Meridian-Doc-carton', preview.innerHTML);
+    if (preview) printDocument('Hammad-Doc-carton', preview.innerHTML);
   });
 
   document.getElementById('btn-wip-final-clearance')?.addEventListener('click', () => {
@@ -3800,7 +3929,7 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
       return `
         <div style="border: 2px solid var(--ink-950); padding: 18px; font-family: monospace; background: var(--white);">
           <div style="text-align: center; border-bottom: 2px solid var(--ink-950); padding-bottom: 8px; margin-bottom: 12px;">
-            <div style="font-size: 18px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; EXPORT MASTER CARTON</div>
+            <div style="font-size: 18px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; EXPORT MASTER CARTON</div>
             <div style="font-size: 11px; color: var(--ink-600);">INTERNATIONAL EXPORT SHIPPING LABEL &bull; THERMAL DIRECT / A4</div>
           </div>
           <div class="printable-meta-grid">
@@ -3829,10 +3958,10 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
         <div class="printable-slip-box">
           <div class="printable-slip-header">
             <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">COMMERCIAL EXPORT PACKING LIST MANIFEST</h2>
-            <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">Meridian Works &bull; Customs Clearance &amp; Container Gate Release</p>
+            <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">Hammad Industries &bull; Customs Clearance &amp; Container Gate Release</p>
           </div>
           <div class="printable-meta-grid">
-            <div><span>Shipper:</span> <strong>Meridian Works (Pvt) Ltd</strong></div>
+            <div><span>Shipper:</span> <strong>Hammad Industries (Pvt) Ltd</strong></div>
             <div><span>Requisition #:</span> <strong>${baseReq}</strong></div>
             <div><span>Article:</span> <strong>${state.packingWip.article || '---'}</strong></div>
             <div><span>Total Cartons:</span> <strong>${state.cartons.length} Cartons</strong></div>
@@ -3893,7 +4022,7 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
   document.getElementById('btn-quick-print-doc')?.addEventListener('click', () => {
     const docContainer = document.getElementById('doc-preview-container');
     const content = docContainer ? docContainer.innerHTML : '';
-    printDocument(`Meridian-Doc-${defaultDoc}`, content);
+    printDocument(`Hammad-Doc-${defaultDoc}`, content);
   });
 }
 
@@ -4064,6 +4193,13 @@ function attachAdminHandlers(): void {
     });
   });
 
+  document.querySelectorAll<HTMLButtonElement>('[data-admin-delete-user]').forEach(button => {
+    button.addEventListener('click', () => {
+      const userId = button.dataset.adminDeleteUser;
+      if (userId) void window.adminDeleteSystemUser(userId, button);
+    });
+  });
+
   document.querySelectorAll('[data-admin-tab-jump]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const tab = (e.currentTarget as HTMLElement).getAttribute('data-admin-tab-jump') as any;
@@ -4126,6 +4262,14 @@ function attachAdminHandlers(): void {
         case 'expand-all':
           window.adminSetAllOrdersExpanded(el.dataset.expanded === 'true');
           break;
+        case 'toggle-all-registries': {
+          const isExp = el.dataset.expanded === 'true';
+          for (const key of ['buyers', 'articles', 'makers_pos', 'audit_trail', 'sqlite_wal', 'phased_rollout']) {
+            state.adminOpenRegistries[key] = isExp;
+          }
+          renderApp();
+          break;
+        }
         case 'tracking-page': {
           const page = Number(el.dataset.page);
           if (Number.isFinite(page)) window.adminSetTrackingPage(page);
@@ -4173,9 +4317,27 @@ function attachAdminHandlers(): void {
           if (listKey && itemVal !== undefined) void window.adminRemoveDropdownItem(listKey, itemVal, el);
           break;
         }
+        case 'remove-split-row': {
+          const splitIdx = Number(el.dataset.splitIndex);
+          if (Number.isInteger(splitIdx) && state.adminOrderSplitRows.length > 2) {
+            syncAdminOrderDraftFromDom();
+            state.adminOrderSplitRows.splice(splitIdx, 1);
+            renderApp();
+          }
+          break;
+        }
         case 'add-system-user':
           void window.adminAddSystemUser(el);
           break;
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLDetailsElement>('details.su-collapsible-registry[data-registry-id]').forEach(detailsEl => {
+    detailsEl.addEventListener('toggle', () => {
+      const regId = detailsEl.dataset.registryId;
+      if (regId) {
+        state.adminOpenRegistries[regId] = detailsEl.open;
       }
     });
   });
@@ -4298,28 +4460,147 @@ function attachAdminHandlers(): void {
     });
   });
 
+  function syncAdminOrderDraftFromDom(): void {
+    state.adminOrderDraft.buyer = (document.getElementById('admin-pending-order-buyer') as HTMLSelectElement)?.value?.trim() || '';
+    state.adminOrderDraft.maker = (document.getElementById('admin-pending-order-maker') as HTMLSelectElement)?.value?.trim() || '';
+    state.adminOrderDraft.po = (document.getElementById('admin-pending-order-po') as HTMLInputElement)?.value?.trim() || '';
+    state.adminOrderDraft.article = (document.getElementById('admin-pending-order-article') as HTMLSelectElement)?.value?.trim() || '';
+    state.adminOrderDraft.color = (document.getElementById('admin-pending-order-color') as HTMLInputElement)?.value?.trim() || '';
+    state.adminOrderDraft.dueDate = (document.getElementById('admin-pending-order-due-date') as HTMLInputElement)?.value?.trim() || '';
+    const sizes = createEmptySizes();
+    document.querySelectorAll('.admin-order-size-val').forEach(el => {
+      const inp = el as HTMLInputElement;
+      const k = inp.getAttribute('data-size') as keyof SizeBreakdown;
+      if (k) sizes[k] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+    });
+    state.adminOrderDraft.sizes = sizes;
+  }
+
+  function updateAdminSplitBalanceDom(): void {
+    if (state.adminOrderSplitRows.length === 0) return;
+    state.adminOrderSplitRows.forEach((row, idx) => {
+      const rowTotalCell = document.getElementById(`admin-split-row-total-${idx}`);
+      if (rowTotalCell) rowTotalCell.textContent = calculateSizeTotal(row.sizes).toLocaleString();
+    });
+    const balanceBar = document.getElementById('admin-split-balance-bar');
+    if (balanceBar) {
+      const check = validateContractorAllocations(state.adminOrderDraft.sizes, state.adminOrderSplitRows);
+      balanceBar.className = `su-split-balance-bar ${check.valid ? 'is-balanced' : 'is-unbalanced'}`;
+      balanceBar.innerHTML = `
+        <span>
+          Unassigned Balance:
+          <strong>7:${check.unassignedBySize['7']}</strong> |
+          <strong>8:${check.unassignedBySize['8']}</strong> |
+          <strong>9:${check.unassignedBySize['9']}</strong> |
+          <strong>10:${check.unassignedBySize['10']}</strong> |
+          <strong>11:${check.unassignedBySize['11']}</strong>
+          (<strong>${check.totalUnassigned}</strong> Prs remaining)
+        </span>
+        <strong>${check.valid ? 'Split Matches Order 100% ✓' : escapeHtml(check.error || 'Adjust contractor quantities to match order totals')}</strong>
+      `;
+    }
+  }
+
   // Recalculate planned order size total in Super User form
   function recalcAdminOrderSizes(): void {
-    let tot = 0;
-    document.querySelectorAll('.admin-order-size-val').forEach(el => {
-      const val = parseInt((el as HTMLInputElement).value || '0', 10) || 0;
-      if (val > 0) tot += val;
-    });
+    syncAdminOrderDraftFromDom();
+    const tot = calculateSizeTotal(state.adminOrderDraft.sizes);
     const cell = document.getElementById('admin-order-size-total');
     if (cell) cell.textContent = tot.toLocaleString();
+    updateAdminSplitBalanceDom();
   }
 
   document.querySelectorAll('.admin-order-size-val').forEach(inp => {
     inp.addEventListener('input', recalcAdminOrderSizes);
   });
 
+  for (const fieldId of [
+    'admin-pending-order-buyer',
+    'admin-pending-order-maker',
+    'admin-pending-order-po',
+    'admin-pending-order-article',
+    'admin-pending-order-color',
+    'admin-pending-order-due-date'
+  ]) {
+    document.getElementById(fieldId)?.addEventListener('change', syncAdminOrderDraftFromDom);
+  }
+
+  document.getElementById('btn-admin-toggle-split')?.addEventListener('click', () => {
+    syncAdminOrderDraftFromDom();
+    if (state.adminOrderSplitRows.length > 0) {
+      state.adminOrderSplitRows = [];
+    } else {
+      const firstMaker = state.adminOrderDraft.maker || state.dropdownOptions.makers[0] || '';
+      const secondMaker = state.dropdownOptions.makers.find(m => m !== firstMaker) || '';
+      state.adminOrderSplitRows = [
+        { maker: firstMaker, sizes: { ...state.adminOrderDraft.sizes }, dueDate: state.adminOrderDraft.dueDate },
+        { maker: secondMaker, sizes: createEmptySizes(), dueDate: state.adminOrderDraft.dueDate }
+      ];
+    }
+    renderApp();
+  });
+
+  document.getElementById('btn-admin-add-split-row')?.addEventListener('click', () => {
+    syncAdminOrderDraftFromDom();
+    const used = new Set(state.adminOrderSplitRows.map(r => r.maker));
+    const nextMaker = state.dropdownOptions.makers.find(m => !used.has(m)) || '';
+    state.adminOrderSplitRows.push({
+      maker: nextMaker,
+      sizes: createEmptySizes(),
+      dueDate: state.adminOrderDraft.dueDate
+    });
+    renderApp();
+  });
+
+  document.querySelectorAll<HTMLSelectElement>('.admin-split-maker').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const idx = Number(sel.getAttribute('data-split-index'));
+      if (state.adminOrderSplitRows[idx]) {
+        state.adminOrderSplitRows[idx].maker = sel.value;
+        updateAdminSplitBalanceDom();
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.admin-split-size-val').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const idx = Number(inp.getAttribute('data-split-index'));
+      const sz = inp.getAttribute('data-size') as keyof SizeBreakdown;
+      if (state.adminOrderSplitRows[idx] && sz) {
+        state.adminOrderSplitRows[idx].sizes[sz] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+        updateAdminSplitBalanceDom();
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.admin-split-due-date').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const idx = Number(inp.getAttribute('data-split-index'));
+      if (state.adminOrderSplitRows[idx]) {
+        state.adminOrderSplitRows[idx].dueDate = inp.value;
+      }
+    });
+  });
+
   document.getElementById('btn-admin-reset-pending-order')?.addEventListener('click', () => {
+    const hadSplit = state.adminOrderSplitRows.length > 0;
+    state.adminOrderDraft = {
+      buyer: '',
+      maker: '',
+      po: '',
+      article: '',
+      color: '',
+      dueDate: '',
+      sizes: createEmptySizes()
+    };
+    state.adminOrderSplitRows = [];
     for (const id of [
       'admin-pending-order-buyer',
       'admin-pending-order-maker',
       'admin-pending-order-po',
       'admin-pending-order-article',
-      'admin-pending-order-color'
+      'admin-pending-order-color',
+      'admin-pending-order-due-date'
     ]) {
       const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
       if (el) {
@@ -4332,30 +4613,43 @@ function attachAdminHandlers(): void {
     });
     const cell = document.getElementById('admin-order-size-total');
     if (cell) cell.textContent = '0';
+    if (hadSplit) renderApp();
   });
 
   document.getElementById('btn-admin-add-pending-order')?.addEventListener('click', (e) => {
+    syncAdminOrderDraftFromDom();
     const makerEl = document.getElementById('admin-pending-order-maker') as HTMLSelectElement | null;
     const articleEl = document.getElementById('admin-pending-order-article') as HTMLSelectElement | null;
-    const buyer = (document.getElementById('admin-pending-order-buyer') as HTMLSelectElement)?.value?.trim();
-    const maker = makerEl?.value?.trim() || '';
-    const po = (document.getElementById('admin-pending-order-po') as HTMLInputElement)?.value?.trim();
-    const article = articleEl?.value?.trim() || '';
-    const color = (document.getElementById('admin-pending-order-color') as HTMLInputElement)?.value?.trim();
-
-    const errors = validatePendingOrderInputs({ maker, article });
-    if (applyFieldValidationErrors([[makerEl, errors.maker], [articleEl, errors.article]])) {
-      showToast('Select the required Contractor / Maker and Article.');
-      return;
-    }
-
-    const sizes: SizeBreakdown = createEmptySizes();
-    document.querySelectorAll('.admin-order-size-val').forEach(el => {
-      const inp = el as HTMLInputElement;
-      const k = inp.getAttribute('data-size') as keyof SizeBreakdown;
-      if (k) sizes[k] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
-    });
+    const buyer = state.adminOrderDraft.buyer;
+    const splitActive = state.adminOrderSplitRows.length > 0;
+    const maker = splitActive
+      ? state.adminOrderSplitRows.map(r => r.maker.trim()).filter(Boolean).join(', ')
+      : state.adminOrderDraft.maker;
+    const po = state.adminOrderDraft.po;
+    const article = state.adminOrderDraft.article;
+    const color = state.adminOrderDraft.color;
+    const dueDate = state.adminOrderDraft.dueDate;
+    const sizes: SizeBreakdown = { ...state.adminOrderDraft.sizes };
     const totalPairs = calculateSizeTotal(sizes);
+
+    if (splitActive) {
+      const artErrors = validatePendingOrderInputs({ maker: 'split', article });
+      if (applyFieldValidationErrors([[articleEl, artErrors.article]])) {
+        showToast('Select the required Article.');
+        return;
+      }
+      const splitCheck = validateContractorAllocations(sizes, state.adminOrderSplitRows);
+      if (!splitCheck.valid) {
+        showToast(splitCheck.error || 'Contractor split quantities must equal the order size totals.');
+        return;
+      }
+    } else {
+      const errors = validatePendingOrderInputs({ maker, article });
+      if (applyFieldValidationErrors([[makerEl, errors.maker], [articleEl, errors.article]])) {
+        showToast('Select the required Contractor / Maker and Article.');
+        return;
+      }
+    }
 
     const newOrder = {
       buyer: buyer || 'Standard Client',
@@ -4363,8 +4657,16 @@ function attachAdminHandlers(): void {
       po: po || '---',
       article,
       color: color || 'Standard',
+      dueDate,
       sizes,
       totalQty: totalPairs,
+      allocations: splitActive
+        ? state.adminOrderSplitRows.map(r => ({
+            maker: r.maker.trim(),
+            sizes: { ...r.sizes },
+            dueDate: r.dueDate || dueDate || ''
+          }))
+        : undefined,
       notes: `Created by Super User: Buyer=${buyer}, PO=${po}, Color=${color}`
     };
 
@@ -4384,10 +4686,20 @@ function attachAdminHandlers(): void {
         const { orderId, orders } = json.data;
         state.pendingOrders = orders;
         state.adminExpandedOrders[orderId] = true;
+        state.adminOrderDraft = {
+          buyer: '',
+          maker: '',
+          po: '',
+          article: '',
+          color: '',
+          dueDate: '',
+          sizes: createEmptySizes()
+        };
+        state.adminOrderSplitRows = [];
         if (po && !state.dropdownOptions.poList.includes(po)) {
           state.dropdownOptions.poList.unshift(po);
         }
-        if (maker && !state.dropdownOptions.makers.includes(maker)) {
+        if (maker && !splitActive && !state.dropdownOptions.makers.includes(maker)) {
           state.dropdownOptions.makers.unshift(maker);
         }
         showToast(`Saved Master Order ${orderId} (${buyer || 'Standard'} | ${maker} | ${article} | ${totalPairs} Pairs).`);
@@ -4543,7 +4855,7 @@ function attachAdminHandlers(): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `meridian_industries_full_erp_dump_${Date.now()}.json`;
+    a.download = `hammad_industries_full_erp_dump_${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -4577,6 +4889,7 @@ declare global {
     adminCloseOrderShort: (orderId: string, triggerEl?: HTMLElement | null) => void;
     adminAddSystemUser: (triggerEl?: HTMLElement | null) => void;
     adminResetSystemUserPassword: (userId: string, triggerEl?: HTMLElement | null) => void;
+    adminDeleteSystemUser: (userId: string, triggerEl?: HTMLElement | null) => Promise<void>;
     adminQuickReceiveGrnForOrder: (orderId: string) => void;
     adminQuickCreateReqForOrder: (orderId: string) => void;
     adminOpenReqInScreen: (reqNumber: string, targetScreen: string) => void;
@@ -4981,15 +5294,102 @@ window.adminResetSystemUserPassword = async function(userId: string, triggerEl?:
   );
 };
 
+window.adminDeleteSystemUser = async function(userId: string, triggerEl?: HTMLElement | null) {
+  const targetUser = state.systemUsers.find(u => u.userId === userId);
+  if (state.currentUser?.userId === userId) {
+    showToast('You cannot delete your own active Super User account.');
+    return;
+  }
+
+  resolvePendingConfirmDialog(false);
+  const accountLabel = targetUser
+    ? `${targetUser.name} (@${targetUser.username} • ${targetUser.role})`
+    : userId;
+  const html = buildConfirmDialogHtml({
+    message: `Delete user account ${accountLabel}?`,
+    detail: 'This permanently deletes the account and revokes all of its active sessions. Enter your Admin password to authorize deletion.',
+    confirmLabel: 'Delete User',
+    cancelLabel: 'Cancel',
+    tone: 'danger',
+    passwordField: {
+      id: 'confirm-admin-password',
+      label: 'Admin Password',
+      placeholder: 'Enter your Super User password',
+      hint: 'Required to authorize permanent account deletion.'
+    }
+  });
+  openModal('Confirm Delete User Account', html, false, {
+    hideGlobalFooter: true,
+    returnFocusTarget: triggerEl instanceof HTMLElement ? triggerEl : undefined
+  });
+
+  const pwInput = document.getElementById('confirm-admin-password') as HTMLInputElement | null;
+  const confirmBtn = document.getElementById('confirm-dialog-confirm') as HTMLButtonElement | null;
+  pwInput?.addEventListener('input', () => clearFieldValidationError(pwInput));
+  pwInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmBtn?.click();
+    }
+  });
+
+  confirmBtn?.addEventListener('click', () => {
+    const adminPassword = pwInput?.value || '';
+    if (!adminPassword) {
+      applyFieldValidationErrors([[pwInput, 'Enter your Admin password to confirm user deletion.']]);
+      showToast('Enter your Admin password to confirm user deletion.');
+      return;
+    }
+
+    void runAdminAction(`admin:delete-user:${userId}`, confirmBtn, async () => {
+      try {
+        const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminPassword })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Incorrect Admin password. User was not deleted.');
+        }
+        state.systemUsers = Array.isArray(result.data?.users)
+          ? result.data.users
+          : state.systemUsers.filter(u => u.userId !== userId);
+        logAuditEvent(
+          'USER_DELETE',
+          targetUser?.username || userId,
+          targetUser?.role || 'USER',
+          'Deleted by Super User'
+        );
+        closeModal();
+        showToast(`Deleted user account ${targetUser ? targetUser.name : userId}.`);
+        renderApp();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unable to delete user account.';
+        applyFieldValidationErrors([[pwInput, msg]]);
+        showToast(msg);
+      }
+    });
+  });
+};
+
 window.adminQuickReceiveGrnForOrder = function(orderId: string) {
   const order = state.pendingOrders.find(o => o.orderId === orderId);
   if (order) {
+    const allocs = order.contractorAllocations || [];
+    const activeAlloc = allocs.length > 0
+      ? (allocs.find(a => (a.remainingPairs ?? a.totalQty) > 0) || allocs[0])
+      : null;
+    const defaultMaker = activeAlloc ? activeAlloc.maker : order.maker;
+    const defaultSizes = activeAlloc ? (activeAlloc.remainingSizes || activeAlloc.sizes) : (order.sizes || createEmptySizes());
     state.grnForm = {
       pendingOrderId: order.orderId,
-      maker: order.maker,
+      maker: defaultMaker,
       article: order.article,
-      rcvdPairs: String(order.totalQty || ''),
-      sizes: { ...(order.sizes || createEmptySizes()) }
+      color: order.color || 'Standard',
+      receivedFrom: defaultMaker ? `${defaultMaker} Representative` : '',
+      rcvdPairs: String(calculateSizeTotal(defaultSizes) || order.totalQty || ''),
+      sizes: { ...defaultSizes }
     };
   } else {
     state.grnForm.pendingOrderId = orderId;
@@ -5118,6 +5518,8 @@ window.viewGrnRecord = function(sr: number) {
       pendingOrderId: item.pendingOrderId,
       maker: item.maker,
       article: item.article,
+      color: item.color,
+      receivedFrom: item.receivedFrom,
       rcvdPairs: item.rcvdPairs,
       sizes: item.sizes
     });
@@ -5132,6 +5534,8 @@ window.editGrnRecord = function(sr: number) {
       pendingOrderId: item.pendingOrderId,
       maker: item.maker,
       article: item.article,
+      color: item.color || 'Standard',
+      receivedFrom: item.receivedFrom || item.maker || '',
       rcvdPairs: String(item.rcvdPairs),
       sizes: { ...item.sizes }
     };
@@ -5249,6 +5653,8 @@ async function syncBackendData(options: { manual?: boolean } = {}): Promise<void
                 pendingOrderId: r.order_id || r.po_number || 'ORD-INWARD',
                 maker: r.maker_contractor,
                 article: r.article_name,
+                color: r.color_shade || 'Standard',
+                receivedFrom: r.received_from || r.maker_contractor || '',
                 rcvdPairs: Number(r.rcvd_pairs) || 0,
                 sizes,
                 status: isVoided ? 'VOIDED' : 'Received',

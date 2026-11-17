@@ -1,5 +1,5 @@
 /**
- * Meridian Works - Factory ERP & QA Management Portal
+ * Hammad Industries - Factory ERP & QA Management Portal
  * Standalone Vanilla JavaScript (ES6) - Clean Inspection Mode
  */
 
@@ -183,7 +183,7 @@ function renderScreenGRN() {
       <div class="header-brand">
         ${LOGO_SVG}
         <div class="brand-text">
-          <span class="brand-title">MERIDIAN WORKS</span>
+          <span class="brand-title">HAMMAD INDUSTRIES</span>
         </div>
       </div>
       <div class="header-center-info">
@@ -337,7 +337,7 @@ function renderScreenStore() {
       <div class="header-brand">
         ${LOGO_SVG}
         <div class="brand-text">
-          <span class="brand-title">MERIDIAN</span>
+          <span class="brand-title">HAMMAD INDUSTRIES</span>
           <span class="brand-subtitle">INDUSTRIES</span>
         </div>
       </div>
@@ -548,7 +548,7 @@ function renderScreenRepair() {
       <div class="header-brand">
         ${LOGO_SVG}
         <div class="brand-text">
-          <span class="brand-title">MERIDIAN WORKS</span>
+          <span class="brand-title">HAMMAD INDUSTRIES</span>
           <span class="brand-subtitle">Quality Assurance – Alteration & Repair Bay Operations</span>
         </div>
       </div>
@@ -706,7 +706,7 @@ function renderScreenQC() {
       <div class="header-brand">
         ${LOGO_SVG}
         <div class="brand-text">
-          <span class="brand-title">MERIDIAN WORKS</span>
+          <span class="brand-title">HAMMAD INDUSTRIES</span>
         </div>
       </div>
       <div class="header-center-info">
@@ -982,7 +982,7 @@ function attachGRNHandlers() {
   document.getElementById('btn-print-grn-slip')?.addEventListener('click', () => {
     openModal('Goods Receiving Slip (GRN)', `
       <div style="font-family: monospace; font-size: 13px; line-height: 1.6;">
-        <h2 style="margin: 0; font-size: 16px;">MERIDIAN WORKS - INWARD GOODS SLIP</h2>
+        <h2 style="margin: 0; font-size: 16px;">HAMMAD INDUSTRIES - INWARD GOODS SLIP</h2>
         <p>Dock #1 | Date: 31-10-2026</p>
       </div>
     `);

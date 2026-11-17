@@ -344,6 +344,19 @@ apiRouter.patch('/admin/users/:userId/password', handle(req => {
   return { updated: true };
 }));
 
+apiRouter.delete('/admin/users/:userId', handle(req => {
+  const deletedUser = AuthService.deleteUserByAdmin({
+    targetUserId: req.params.userId,
+    adminUserId: req.authUser.userId,
+    adminPassword: req.body?.adminPassword
+  });
+  return {
+    deleted: true,
+    user: deletedUser,
+    users: AuthService.listUsers()
+  };
+}));
+
 apiRouter.get('/admin/audit-trail', handle((req) => {
   return PackingService.getAuditTrail(req.query.limit);
 }));

@@ -6,7 +6,7 @@
 
 ---
 
-**Project:** Meridian Works MES
+**Project:** Hammad Industries MES
 **Generated:** 2026-11-04 10:38:57
 **Category:** Analytics Dashboard
 **Design Dials:** Variance 3/10 (Centered / Minimal) | Motion 2/10 (Subtle) | Density 8/10 (Dense / Dashboard)

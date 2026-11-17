@@ -12,6 +12,7 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
   let inwardCookie;
   let adminUsername;
   let adminPassword;
+  let adminUserId;
   let packingCookie;
   const testUserIds = [];
   const testTokens = [];
@@ -29,6 +30,7 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
       station: 'Test'
     });
     const adminSession = AuthService.createSession(admin.userId);
+    adminUserId = admin.userId;
     adminCookie = `mes_session=${adminSession.token}`;
     testUserIds.push(admin.userId);
     testTokens.push(adminSession.token);
@@ -187,6 +189,67 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
     assert.equal(AuthService.verifyCredentials(username, oldPassword), null);
     assert.ok(AuthService.verifyCredentials(username, 'New-Secure-Password'));
     assert.equal(AuthService.getSessionUser(session.token), null);
+  });
+
+  test('API authentication: Super User can delete user only with valid Admin password and cannot self-delete', async () => {
+    const suffix = randomUUID();
+    const username = `del-${suffix}`;
+    const userPassword = `Del-${suffix}-Password`;
+    const targetUser = AuthService.createUser({
+      name: 'Delete Target Operator',
+      username,
+      password: userPassword,
+      role: 'INWARD_CLERK',
+      station: 'Dock #1'
+    });
+    const targetSession = AuthService.createSession(targetUser.userId);
+    testUserIds.push(targetUser.userId);
+    testTokens.push(targetSession.token);
+
+    const targetEndpoint = `${baseUrl}/api/admin/users/${encodeURIComponent(targetUser.userId)}`;
+
+    const denied = await apiFetch(targetEndpoint, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword })
+    }, inwardCookie);
+    assert.equal(denied.status, 403);
+
+    const blankPassword = await apiFetch(targetEndpoint, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword: '' })
+    });
+    assert.equal(blankPassword.status, 400);
+
+    const wrongPassword = await apiFetch(targetEndpoint, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword: 'Wrong-Admin-Password' })
+    });
+    assert.equal(wrongPassword.status, 401);
+    assert.ok(AuthService.listUsers().some(u => u.userId === targetUser.userId));
+
+    const selfDelete = await apiFetch(`${baseUrl}/api/admin/users/${encodeURIComponent(adminUserId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword })
+    });
+    assert.equal(selfDelete.status, 400);
+    assert.ok(AuthService.listUsers().some(u => u.userId === adminUserId));
+
+    const deleted = await apiFetch(targetEndpoint, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword })
+    });
+    assert.equal(deleted.status, 200);
+    const deletedJson = await deleted.json();
+    assert.equal(deletedJson.success, true);
+    assert.equal(deletedJson.data.deleted, true);
+    assert.equal(deletedJson.data.user.userId, targetUser.userId);
+    assert.equal(AuthService.getSessionUser(targetSession.token), null);
+    assert.equal(AuthService.listUsers().some(u => u.userId === targetUser.userId), false);
   });
 
   test('API: /api/inventory/gloves returns seeded glove inventory', async () => {
@@ -822,6 +885,193 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
       }
       if (rcvNumber) db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
       if (orderId) db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+    }
+  });
+
+  test('API: POST /api/store/receivings locks article & colour from linked order and requires receivedFrom', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    let orderId;
+    let rcvNumber;
+
+    try {
+      const orderResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'Hall A',
+          po: `PO-LOCK-${randomUUID().slice(0, 6)}`,
+          article: master.article,
+          color: 'Hi-Vis Neon',
+          sizes: { '7': 40, '8': 40, '9': 40, '10': 40, '11': 40 },
+          totalQty: 200
+        })
+      });
+      assert.equal(orderResp.status, 200);
+      orderId = (await orderResp.json()).data.orderId;
+
+      // Missing / empty receivedFrom must fail 400
+      const missingReceiver = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rcvDate: '31-10-2026',
+          orderId,
+          makerContractor: 'Hall A',
+          articleName: 'TAMPERED-ARTICLE',
+          colorShade: 'TAMPERED-COLOR',
+          receivedFrom: '   ',
+          strictInwardEntry: true,
+          rcvdPairs: 50
+        })
+      }, inwardCookie);
+      assert.equal(missingReceiver.status, 400);
+
+      // Valid receivedFrom saves receiving, ignoring tampered article & color from client
+      const validGrn = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rcvDate: '31-10-2026',
+          orderId,
+          makerContractor: 'Hall A',
+          customerName: 'TAMPERED-BUYER',
+          articleName: 'TAMPERED-ARTICLE',
+          colorShade: 'TAMPERED-COLOR',
+          receivedFrom: 'Bilal Driver',
+          strictInwardEntry: true,
+          rcvdPairs: 50
+        })
+      }, inwardCookie);
+      assert.equal(validGrn.status, 200);
+      const validData = (await validGrn.json()).data;
+      rcvNumber = validData.rcv_number;
+      assert.equal(validData.article_name, master.article);
+      assert.equal(validData.color_shade, 'Hi-Vis Neon');
+      assert.equal(validData.customer_name, master.buyer);
+      assert.equal(validData.received_from, 'Bilal Driver');
+    } finally {
+      if (rcvNumber) db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
+      if (orderId) {
+        db.prepare('DELETE FROM order_contractor_allocations WHERE order_id = ?').run(orderId);
+        db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+      }
+    }
+  });
+
+  test('API: Multi-contractor split order enforces allocations and tracks per-contractor balances', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    let orderId;
+    const rcvNumbers = [];
+
+    try {
+      const orderResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'Hall A, Hall B',
+          po: `PO-SPLIT-${randomUUID().slice(0, 6)}`,
+          article: master.article,
+          color: 'Black',
+          sizes: { '7': 40, '8': 40, '9': 40, '10': 40, '11': 40 },
+          totalQty: 200,
+          allocations: [
+            { maker: 'Hall A', sizes: { '7': 25, '8': 25, '9': 25, '10': 25, '11': 20 } },
+            { maker: 'Hall B', sizes: { '7': 15, '8': 15, '9': 15, '10': 15, '11': 20 } }
+          ]
+        })
+      });
+      assert.equal(orderResp.status, 200);
+      const orderData = (await orderResp.json()).data;
+      orderId = orderData.orderId;
+      const created = orderData.orders.find(o => o.orderId === orderId);
+      assert.equal(created.contractorAllocations.length, 2);
+
+      // Receive full 120 pairs for Hall A -> 200
+      const rcvA = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Hall A',
+          receivedFrom: 'Asif Carrier',
+          strictInwardEntry: true,
+          rcvdPairs: 120
+        })
+      }, inwardCookie);
+      assert.equal(rcvA.status, 200);
+      rcvNumbers.push((await rcvA.json()).data.rcv_number);
+
+      // Over-receipt for Hall A (even 10 pairs over 120) must reject 400
+      const overA = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Hall A',
+          receivedFrom: 'Asif Carrier',
+          strictInwardEntry: true,
+          rcvdPairs: 10
+        })
+      }, inwardCookie);
+      assert.equal(overA.status, 400);
+
+      // Unassigned contractor Maker C must reject 400
+      const wrongMaker = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Maker C',
+          receivedFrom: 'Unknown Driver',
+          strictInwardEntry: true,
+          rcvdPairs: 10
+        })
+      }, inwardCookie);
+      assert.equal(wrongMaker.status, 400);
+
+      // Receive 80 pairs for Hall B -> 200 and verify updated allocations
+      const rcvB = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Hall B',
+          receivedFrom: 'Rashid Driver',
+          strictInwardEntry: true,
+          rcvdPairs: 80
+        })
+      }, inwardCookie);
+      assert.equal(rcvB.status, 200);
+      rcvNumbers.push((await rcvB.json()).data.rcv_number);
+
+      const pendingAfter = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {}, inwardCookie);
+      const updated = (await pendingAfter.json()).data.find(o => o.orderId === orderId);
+      assert.equal(updated.contractorAllocations[0].receivedPairs, 120);
+      assert.equal(updated.contractorAllocations[0].remainingPairs, 0);
+      assert.equal(updated.contractorAllocations[1].receivedPairs, 80);
+      assert.equal(updated.contractorAllocations[1].remainingPairs, 0);
+    } finally {
+      for (const rcvNo of rcvNumbers) {
+        db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNo);
+      }
+      if (orderId) {
+        db.prepare('DELETE FROM order_contractor_allocations WHERE order_id = ?').run(orderId);
+        db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+      }
     }
   });
 });

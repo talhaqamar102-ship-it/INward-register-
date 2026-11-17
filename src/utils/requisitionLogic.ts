@@ -41,6 +41,120 @@ export const SIZE_LABELS: Array<{ key: '7' | '8' | '9' | '10' | '11'; label: str
   { key: '11', label: '11 / XXL' }
 ];
 
+export interface DeliveryCountdownInfo {
+  dueDate: string;
+  hasDueDate: boolean;
+  daysRemaining: number | null;
+  status: 'NO_DATE' | 'DELIVERED' | 'OVERDUE' | 'DUE_SOON' | 'ON_TRACK';
+  badgeText: string;
+  progressPct: number;
+}
+
+function parseUtcDateMidnightMs(dateInput?: string | null): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateInput || '').trim());
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const ms = Date.UTC(year, month, day);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+export function computeDeliveryCountdown(params: {
+  dueDate?: string;
+  createdAt?: string;
+  isCompleted?: boolean;
+  nowIso?: string;
+}): DeliveryCountdownInfo {
+  const rawDue = String(params.dueDate || '').trim();
+  const dueMs = parseUtcDateMidnightMs(rawDue);
+  if (dueMs === null) {
+    return {
+      dueDate: '',
+      hasDueDate: false,
+      daysRemaining: null,
+      status: params.isCompleted ? 'DELIVERED' : 'NO_DATE',
+      badgeText: params.isCompleted ? 'Delivered ✓' : 'No Due Date',
+      progressPct: params.isCompleted ? 100 : 0
+    };
+  }
+  const normalizedDue = rawDue.slice(0, 10);
+  if (params.isCompleted) {
+    return {
+      dueDate: normalizedDue,
+      hasDueDate: true,
+      daysRemaining: 0,
+      status: 'DELIVERED',
+      badgeText: 'Delivered ✓',
+      progressPct: 100
+    };
+  }
+
+  const nowStr = params.nowIso || new Date().toISOString().slice(0, 10);
+  const todayMs = parseUtcDateMidnightMs(nowStr) ?? Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
+  const daysRemaining = Math.round((dueMs - todayMs) / 86400000);
+
+  let progressPct = 50;
+  const createdMs = parseUtcDateMidnightMs(params.createdAt);
+  if (createdMs !== null && dueMs > createdMs) {
+    const rawPct = Math.round(((todayMs - createdMs) / (dueMs - createdMs)) * 100);
+    progressPct = Math.max(8, Math.min(95, rawPct));
+  } else {
+    const fallbackPct = Math.round(((14 - Math.max(0, Math.min(14, daysRemaining))) / 14) * 100);
+    progressPct = Math.max(8, Math.min(95, fallbackPct));
+  }
+
+  if (daysRemaining < 0) {
+    return {
+      dueDate: normalizedDue,
+      hasDueDate: true,
+      daysRemaining,
+      status: 'OVERDUE',
+      badgeText: `Overdue by ${Math.abs(daysRemaining)}d`,
+      progressPct: 100
+    };
+  }
+  if (daysRemaining === 0) {
+    return {
+      dueDate: normalizedDue,
+      hasDueDate: true,
+      daysRemaining: 0,
+      status: 'DUE_SOON',
+      badgeText: 'Due Today',
+      progressPct: 95
+    };
+  }
+  if (daysRemaining <= 7) {
+    return {
+      dueDate: normalizedDue,
+      hasDueDate: true,
+      daysRemaining,
+      status: 'DUE_SOON',
+      badgeText: `${daysRemaining}d left`,
+      progressPct
+    };
+  }
+  return {
+    dueDate: normalizedDue,
+    hasDueDate: true,
+    daysRemaining,
+    status: 'ON_TRACK',
+    badgeText: `${daysRemaining}d left`,
+    progressPct
+  };
+}
+
+export interface ContractorOrderAllocation {
+  maker: string;
+  sizes: SizeBreakdown;
+  totalQty: number;
+  dueDate?: string;
+  receivedPairs?: number;
+  receivedSizes?: SizeBreakdown;
+  remainingPairs?: number;
+  remainingSizes?: SizeBreakdown;
+}
+
 export interface PendingOrder {
   orderId: string;
   buyer?: string;
@@ -48,6 +162,8 @@ export interface PendingOrder {
   po?: string;
   article: string;
   color?: string;
+  dueDate?: string;
+  createdAt?: string;
   sizes?: SizeBreakdown;
   totalQty?: number;
   notes?: string;
@@ -64,6 +180,88 @@ export interface PendingOrder {
   unclaimedDockPairs?: number;
   remainingOrderSizes?: SizeBreakdown;
   receivedSizes?: SizeBreakdown;
+  contractorAllocations?: ContractorOrderAllocation[];
+}
+
+export function validateContractorAllocations(
+  orderSizes: SizeBreakdown,
+  allocations: Array<{ maker: string; sizes: SizeBreakdown; dueDate?: string }>
+): {
+  valid: boolean;
+  error?: string;
+  unassignedBySize: SizeBreakdown;
+  totalUnassigned: number;
+} {
+  const orderTotal = STANDARD_GLOVE_SIZES.reduce((sum, sz) => sum + Math.max(0, Number(orderSizes[sz] || 0)), 0);
+  const sumBySize = createEmptySizes();
+  const seenMakers = new Set<string>();
+
+  if (!Array.isArray(allocations) || allocations.length === 0) {
+    return {
+      valid: false,
+      error: 'Add at least one contractor allocation.',
+      unassignedBySize: {
+        '7': Number(orderSizes['7'] || 0),
+        '8': Number(orderSizes['8'] || 0),
+        '9': Number(orderSizes['9'] || 0),
+        '10': Number(orderSizes['10'] || 0),
+        '11': Number(orderSizes['11'] || 0)
+      },
+      totalUnassigned: orderTotal
+    };
+  }
+
+  let firstError: string | undefined;
+  for (let i = 0; i < allocations.length; i++) {
+    const row = allocations[i];
+    const maker = String(row?.maker || '').trim();
+    if (!maker && !firstError) {
+      firstError = `Row ${i + 1}: Select a Contractor / Maker.`;
+    }
+    const makerKey = maker.toLowerCase();
+    if (maker && seenMakers.has(makerKey) && !firstError) {
+      firstError = `Duplicate contractor "${maker}" in split allocation.`;
+    }
+    if (maker) seenMakers.add(makerKey);
+
+    let rowTotal = 0;
+    for (const sz of STANDARD_GLOVE_SIZES) {
+      const val = Number(row?.sizes?.[sz] || 0);
+      if ((!Number.isFinite(val) || val < 0) && !firstError) {
+        firstError = `Contractor "${maker || `#${i + 1}`}": size ${sz} quantity cannot be negative.`;
+      }
+      const cleanVal = Math.max(0, val);
+      sumBySize[sz] += cleanVal;
+      rowTotal += cleanVal;
+    }
+    if (orderTotal > 0 && rowTotal <= 0 && !firstError) {
+      firstError = `Contractor "${maker || `#${i + 1}`}" must have at least 1 pair assigned.`;
+    }
+  }
+
+  const unassignedBySize = createEmptySizes();
+  let totalUnassigned = 0;
+  for (const sz of STANDARD_GLOVE_SIZES) {
+    unassignedBySize[sz] = Math.max(0, Number(orderSizes[sz] || 0)) - sumBySize[sz];
+    totalUnassigned += unassignedBySize[sz];
+  }
+
+  if (!firstError) {
+    const mismatchSize = STANDARD_GLOVE_SIZES.find(sz => unassignedBySize[sz] !== 0);
+    if (mismatchSize) {
+      const diff = unassignedBySize[mismatchSize];
+      firstError = diff > 0
+        ? `Size ${mismatchSize} still has ${diff} unassigned pairs across contractors.`
+        : `Size ${mismatchSize} is over-allocated by ${Math.abs(diff)} pairs.`;
+    }
+  }
+
+  return {
+    valid: !firstError,
+    error: firstError,
+    unassignedBySize,
+    totalUnassigned
+  };
 }
 
 export function createEmptySizes(): SizeBreakdown {
@@ -287,6 +485,32 @@ export function isStage5ReadyForCartons(wip: Partial<OrderWipState>): boolean {
 }
 
 /**
+ * Returns true only when Stage 3 (Pair Matching) has completed matched pairs (> 0)
+ * and no pairs remain pending in Stage 1, Stage 2, or Stage 3.
+ */
+export function isStage3ClearedForMaterialReq(wip: Partial<OrderWipState>): boolean {
+  const s1In = Math.max(0, Number(wip.stage1In || 0));
+  const s1Rem = Math.max(0, s1In - Math.max(0, Number(wip.stage1Passed || 0)) - Math.max(0, Number(wip.stage1Defects || 0)));
+  const s2In = Math.max(0, Number(wip.stage2In || 0));
+  const s2Rem = Math.max(0, s2In - Math.max(0, Number(wip.stage2Passed || 0)) - Math.max(0, Number(wip.stage2Defects || 0)));
+  const s3In = Math.max(0, Number(wip.stage3In || 0));
+  const s3Passed = Math.max(0, Number(wip.stage3Passed || 0));
+  const s3Defects = Math.max(0, Number(wip.stage3Defects || 0));
+  const s3Rem = Math.max(0, s3In - s3Passed - s3Defects);
+  return s3Passed > 0 && s1Rem === 0 && s2Rem === 0 && s3Rem === 0;
+}
+
+/**
+ * Returns true when Stage 3 is cleared and the Material Requisition has been generated/issued
+ * so Stage 4 (1st Packing) can proceed.
+ */
+export function isMaterialRequisitionIssuedForStage4(wip: Partial<OrderWipState>): boolean {
+  if (!isStage3ClearedForMaterialReq(wip)) return false;
+  const status = String(wip.mreqStatus || '').trim().toUpperCase();
+  return status === 'ISSUED' || status === 'PRINTED' || status === 'FULFILLED' || Number(wip.stage4Passed || 0) > 0;
+}
+
+/**
  * Rolled Throughput Yield (RTY) across evaluated Stages 1-3:
  * product of stage yields g / (g + d) for every stage with processed pairs > 0.
  */
@@ -447,6 +671,10 @@ export interface OrderTraceabilityItem {
   orderLifecycleStatus: OrderLifecycleStatus;
   shortClosed?: boolean;
   shortCloseReason?: string;
+  dueDate?: string;
+  createdAt?: string;
+  deliveryCountdown?: DeliveryCountdownInfo;
+  contractorAllocations?: ContractorOrderAllocation[];
   grnCodes: string[];
   reqNumbers: string[];
   mReqNumbers: string[];
@@ -1413,6 +1641,49 @@ export function buildSuperUserOrderRollups(params: {
       orderStatus = 'RECEIVING AT DOCK #1';
     }
 
+    const rawAllocations: ContractorOrderAllocation[] =
+      ord.contractorAllocations && ord.contractorAllocations.length > 0
+        ? ord.contractorAllocations
+        : [
+            {
+              maker: ord.maker,
+              sizes: plannedSizes,
+              totalQty: plannedQty,
+              dueDate: ord.dueDate || ''
+            }
+          ];
+    const contractorAllocations: ContractorOrderAllocation[] = rawAllocations.map(alloc => {
+      const allocMaker = String(alloc.maker || '').trim();
+      const allocSizes = alloc.sizes || createEmptySizes();
+      const allocTotal = Math.max(Number(alloc.totalQty || 0), calculateSizeTotal(allocSizes));
+      const makerGrns = rawGrnBatches.filter(
+        g =>
+          rawAllocations.length === 1 ||
+          String(g.maker || '').trim().toLowerCase() === allocMaker.toLowerCase()
+      );
+      const allocRcvdPairs = makerGrns.reduce((sum, g) => sum + Number(g.rcvdPairs || 0), 0);
+      const allocRcvdSizes = createEmptySizes();
+      for (const mg of makerGrns) {
+        for (const sz of STANDARD_GLOVE_SIZES) {
+          allocRcvdSizes[sz] += Number(mg.sizes?.[sz] || 0);
+        }
+      }
+      const allocRemSizes = createEmptySizes();
+      for (const sz of STANDARD_GLOVE_SIZES) {
+        allocRemSizes[sz] = ord.shortClosed ? 0 : Math.max(0, Number(allocSizes[sz] || 0) - allocRcvdSizes[sz]);
+      }
+      return {
+        maker: allocMaker,
+        sizes: allocSizes,
+        totalQty: allocTotal,
+        dueDate: alloc.dueDate || ord.dueDate || '',
+        receivedPairs: allocRcvdPairs,
+        receivedSizes: allocRcvdSizes,
+        remainingPairs: ord.shortClosed ? 0 : Math.max(0, allocTotal - allocRcvdPairs),
+        remainingSizes: allocRemSizes
+      };
+    });
+
     orderRollups.push({
       orderId: ord.orderId,
       buyer: ord.buyer || 'Standard Client',
@@ -1443,6 +1714,14 @@ export function buildSuperUserOrderRollups(params: {
       orderLifecycleStatus: orderStatus,
       shortClosed: ord.shortClosed,
       shortCloseReason: ord.shortCloseReason,
+      dueDate: ord.dueDate || '',
+      createdAt: ord.createdAt || '',
+      deliveryCountdown: computeDeliveryCountdown({
+        dueDate: ord.dueDate,
+        createdAt: ord.createdAt,
+        isCompleted: orderStatus === 'COMPLETED & DISPATCHED' || Boolean(ord.shortClosed)
+      }),
+      contractorAllocations,
       grnCodes: grnBatches.map(g => g.grnCode),
       reqNumbers: reqBatches.map(r => r.reqNumber),
       mReqNumbers: reqBatches.map(r => r.mreqNo),
@@ -1969,7 +2248,8 @@ export type MesActionType =
   | 'FINAL_QC_REJECT'
   | 'STAGE_5_CARTON_SEAL'
   | 'ALTERATION_CYCLE_UPDATE'
-  | 'SCRAP_CONDEMN';
+  | 'SCRAP_CONDEMN'
+  | 'USER_DELETE';
 
 export const ROLE_PERMISSIONS: Record<MesUserRole, MesActionType[]> = {
   SUPER_USER: [
@@ -1987,7 +2267,8 @@ export const ROLE_PERMISSIONS: Record<MesUserRole, MesActionType[]> = {
     'FINAL_QC_REJECT',
     'STAGE_5_CARTON_SEAL',
     'ALTERATION_CYCLE_UPDATE',
-    'SCRAP_CONDEMN'
+    'SCRAP_CONDEMN',
+    'USER_DELETE'
   ],
   INWARD_CLERK: ['GRN_RECEIVE', 'REQ_ISSUE'],
   PACKING_SUPERVISOR: ['REQ_CREATE', 'WIP_STAGE_ADVANCE', 'STAGE_5_CARTON_SEAL'],
@@ -2510,11 +2791,15 @@ export function applyPendingOrderSelection(
   po?: string;
   article: string;
   color?: string;
+  dueDate?: string;
   sizes?: SizeBreakdown;
   totalQty?: number;
+  contractorAllocations?: ContractorOrderAllocation[];
 } | null {
   const found = orders.find(o => o.orderId === selectedOrderId);
   if (!found) return null;
+  const allocs = found.contractorAllocations || [];
+  const defaultMaker = allocs.length === 1 ? allocs[0].maker : (allocs.length > 1 ? '' : found.maker);
   const result: {
     pendingOrderId: string;
     buyer?: string;
@@ -2522,18 +2807,22 @@ export function applyPendingOrderSelection(
     po?: string;
     article: string;
     color?: string;
+    dueDate?: string;
     sizes?: SizeBreakdown;
     totalQty?: number;
+    contractorAllocations?: ContractorOrderAllocation[];
   } = {
     pendingOrderId: found.orderId,
-    maker: found.maker,
+    maker: defaultMaker,
     article: found.article
   };
   if (found.buyer !== undefined) result.buyer = found.buyer;
   if (found.po !== undefined) result.po = found.po;
   if (found.color !== undefined) result.color = found.color;
+  if (found.dueDate !== undefined) result.dueDate = found.dueDate;
   if (found.sizes !== undefined) result.sizes = found.sizes;
   if (found.totalQty !== undefined) result.totalQty = found.totalQty;
+  if (found.contractorAllocations !== undefined) result.contractorAllocations = found.contractorAllocations;
   return result;
 }
 
@@ -2586,7 +2875,7 @@ export function buildPackingRequisitionSlipHtml(params: PackingRequisitionSlipPa
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; PACKING HALL REQUISITION SLIP</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; PACKING HALL REQUISITION SLIP</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           Packing Floor &bull; Unified Production, Material (M) &amp; Alteration (A) Requisition
         </p>
@@ -2700,7 +2989,7 @@ export function buildMaterialRequisitionSlipHtml(params: {
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; STAGE 4 MATERIAL REQUISITION SLIP (M-REQ)</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; STAGE 4 MATERIAL REQUISITION SLIP (M-REQ)</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           1st Packing (Polybag &amp; Trims) &bull; Official Packaging Accessories Issue Voucher
         </p>
@@ -2781,7 +3070,7 @@ export function buildAlterationRouteSlipHtml(params: {
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; ALTERATION &amp; REWORK ROUTE SLIP (A-REQ)</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; ALTERATION &amp; REWORK ROUTE SLIP (A-REQ)</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           Alteration Bay &bull; 2-Cycle Rework Limit &amp; Scrap Condemnation Voucher
         </p>
@@ -2831,6 +3120,8 @@ export interface GrnSlipParams {
   date: string;
   maker: string;
   article: string;
+  color?: string;
+  receivedFrom?: string;
   rcvdPairs: number;
   sizes: SizeBreakdown;
 }
@@ -2838,7 +3129,9 @@ export interface GrnSlipParams {
 export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
   const pendingOrderId = params.pendingOrderId || '---';
   const article = params.article || '---';
+  const color = params.color || 'Standard';
   const maker = params.maker || '---';
+  const receivedFrom = params.receivedFrom || maker || '---';
   const dateStr = params.date || '31-10-2026';
   const grnRef = params.grnRef || 'GRN-2026-0001';
   const sizeTotal = calculateSizeTotal(params.sizes);
@@ -2847,17 +3140,19 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; INWARD GOODS RECEIVING SLIP</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; INWARD GOODS RECEIVING SLIP</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           Dock Receiving Register &bull; Official Received Goods Voucher
         </p>
       </div>
       <div class="printable-meta-grid">
-        <div><span>GRN Reference:</span> <strong>${grnRef}</strong></div>
-        <div><span>Receiving Date:</span> <strong>${dateStr}</strong></div>
-        <div><span>Pending Order #:</span> <strong>${pendingOrderId}</strong></div>
-        <div><span>Maker / Contractor:</span> <strong>${maker}</strong></div>
-        <div><span>Article / Product:</span> <strong>${article}</strong></div>
+        <div><span>GRN Reference:</span> <strong>${escapeHtml(grnRef)}</strong></div>
+        <div><span>Receiving Date:</span> <strong>${escapeHtml(dateStr)}</strong></div>
+        <div><span>Pending Order #:</span> <strong>${escapeHtml(pendingOrderId)}</strong></div>
+        <div><span>Maker / Contractor:</span> <strong>${escapeHtml(maker)}</strong></div>
+        <div><span>Article / Model:</span> <strong>${escapeHtml(article)}</strong></div>
+        <div><span>Colour / Shade:</span> <strong>${escapeHtml(color)}</strong></div>
+        <div><span>Received From:</span> <strong>${escapeHtml(receivedFrom)}</strong></div>
         <div><span>Total Received:</span> <strong>${rcvd.toLocaleString()} Pairs</strong></div>
       </div>
 
@@ -2867,7 +3162,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
       <table class="size-matrix-table" style="width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 12px;">
         <thead>
           <tr style="background: var(--ink-100); color: var(--ink-950);">
-            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: left;">Article</th>
+            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: left;">Article / Colour</th>
             <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">7 / S</th>
             <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">8 / M</th>
             <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">9 / L</th>
@@ -2878,7 +3173,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
         </thead>
         <tbody>
           <tr>
-            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: left; font-weight: 700;">${article}</td>
+            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: left; font-weight: 700;">${escapeHtml(article)} (${escapeHtml(color)})</td>
             <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['7'] || 0).toLocaleString()} Prs</td>
             <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['8'] || 0).toLocaleString()} Prs</td>
             <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['9'] || 0).toLocaleString()} Prs</td>
@@ -2890,7 +3185,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
       </table>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 11px; margin-top: 24px; border-top: 1px dashed var(--ink-500); padding-top: 8px; white-space: nowrap;">
-        <span>Contractor Agent Sign: _____________</span>
+        <span>Received From: <strong>${escapeHtml(receivedFrom)}</strong></span>
         <span>Dock Receiver: _____________</span>
         <span>Store Head Sign: _____________</span>
       </div>
@@ -3187,7 +3482,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
           </span>
           <span style="display: inline-flex; align-items: center; gap: 5px;">
             <span style="width: 10px; height: 10px; background: ${s4Fill}; border: 1.5px solid ${s4Border}; display: inline-block;"></span>
-            1st Packed (M-REQ / S4 QC)
+            ${isSu ? '1st Packed (M-REQ / S4 QC)' : '1st Packed (Stage 4)'}
           </span>
           <span style="display: inline-flex; align-items: center; gap: 5px;">
             <span style="width: 10px; height: 10px; background: ${s5Fill}; border: 1.5px solid ${s5Border}; display: inline-block;"></span>
@@ -3195,7 +3490,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
           </span>
           <span style="display: inline-flex; align-items: center; gap: 5px;">
             <span style="width: 10px; height: 10px; background: ${altFill}; border: 1px solid ${altBorder}; display: inline-block;"></span>
-            Alteration / Scrap (A-REQ)
+            ${isSu ? 'Alteration / Scrap (A-REQ)' : 'Alteration / Scrap'}
           </span>
         </div>
       </div>
@@ -3211,7 +3506,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-req-accent)' : 'var(--ink-900)'};">${totalIssued.toLocaleString()} Pairs</div>
           </div>
           <div>
-            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Stage 4 1st Packed (M-REQ)</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">${isSu ? 'Stage 4 1st Packed (M-REQ)' : 'Stage 4 1st Packed'}</div>
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-mreq-dark)' : 'var(--ink-900)'};">${totalStage4.toLocaleString()} Pairs</div>
           </div>
           <div>
@@ -3219,7 +3514,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-complete-dark)' : 'var(--ink-950)'};">${totalActualPacked.toLocaleString()} Pairs (${overallCompletionPct}%)</div>
           </div>
           <div>
-            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">Alteration / Scrap (A-REQ)</div>
+            <div style="font-size: ${isSu ? '12px' : '10.5px'}; text-transform: uppercase; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'}; font-weight: 700;">${isSu ? 'Alteration / Scrap (A-REQ)' : 'Alteration / Scrap'}</div>
             <div style="font-size: 14px; font-weight: 800; color: ${isSu ? 'var(--su-areq-primary)' : 'var(--ink-900)'};">${totalAlteration.toLocaleString()} Pairs</div>
           </div>
         </div>
@@ -3228,7 +3523,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
           <div style="border: 1px solid ${isSu ? 'var(--su-border)' : 'var(--border-subtle)'}; border-radius: 4px; padding: 12px 14px; background: var(--white);">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
               <span style="font-size: 11.5px; font-weight: 800; color: ${isSu ? 'var(--su-text-primary)' : 'var(--ink-950)'}; text-transform: uppercase;">
-                Grouped Bar Comparison by Requisition (REQ &rarr; M-REQ / A-REQ / S5)
+                ${isSu ? 'Grouped Bar Comparison by Requisition (REQ &rarr; M-REQ / A-REQ / S5)' : 'Grouped Bar Comparison by Requisition'}
               </span>
               <span style="font-size: 11px; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'};">
                 ${mode === 'packing-hall' ? 'Click any requisition bar group to switch active floor batch' : 'Click any requisition bar group to open in Packing Hall'}
@@ -3307,9 +3602,11 @@ export function renderRequisitionWipAnalyticsChart(params: {
                     <div style="font-size: ${isSu ? '12px' : '10.5px'}; color: var(--ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                       ${escapeHtml(pt.article)} (${escapeHtml(pt.parentOrderId)})
                     </div>
-                    <div style="font-family: var(--font-mono); font-size: ${isSu ? '12px' : '10.5px'}; color: ${isSu ? 'var(--su-text-secondary)' : 'var(--ink-500)'};">
-                      <span style="color: ${isSu ? 'var(--su-mreq-dark)' : 'inherit'};">${escapeHtml(pt.mreqNo)}</span> &bull; <span style="color: ${isSu ? 'var(--su-areq-primary)' : 'inherit'};">${escapeHtml(pt.altReqNo)}</span>
+                    ${isSu ? `
+                    <div style="font-family: var(--font-mono); font-size: 12px; color: var(--su-text-secondary);">
+                      <span style="color: var(--su-mreq-dark);">${escapeHtml(pt.mreqNo)}</span> &bull; <span style="color: var(--su-areq-primary);">${escapeHtml(pt.altReqNo)}</span>
                     </div>
+                    ` : ''}
                   </div>
                 `
                   )
@@ -3406,12 +3703,20 @@ export function renderRequisitionWipAnalyticsChart(params: {
   `;
 }
 
+export interface ConfirmDialogPasswordFieldOptions {
+  id?: string;
+  label: string;
+  placeholder?: string;
+  hint?: string;
+}
+
 export interface ConfirmDialogHtmlOptions {
   message: string;
   detail?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: 'danger' | 'warning';
+  passwordField?: ConfirmDialogPasswordFieldOptions;
 }
 
 /** Builds escaped confirmation dialog body markup for #global-modal. */
@@ -3420,10 +3725,28 @@ export function buildConfirmDialogHtml(options: ConfirmDialogHtmlOptions): strin
   const detailBlock = options.detail
     ? `<p class="su-confirm-detail">${escapeHtml(options.detail)}</p>`
     : '';
+  const pwFieldId = options.passwordField?.id || 'confirm-admin-password';
+  const passwordBlock = options.passwordField
+    ? `
+      <div class="form-group su-confirm-password-group">
+        <label for="${escapeHtml(pwFieldId)}">${escapeHtml(options.passwordField.label)} <span class="su-required-mark" aria-hidden="true">*</span></label>
+        <input
+          type="password"
+          id="${escapeHtml(pwFieldId)}"
+          class="form-input"
+          autocomplete="current-password"
+          aria-required="true"
+          placeholder="${escapeHtml(options.passwordField.placeholder || 'Enter Admin password')}"
+        />
+        ${options.passwordField.hint ? `<span class="form-hint">${escapeHtml(options.passwordField.hint)}</span>` : ''}
+      </div>
+    `
+    : '';
   return `
     <div class="su-confirm-dialog">
       <p class="su-confirm-message">${escapeHtml(options.message)}</p>
       ${detailBlock}
+      ${passwordBlock}
       <div class="su-confirm-actions">
         <button type="button" class="btn-outline" id="confirm-dialog-cancel" data-modal-cancel>${escapeHtml(options.cancelLabel || 'Cancel')}</button>
         <button type="button" class="${confirmClass}" id="confirm-dialog-confirm">${escapeHtml(options.confirmLabel || 'Confirm')}</button>

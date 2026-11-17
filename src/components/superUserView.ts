@@ -1,6 +1,10 @@
 import {
   PendingOrder,
+  SizeBreakdown,
+  DeliveryCountdownInfo,
   calculateSizeTotal,
+  validateContractorAllocations,
+  computeDeliveryCountdown,
   SuperUserDashboardSummary,
   SuperUserOrderRollup,
   SuperUserGrnBatchItem,
@@ -58,6 +62,7 @@ export interface SuperUserRenderContext {
     poList: string[];
   };
   systemUsers?: SystemUserRecord[];
+  currentUserId?: string;
   auditTrail?: AuditTrailEntry[];
   adminOverview: {
     dbHealth: {
@@ -74,6 +79,21 @@ export interface SuperUserRenderContext {
   };
   lastBackupPath: string;
   rollupSummary: SuperUserDashboardSummary;
+  orderDraft?: {
+    buyer: string;
+    maker: string;
+    po: string;
+    article: string;
+    color: string;
+    dueDate: string;
+    sizes: SizeBreakdown;
+  };
+  orderSplitRows?: Array<{
+    maker: string;
+    sizes: SizeBreakdown;
+    dueDate: string;
+  }>;
+  openRegistryIds?: Record<string, boolean>;
 }
 
 function renderReconciliationBadge(rec: ReconciliationResult): string {
@@ -82,6 +102,35 @@ function renderReconciliationBadge(rec: ReconciliationResult): string {
   }
   const deltaSign = rec.deltaPairs > 0 ? `+${rec.deltaPairs}` : `${rec.deltaPairs}`;
   return `<span class="su-badge su-badge-variance" title="${escapeHtml(rec.detail)}">VARIANCE &Delta; (${deltaSign} Prs &bull; ${escapeHtml(rec.failingGate)})</span>`;
+}
+
+function renderDeliveryCountdownChip(cd?: DeliveryCountdownInfo, showTimelineBar = false): string {
+  if (!cd || (!cd.hasDueDate && cd.status !== 'DELIVERED')) {
+    return `<span class="su-countdown-badge" data-testid="order-countdown-badge">No Due Date</span>`;
+  }
+  const toneClass = cd.status === 'OVERDUE'
+    ? 'is-overdue'
+    : cd.status === 'DUE_SOON'
+      ? 'is-soon'
+      : cd.status === 'DELIVERED'
+        ? 'is-delivered'
+        : 'is-ontrack';
+  const fillClass = cd.status === 'OVERDUE'
+    ? 'is-overdue'
+    : cd.status === 'DELIVERED'
+      ? 'is-delivered'
+      : '';
+  const dueTitle = cd.dueDate ? `Delivery Due: ${cd.dueDate}` : 'Delivery Timeline';
+  return `
+    <span class="su-countdown-badge ${toneClass}" data-testid="order-countdown-badge" title="${escapeHtml(dueTitle)}">
+      ${escapeHtml(cd.badgeText)}${cd.dueDate ? ` (${escapeHtml(cd.dueDate)})` : ''}
+    </span>
+    ${showTimelineBar && cd.hasDueDate ? `
+      <div class="su-timeline-track" title="${escapeHtml(dueTitle)} &bull; ${cd.progressPct}% elapsed">
+        <div class="su-timeline-fill ${fillClass}" style="width: ${cd.progressPct}%;"></div>
+      </div>
+    ` : ''}
+  `;
 }
 
 function renderStageMiniTrack(activeStage: string, awaitingQc: boolean, isClosed: boolean): string {
@@ -808,6 +857,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
               <th class="text-right">WIP / S4 Hold</th>
               <th class="text-right">Alt / Scrap</th>
               <th class="text-right">Packed (S5)</th>
+              <th class="text-center">Delivery Timeline</th>
               <th class="text-center">Reconciliation</th>
               <th class="text-center">Status</th>
             </tr>
@@ -817,7 +867,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
               s.orderRollups.length === 0
                 ? `
               <tr>
-                <td colspan="15" class="text-center" style="padding: 28px 16px; color: var(--su-text-muted);">
+                <td colspan="16" class="text-center" style="padding: 28px 16px; color: var(--su-text-muted);">
                   <div style="margin-bottom: 10px;">
                     No Master Orders created yet. Go to <strong>Order Creation</strong> to create a Buyer Order and issue it to Inward Receiving.
                   </div>
@@ -856,6 +906,7 @@ function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduction: nu
                   ${o.inAlterationQty} / ${o.scrappedQty}
                 </td>
                 <td class="text-right font-bold" style="color: var(--su-complete-dark);">${o.packedStage5Qty.toLocaleString()}</td>
+                <td class="text-center">${renderDeliveryCountdownChip(o.deliveryCountdown, false)}</td>
                 <td class="text-center">${renderReconciliationBadge(o.reconciliation)}</td>
                 <td class="text-center"><span class="${getSuperUserStatusBadgeClass(o.orderStatus)}">${escapeHtml(o.orderStatus)}</span></td>
               </tr>
@@ -885,7 +936,13 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
   const currentPage = Math.max(1, Number(ctx.trackingPage || 1));
 
   const uniqueBuyers = Array.from(new Set(s.orderRollups.map(o => o.buyer).filter(Boolean)));
-  const uniqueMakers = Array.from(new Set(s.orderRollups.map(o => o.maker).filter(Boolean)));
+  const uniqueMakers = Array.from(new Set(
+    s.orderRollups.flatMap(o =>
+      o.contractorAllocations && o.contractorAllocations.length > 0
+        ? o.contractorAllocations.map(a => a.maker)
+        : [o.maker]
+    ).filter(Boolean)
+  ));
 
   const filteredOrders = s.orderRollups.filter(o => {
     if (
@@ -911,7 +968,11 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
     if (buyerFilter !== 'ALL' && o.buyer !== buyerFilter) {
       return false;
     }
-    if (makerFilter !== 'ALL' && o.maker !== makerFilter) {
+    if (
+      makerFilter !== 'ALL' &&
+      o.maker !== makerFilter &&
+      !(o.contractorAllocations || []).some(a => a.maker === makerFilter)
+    ) {
       return false;
     }
     if (!search) return true;
@@ -919,6 +980,7 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
       o.orderId,
       o.buyer,
       o.maker,
+      ...(o.contractorAllocations || []).map(a => a.maker),
       o.po,
       o.article,
       o.color,
@@ -930,10 +992,19 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
     return hay.includes(search);
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const urgencyRank = (o: SuperUserOrderRollup): number => {
+    const st = o.deliveryCountdown?.status;
+    if (st === 'OVERDUE') return 0;
+    if (st === 'DUE_SOON') return 1;
+    if (st === 'ON_TRACK') return 2;
+    if (st === 'NO_DATE') return 3;
+    return 4;
+  };
+  const sortedOrders = [...filteredOrders].sort((a, b) => urgencyRank(a) - urgencyRank(b));
+  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const startIdx = (safePage - 1) * pageSize;
-  const pagedOrders = filteredOrders.slice(startIdx, startIdx + pageSize);
+  const pagedOrders = sortedOrders.slice(startIdx, startIdx + pageSize);
 
   return `
     <!-- 6.1 & 6.7: Live Tracking Filter, Buyer/Contractor Dropdowns, Search & Pagination Bar -->
@@ -1120,6 +1191,7 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                   <span>${escapeHtml(ord.article)} (${escapeHtml(ord.color)})</span>
                   <span style="font-weight: 400; color: var(--su-text-muted);">|</span>
                   <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--su-text-secondary);">Plan: <strong>${ord.plannedQty.toLocaleString()} Prs</strong></span>
+                  ${renderDeliveryCountdownChip(ord.deliveryCountdown, true)}
                   ${renderReconciliationBadge(ord.reconciliation)}
                 </div>
                 <div style="font-size: 11.5px; color: var(--su-text-secondary); margin-top: 2px;">
@@ -1127,6 +1199,25 @@ function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                   Planned Sizes: <strong>7:${ord.sizes['7'] || 0} | 8:${ord.sizes['8'] || 0} | 9:${ord.sizes['9'] || 0} | 10:${ord.sizes['10'] || 0} | 11:${ord.sizes['11'] || 0}</strong> &bull;
                   Packed S5 Sizes: <strong>7:${ord.packedSizes['7'] || 0} | 8:${ord.packedSizes['8'] || 0} | 9:${ord.packedSizes['9'] || 0} | 10:${ord.packedSizes['10'] || 0} | 11:${ord.packedSizes['11'] || 0}</strong>
                 </div>
+                ${
+                  (ord.contractorAllocations || []).length > 1
+                    ? `
+                  <div class="su-contractor-chips" data-testid="order-contractor-splits">
+                    ${(ord.contractorAllocations || []).map(a => {
+                      const splitCd = a.dueDate
+                        ? computeDeliveryCountdown({ dueDate: a.dueDate, createdAt: ord.createdAt, isCompleted: Number(a.remainingPairs ?? a.totalQty) === 0 })
+                        : null;
+                      return `
+                      <span class="su-contractor-chip">
+                        <strong>${escapeHtml(a.maker)}</strong>:
+                        Rcvd <strong>${Number(a.receivedPairs || 0).toLocaleString()}</strong> / ${a.totalQty.toLocaleString()} Prs
+                        (Bal: <strong>${Number(a.remainingPairs ?? a.totalQty).toLocaleString()}</strong>)${splitCd?.hasDueDate ? ` &bull; ${escapeHtml(splitCd.badgeText)}` : ''}
+                      </span>`;
+                    }).join('')}
+                  </div>
+                `
+                    : ''
+                }
               </div>
             </div>
 
@@ -1411,6 +1502,19 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
   const counts = ov.dbHealth.tableCounts || {};
   const totalRows = Object.values(counts).reduce((sum: number, n: any) => sum + Number(n || 0), 0);
   const auditTrail: AuditTrailEntry[] = ctx.auditTrail || [];
+  const draft = ctx.orderDraft || {
+    buyer: '',
+    maker: '',
+    po: '',
+    article: '',
+    color: '',
+    dueDate: '',
+    sizes: { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 }
+  };
+  const draftTotal = calculateSizeTotal(draft.sizes);
+  const splitRows = ctx.orderSplitRows || [];
+  const splitActive = splitRows.length > 0;
+  const splitValidation = splitActive ? validateContractorAllocations(draft.sizes, splitRows) : null;
 
   return `
     <!-- 7.1: Super User Master Order Creation Suite (Primary View) -->
@@ -1436,18 +1540,18 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
               <option value="">-- Choose Buyer --</option>
               ${(ov.customers.length
                 ? ov.customers.map(
-                    (c: any) => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${escapeHtml(c.country || 'Global')})</option>`
+                    (c: any) => `<option value="${escapeHtml(c.name)}" ${draft.buyer === c.name ? 'selected' : ''}>${escapeHtml(c.name)} (${escapeHtml(c.country || 'Global')})</option>`
                   )
-                : ctx.dropdownOptions.customers.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
+                : ctx.dropdownOptions.customers.map(c => `<option value="${escapeHtml(c)}" ${draft.buyer === c ? 'selected' : ''}>${escapeHtml(c)}</option>`)
               ).join('')}
               ${
                 !ov.customers.length && !ctx.dropdownOptions.customers.length
                   ? `
-                <option value="Northwind Safety Ltd">Northwind Safety Ltd (UK)</option>
-                <option value="Globex Supply Co.">Globex Supply Co. (Japan)</option>
-                <option value="Initech Safety Ltd">Initech Safety Ltd (France)</option>
-                <option value="Umbrella Workwear GmbH">Umbrella Workwear GmbH (Germany)</option>
-                <option value="Stark Protective Ltd">Stark Protective Ltd (Norway)</option>
+                <option value="Northwind Safety Ltd" ${draft.buyer === 'Northwind Safety Ltd' ? 'selected' : ''}>Northwind Safety Ltd (UK)</option>
+                <option value="Globex Supply Co." ${draft.buyer === 'Globex Supply Co.' ? 'selected' : ''}>Globex Supply Co. (Japan)</option>
+                <option value="Initech Safety Ltd" ${draft.buyer === 'Initech Safety Ltd' ? 'selected' : ''}>Initech Safety Ltd (France)</option>
+                <option value="Umbrella Workwear GmbH" ${draft.buyer === 'Umbrella Workwear GmbH' ? 'selected' : ''}>Umbrella Workwear GmbH (Germany)</option>
+                <option value="Stark Protective Ltd" ${draft.buyer === 'Stark Protective Ltd' ? 'selected' : ''}>Stark Protective Ltd (Norway)</option>
               `
                   : ''
               }
@@ -1455,16 +1559,16 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
 
           <div class="form-group">
-            <label for="admin-pending-order-maker">Contractor / Maker <span class="su-required-mark" aria-hidden="true">*</span></label>
-            <select id="admin-pending-order-maker" class="form-select" required aria-required="true">
+            <label for="admin-pending-order-maker">${splitActive ? 'Primary Contractor' : 'Contractor / Maker'} <span class="su-required-mark" aria-hidden="true">*</span></label>
+            <select id="admin-pending-order-maker" class="form-select" required aria-required="true" ${splitActive ? 'disabled title="Contractors are assigned in the Split Allocation table below."' : ''}>
               <option value="">-- Choose Contractor --</option>
-              ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}
+              ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${draft.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
             </select>
           </div>
 
           <div class="form-group">
             <label for="admin-pending-order-po">PO Number</label>
-            <input type="text" id="admin-pending-order-po" class="form-input" placeholder="e.g. 27351" list="admin-po-preset-list" />
+            <input type="text" id="admin-pending-order-po" class="form-input" placeholder="e.g. 27351" list="admin-po-preset-list" value="${escapeHtml(draft.po)}" />
             <datalist id="admin-po-preset-list">
               ${ctx.dropdownOptions.poList.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
             </datalist>
@@ -1474,13 +1578,18 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             <label for="admin-pending-order-article">Article <span class="su-required-mark" aria-hidden="true">*</span></label>
             <select id="admin-pending-order-article" class="form-select" required aria-required="true">
               <option value="">-- Choose Article --</option>
-              ${ctx.dropdownOptions.articles.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}
+              ${ctx.dropdownOptions.articles.map(a => `<option value="${escapeHtml(a)}" ${draft.article === a ? 'selected' : ''}>${escapeHtml(a)}</option>`).join('')}
             </select>
           </div>
 
           <div class="form-group">
             <label for="admin-pending-order-color">Colour / Shade</label>
-            <input type="text" id="admin-pending-order-color" class="form-input" placeholder="e.g. Black / Hi-Vis Yellow" />
+            <input type="text" id="admin-pending-order-color" class="form-input" placeholder="e.g. Black / Hi-Vis Yellow" value="${escapeHtml(draft.color)}" />
+          </div>
+
+          <div class="form-group">
+            <label for="admin-pending-order-due-date">Delivery Due Date</label>
+            <input type="date" id="admin-pending-order-due-date" class="form-input" value="${escapeHtml(draft.dueDate)}" />
           </div>
         </div>
 
@@ -1489,9 +1598,14 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             <span style="font-weight: 700; color: var(--ink-950); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;">
               Planned Order Size Breakdown Matrix (Pairs)
             </span>
-            <span style="font-size: 12px; color: var(--ink-700);">
-              Enter pairs for each size. The order total calculates automatically.
-            </span>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span style="font-size: 12px; color: var(--ink-700);">
+                Enter pairs for each size. The order total calculates automatically.
+              </span>
+              <button type="button" class="btn-outline" id="btn-admin-toggle-split" style="padding: 4px 10px; font-size: 11.5px;">
+                ${splitActive ? 'Use Single Contractor' : '+ Split Across Contractors'}
+              </button>
+            </div>
           </div>
           <table class="size-matrix-table" style="margin: 0;">
             <thead>
@@ -1506,15 +1620,82 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             </thead>
             <tbody>
               <tr>
-                <td><input type="number" aria-label="Order Size 7 / S" class="size-matrix-input admin-order-size-val" data-size="7" min="0" placeholder="0" /></td>
-                <td><input type="number" aria-label="Order Size 8 / M" class="size-matrix-input admin-order-size-val" data-size="8" min="0" placeholder="0" /></td>
-                <td><input type="number" aria-label="Order Size 9 / L" class="size-matrix-input admin-order-size-val" data-size="9" min="0" placeholder="0" /></td>
-                <td><input type="number" aria-label="Order Size 10 / XL" class="size-matrix-input admin-order-size-val" data-size="10" min="0" placeholder="0" /></td>
-                <td><input type="number" aria-label="Order Size 11 / XXL" class="size-matrix-input admin-order-size-val" data-size="11" min="0" placeholder="0" /></td>
-                <td style="font-weight: 800; font-size: 13.5px; color: var(--ink-950); text-align: center;" id="admin-order-size-total">0</td>
+                <td><input type="number" aria-label="Order Size 7 / S" class="size-matrix-input admin-order-size-val" data-size="7" min="0" placeholder="0" value="${draft.sizes['7'] || ''}" /></td>
+                <td><input type="number" aria-label="Order Size 8 / M" class="size-matrix-input admin-order-size-val" data-size="8" min="0" placeholder="0" value="${draft.sizes['8'] || ''}" /></td>
+                <td><input type="number" aria-label="Order Size 9 / L" class="size-matrix-input admin-order-size-val" data-size="9" min="0" placeholder="0" value="${draft.sizes['9'] || ''}" /></td>
+                <td><input type="number" aria-label="Order Size 10 / XL" class="size-matrix-input admin-order-size-val" data-size="10" min="0" placeholder="0" value="${draft.sizes['10'] || ''}" /></td>
+                <td><input type="number" aria-label="Order Size 11 / XXL" class="size-matrix-input admin-order-size-val" data-size="11" min="0" placeholder="0" value="${draft.sizes['11'] || ''}" /></td>
+                <td style="font-weight: 800; font-size: 13.5px; color: var(--ink-950); text-align: center;" id="admin-order-size-total">${draftTotal}</td>
               </tr>
             </tbody>
           </table>
+          ${
+            splitActive
+              ? `
+            <div class="su-split-panel" data-testid="admin-contractor-split-panel">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
+                <span style="font-weight: 700; color: var(--ink-950); font-size: 11.5px; text-transform: uppercase;">
+                  Contractor Share Split (Must Match Order Sizes)
+                </span>
+                <button type="button" class="btn-outline" id="btn-admin-add-split-row" style="padding: 3px 10px; font-size: 11.5px;">
+                  + Add Contractor Row
+                </button>
+              </div>
+              <table class="size-matrix-table" style="margin: 0;">
+                <thead>
+                  <tr>
+                    <th style="min-width: 150px;">Contractor</th>
+                    <th>7/S</th>
+                    <th>8/M</th>
+                    <th>9/L</th>
+                    <th>10/XL</th>
+                    <th>11/XXL</th>
+                    <th>Total</th>
+                    <th>Due Date</th>
+                    <th>Remove</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${splitRows.map((row, idx) => {
+                    const rowTotal = calculateSizeTotal(row.sizes);
+                    return `
+                    <tr class="su-split-row" data-split-index="${idx}">
+                      <td>
+                        <select class="form-select admin-split-maker" data-split-index="${idx}" aria-label="Split Contractor ${idx + 1}" style="font-size: 12px;">
+                          <option value="">-- Choose Contractor --</option>
+                          ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${row.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
+                        </select>
+                      </td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="7" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 7" value="${row.sizes['7'] || ''}" /></td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="8" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 8" value="${row.sizes['8'] || ''}" /></td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="9" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 9" value="${row.sizes['9'] || ''}" /></td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="10" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 10" value="${row.sizes['10'] || ''}" /></td>
+                      <td><input type="number" class="size-matrix-input admin-split-size-val" data-split-index="${idx}" data-size="11" min="0" placeholder="0" aria-label="Contractor ${idx + 1} Size 11" value="${row.sizes['11'] || ''}" /></td>
+                      <td class="text-center font-bold" id="admin-split-row-total-${idx}">${rowTotal.toLocaleString()}</td>
+                      <td><input type="date" class="form-input admin-split-due-date" data-split-index="${idx}" aria-label="Contractor ${idx + 1} Due Date" value="${escapeHtml(row.dueDate || '')}" style="font-size: 11.5px;" /></td>
+                      <td class="text-center">
+                        ${splitRows.length > 2 ? `<button type="button" class="btn-outline" data-su-action="remove-split-row" data-split-index="${idx}" style="padding: 2px 8px; font-size: 11px;">&times;</button>` : '<span style="color: var(--ink-500); font-size: 11px;">Min 2</span>'}
+                      </td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+              <div id="admin-split-balance-bar" class="su-split-balance-bar ${splitValidation?.valid ? 'is-balanced' : 'is-unbalanced'}">
+                <span>
+                  Unassigned Balance:
+                  <strong>7:${splitValidation?.unassignedBySize['7'] ?? 0}</strong> |
+                  <strong>8:${splitValidation?.unassignedBySize['8'] ?? 0}</strong> |
+                  <strong>9:${splitValidation?.unassignedBySize['9'] ?? 0}</strong> |
+                  <strong>10:${splitValidation?.unassignedBySize['10'] ?? 0}</strong> |
+                  <strong>11:${splitValidation?.unassignedBySize['11'] ?? 0}</strong>
+                  (<strong>${splitValidation?.totalUnassigned ?? 0}</strong> Prs remaining)
+                </span>
+                <strong>${splitValidation?.valid ? 'Split Matches Order 100% ✓' : escapeHtml(splitValidation?.error || 'Adjust contractor quantities to match order totals')}</strong>
+              </div>
+            </div>
+          `
+              : ''
+          }
         </div>
 
         <div class="su-order-action-row">
@@ -1548,6 +1729,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                 <th class="text-center">10/XL</th>
                 <th class="text-center">11/XXL</th>
                 <th class="text-right">Planned Pairs</th>
+                <th class="text-center">Delivery</th>
                 <th class="text-center">GRNs / REQs</th>
                 <th class="text-center">Action</th>
               </tr>
@@ -1556,13 +1738,18 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
               ${
                 ctx.pendingOrders.length === 0
                   ? `
-                <tr><td colspan="14" class="table-empty-cell">No orders in database yet. Fill out the form above and click "Save &amp; Issue Master Order".</td></tr>
+                <tr><td colspan="15" class="table-empty-cell">No orders in database yet. Fill out the form above and click "Save &amp; Issue Master Order".</td></tr>
               `
                   : ctx.pendingOrders
                       .map(o => {
                         const rollup = ctx.rollupSummary.orderRollups.find(
                           r => r.orderId === o.orderId
                         );
+                        const rowCountdown = rollup?.deliveryCountdown || computeDeliveryCountdown({
+                          dueDate: o.dueDate,
+                          createdAt: o.createdAt,
+                          isCompleted: o.shortClosed
+                        });
                         return `
                   <tr>
                     <td class="font-bold">${escapeHtml(o.orderId)}</td>
@@ -1577,6 +1764,7 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                     <td class="text-center">${o.sizes?.['10'] ?? '-'}</td>
                     <td class="text-center">${o.sizes?.['11'] ?? '-'}</td>
                     <td class="text-right font-bold">${(o.totalQty || calculateSizeTotal(o.sizes || {}) || 0).toLocaleString()}</td>
+                    <td class="text-center">${renderDeliveryCountdownChip(rowCountdown, false)}</td>
                     <td class="text-center" style="font-size: 11px;">
                       ${rollup ? `${rollup.grnBatches.length} GRNs &middot; ${rollup.reqBatches.length} REQs` : '0 GRNs &middot; 0 REQs'}
                     </td>
@@ -1595,13 +1783,39 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
       </div>
     </section>
 
-    <!-- 7.2: Collapsible Master Registries (Buyers, Articles, Contractors/Makers, Audit Trail) -->
-    <div class="two-column-grid" style="margin-bottom: 14px;">
-      <!-- Collapsible Registry 1: Customer & Buyer Master -->
-      <details class="su-collapsible-registry" open>
+    <!-- 7.2: Collapsible Master Registries (Buyers, Articles, Contractors/Makers, Audit Trail, SQLite WAL, Phased Rollout) -->
+    ${(() => {
+      const isRegOpen = (key: string, defaultOpen = false): boolean =>
+        ctx.openRegistryIds && key in ctx.openRegistryIds
+          ? Boolean(ctx.openRegistryIds[key])
+          : defaultOpen;
+      return `
+    <div class="su-registries-toolbar">
+      <div class="su-registries-toolbar-title">
+        <span>Master Registries &amp; System Administration (Sections 2&ndash;6)</span>
+        <span class="admin-meta-caption">Click any card header to expand full-width or collapse</span>
+      </div>
+      <div class="su-registries-toolbar-actions">
+        <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 11.5px;" data-su-action="toggle-all-registries" data-expanded="true">Expand All Registries</button>
+        <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 11.5px;" data-su-action="toggle-all-registries" data-expanded="false">Collapse All Registries</button>
+      </div>
+    </div>
+
+    <div class="su-registries-grid">
+      <!-- Collapsible Registry 2: Customer & Buyer Master -->
+      <details class="su-collapsible-registry" data-registry-id="buyers" ${isRegOpen('buyers', true) ? 'open' : ''}>
         <summary>
-          <span>2. Customer &amp; Buyer Master Registry (${ov.customers.length} Buyers)</span>
-          <span class="admin-meta-caption">AQL Inspection Rules &bull; Click to Toggle</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">02</span>
+            <span class="su-registry-title-text">2. Customer &amp; Buyer Master Registry (${ov.customers.length} Buyers)</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">AQL Inspection Rules</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div class="su-customer-form-grid">
@@ -1646,11 +1860,20 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </details>
 
-      <!-- Collapsible Registry 2: Glove Product / Article Master -->
-      <details class="su-collapsible-registry" open>
+      <!-- Collapsible Registry 3: Glove Product / Article Master -->
+      <details class="su-collapsible-registry" data-registry-id="articles" ${isRegOpen('articles', true) ? 'open' : ''}>
         <summary>
-          <span>3. Glove Article &amp; Packaging BOM Master (${ov.products.length} Articles)</span>
-          <span class="admin-meta-caption">Per-Pair Accessory Ratios &bull; Click to Toggle</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">03</span>
+            <span class="su-registry-title-text">3. Glove Article &amp; Packaging BOM Master (${ov.products.length} Articles)</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">Per-Pair Accessory Ratios</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div class="su-article-form-grid">
@@ -1700,14 +1923,21 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
         </div>
       </details>
-    </div>
 
-    <div class="two-column-grid" style="margin-bottom: 14px;">
-      <!-- Collapsible Registry 3: Contractors / Makers & PO Dropdowns -->
-      <details class="su-collapsible-registry">
+      <!-- Collapsible Registry 4: Contractors / Makers & PO Dropdowns -->
+      <details class="su-collapsible-registry" data-registry-id="makers_pos" ${isRegOpen('makers_pos', false) ? 'open' : ''}>
         <summary>
-          <span>4. Contractors / Makers (${ctx.dropdownOptions.makers.length}) &amp; PO Registry (${ctx.dropdownOptions.poList.length})</span>
-          <span class="admin-meta-caption">Synchronized across Dock &amp; Alteration Bay</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">04</span>
+            <span class="su-registry-title-text">4. Contractors / Makers (${ctx.dropdownOptions.makers.length}) &amp; PO Registry (${ctx.dropdownOptions.poList.length})</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">Synchronized across Dock &amp; Alteration Bay</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div style="margin-bottom: 12px;">
@@ -1751,14 +1981,20 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </details>
 
-    </div>
-
-    <!-- Collapsible Registry 4: Immutable Audit Trail & SQLite Snapshot Administration (10.3 & 10.5) -->
-    <div class="two-column-grid">
-      <details class="su-collapsible-registry">
+      <!-- Collapsible Registry 5: Immutable Audit Trail -->
+      <details class="su-collapsible-registry" data-registry-id="audit_trail" ${isRegOpen('audit_trail', false) ? 'open' : ''}>
         <summary>
-          <span>5. Immutable Audit Trail Ledger (${auditTrail.length} Recorded Events)</span>
-          <span class="admin-meta-caption">Actor &bull; Timestamp &bull; Before &rarr; After</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">05</span>
+            <span class="su-registry-title-text">5. Immutable Audit Trail Ledger (${auditTrail.length} Recorded Events)</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">Actor &bull; Timestamp &bull; Before &rarr; After</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
@@ -1793,10 +2029,20 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </details>
 
-      <details class="su-collapsible-registry">
+      <!-- Collapsible Registry 6: SQLite WAL Database & Snapshot Administration -->
+      <details class="su-collapsible-registry" data-registry-id="sqlite_wal" ${isRegOpen('sqlite_wal', false) ? 'open' : ''}>
         <summary>
-          <span>6. SQLite WAL Database &amp; Snapshot Administration (${ov.dbHealth.totalTables} Tables &bull; ${totalRows} Rows)</span>
-          <span class="admin-meta-caption">Engine: ${escapeHtml(String(ov.dbHealth.journalMode).toUpperCase())}</span>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">06</span>
+            <span class="su-registry-title-text">6. SQLite WAL Database &amp; Snapshot Administration (${ov.dbHealth.totalTables} Tables &bull; ${totalRows} Rows)</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">Engine: ${escapeHtml(String(ov.dbHealth.journalMode).toUpperCase())}</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
         </summary>
         <div class="su-collapsible-body">
           <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
@@ -1841,14 +2087,22 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
         </div>
       </details>
-    </div>
 
-    <!-- Phased Rollout Record & Active MES Policy Configuration -->
-    <details class="su-collapsible-registry" style="margin-top: 12px;">
-      <summary>
-        <span>Phased Rollout Record (Phase A &bull; Phase B &bull; Phase C) &amp; Active MES Policy Defaults</span>
-        <span class="admin-meta-caption">R1 / 3.8 / 4.6 / 4.7 Policies</span>
-      </summary>
+      <!-- Phased Rollout Record & Active MES Policy Configuration -->
+      <details class="su-collapsible-registry" data-registry-id="phased_rollout" ${isRegOpen('phased_rollout', false) ? 'open' : ''}>
+        <summary>
+          <span class="su-registry-summary-main">
+            <span class="su-registry-step-badge">POLICY</span>
+            <span class="su-registry-title-text">Phased Rollout Record (Phase A &bull; Phase B &bull; Phase C) &amp; Active MES Policy Defaults</span>
+          </span>
+          <span class="su-registry-summary-meta">
+            <span class="admin-meta-caption">R1 / 3.8 / 4.6 / 4.7 Policies</span>
+            <span class="su-registry-toggle-pill" aria-hidden="true">
+              <span class="su-toggle-when-closed">Expand &#9662;</span>
+              <span class="su-toggle-when-open">Collapse &#9652;</span>
+            </span>
+          </span>
+        </summary>
       <div class="su-collapsible-body">
         <div class="table-responsive" style="margin-bottom: 10px;">
           <table class="data-table">
@@ -1877,6 +2131,9 @@ function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </div>
     </details>
+    </div>
+      `;
+    })()}
   `;
 }
 
@@ -1933,7 +2190,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
     const html = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; ORDER VS. INWARD GRN &amp; CONTRACTOR BALANCE REPORT</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; ORDER VS. INWARD GRN &amp; CONTRACTOR BALANCE REPORT</h2>
           <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             Super User Reconciliation Statement &bull; Parent Order to Multiple GRN Batches (0001, 0002...)
           </p>
@@ -2030,7 +2287,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
     const html = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; ORDER-TO-REQUISITION (REQ / M-REQ / A-REQ) TRACEABILITY LEDGER</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; ORDER-TO-REQUISITION (REQ / M-REQ / A-REQ) TRACEABILITY LEDGER</h2>
           <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             5-Stage Packing Hall Execution &bull; Stage 4 Final QC Gate &amp; Pair Reconciliation
           </p>
@@ -2120,7 +2377,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
     const html = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; CONTRACTOR QUALITY, ALTERATION (A-REQ) &amp; SCRAP DEDUCTION STATEMENT</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; CONTRACTOR QUALITY, ALTERATION (A-REQ) &amp; SCRAP DEDUCTION STATEMENT</h2>
           <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             Alteration Bay #2 Rework Audit &bull; Max 2-Cycle Condemned Scrap Financial Debit Note
           </p>
@@ -2204,7 +2461,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
   const html = `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; FINAL QC (AQL 1.5) &amp; STAGE 5 EXPORT DISPATCH MANIFEST</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; FINAL QC (AQL 1.5) &amp; STAGE 5 EXPORT DISPATCH MANIFEST</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           ISO 2859-1 Level II Final Inspection Gate &bull; Master Carton Sealing &amp; Container Release
         </p>
@@ -2466,7 +2723,7 @@ function renderUsersTab(ctx: SuperUserRenderContext): string {
         <div class="table-responsive">
           <table class="data-table su-user-table">
             <thead>
-              <tr><th>Operator</th><th>Username</th><th>Role</th><th>Station</th><th>Status</th><th>Authorized Actions</th><th>Set Sign-in Password</th></tr>
+              <tr><th>Operator</th><th>Username</th><th>Role</th><th>Station</th><th>Status</th><th>Authorized Actions</th><th>Set Sign-in Password &amp; Actions</th></tr>
             </thead>
             <tbody>
               ${systemUsers.map(user => {
@@ -2474,6 +2731,7 @@ function renderUsersTab(ctx: SuperUserRenderContext): string {
                 const summaryPreview = perms.length > 0
                   ? `${perms.length} action${perms.length === 1 ? '' : 's'} (${escapeHtml(perms.slice(0, 2).join(', '))}${perms.length > 2 ? ', +' + (perms.length - 2) + ' more' : ''})`
                   : 'No permissions';
+                const isCurrentUser = Boolean(ctx.currentUserId && user.userId === ctx.currentUserId);
                 return `
                 <tr>
                   <td class="font-bold">${escapeHtml(user.name)}</td>
@@ -2495,6 +2753,13 @@ function renderUsersTab(ctx: SuperUserRenderContext): string {
                         autocomplete="new-password" aria-label="New sign-in password for ${escapeHtml(user.username)}"
                         placeholder="At least 8 characters" />
                       <button type="button" class="btn-outline" data-admin-reset-password="${escapeHtml(user.userId)}">Update</button>
+                      <button
+                        type="button"
+                        class="btn-danger"
+                        data-admin-delete-user="${escapeHtml(user.userId)}"
+                        aria-label="Delete user ${escapeHtml(user.username)}"
+                        ${isCurrentUser ? 'disabled title="Cannot delete your own active Super User account"' : ''}
+                      >Delete</button>
                     </div>
                   </td>
                 </tr>

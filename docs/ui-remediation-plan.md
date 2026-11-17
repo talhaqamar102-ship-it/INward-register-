@@ -1,4 +1,4 @@
-# Meridian Works MES — UI/UX & Accessibility Remediation Plan
+# Hammad Industries MES — UI/UX & Accessibility Remediation Plan
 
 ## Current Phase Status
 

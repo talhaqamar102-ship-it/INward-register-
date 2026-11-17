@@ -598,4 +598,407 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
 
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('Inward Register locks article & colour from order and requires Received From', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const makerSelect = page.locator('#admin-pending-order-maker');
+    const articleSelect = page.locator('#admin-pending-order-article');
+    const makerOption = await makerSelect.locator('option').nth(1).getAttribute('value');
+    const articleOption = await articleSelect.locator('option').nth(1).getAttribute('value');
+    await makerSelect.selectOption(makerOption!);
+    await articleSelect.selectOption(articleOption!);
+    await page.fill('#admin-pending-order-po', 'PO-INWARD-LOCK');
+    await page.fill('#admin-pending-order-color', 'Safety Orange');
+    await page.fill('.admin-order-size-val[data-size="7"]', '60');
+    await page.click('#btn-admin-add-pending-order');
+
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    // Jump to Inward Register via Quick Receive
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+
+    await expect(page.locator('#grn-article')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#grn-article')).toHaveValue(articleOption!);
+    await expect(page.locator('#grn-color')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#grn-color')).toHaveValue('Safety Orange');
+
+    // Clearing Received From blocks save and marks field invalid
+    await page.fill('#grn-received-from', '');
+    await page.fill('.grn-size-val[data-size="7"]', '30');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#grn-received-from')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+
+    // Entering Received From succeeds and shows on GRN table & printable slip
+    await page.fill('#grn-received-from', 'Imran Carrier');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await expect(page.locator('#modal-body')).toContainText('Imran Carrier');
+    await expect(page.locator('#modal-body')).toContainText('Safety Orange');
+    await page.click('#modal-btn-close');
+
+    // Clean up order via voiding the GRN first or return to admin
+    await page.click('#btn-return-admin');
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('Multi-contractor order split and delivery countdown render across Super User and Inward Register', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const articleSelect = page.locator('#admin-pending-order-article');
+    const articleOption = await articleSelect.locator('option').nth(1).getAttribute('value');
+    await articleSelect.selectOption(articleOption!);
+    await page.fill('#admin-pending-order-po', 'PO-SPLIT-E2E');
+    await page.fill('#admin-pending-order-color', 'Hi-Vis Green');
+
+    const futureDate = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
+    await page.fill('#admin-pending-order-due-date', futureDate);
+    await page.fill('.admin-order-size-val[data-size="7"]', '50');
+    await page.fill('.admin-order-size-val[data-size="8"]', '50');
+    await page.click('#btn-admin-toggle-split');
+
+    await expect(page.locator('[data-testid="admin-contractor-split-panel"]')).toBeVisible();
+    const maker1Select = page.locator('.admin-split-maker[data-split-index="0"]');
+    const maker2Select = page.locator('.admin-split-maker[data-split-index="1"]');
+    const m1Val = await maker1Select.inputValue();
+    const m2Val = await maker2Select.inputValue();
+    expect(m1Val).toBeTruthy();
+    expect(m2Val).toBeTruthy();
+    expect(m1Val).not.toBe(m2Val);
+
+    // Split Size 7: 30/20, Size 8: 30/20 => 60 / 40
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="7"]', '30');
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="8"]', '30');
+    await page.fill('.admin-split-size-val[data-split-index="1"][data-size="7"]', '20');
+    await page.fill('.admin-split-size-val[data-split-index="1"][data-size="8"]', '20');
+    await expect(page.locator('#admin-split-balance-bar')).toContainText('Split Matches Order 100%');
+
+    await page.click('#btn-admin-add-pending-order');
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    // Verify Live Tracking displays countdown badge and split contractor chips
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    const orderCard = page.locator(`#tracking-order-card-${orderId}`);
+    await expect(orderCard).toBeVisible();
+    await expect(orderCard.locator('[data-testid="order-countdown-badge"]')).toContainText(/\d+d left/);
+    await expect(orderCard.locator('[data-testid="order-contractor-splits"]')).toContainText(m1Val);
+    await expect(orderCard.locator('[data-testid="order-contractor-splits"]')).toContainText(m2Val);
+
+    // Jump to Inward Register & confirm contractor dropdown only lists the 2 split contractors and locks Article/Colour
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await expect(page.locator('#grn-article')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#grn-color')).toHaveValue('Hi-Vis Green');
+    await expect(page.locator('#grn-delivery-timeline')).toContainText(futureDate);
+    const grnMakerOptions = await page.locator('#grn-maker option').allTextContents();
+    expect(grnMakerOptions.some(t => t.includes(m1Val))).toBe(true);
+    expect(grnMakerOptions.some(t => t.includes(m2Val))).toBe(true);
+    expect(grnMakerOptions.length).toBe(3); // Choose prompt + 2 allocated contractors
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('User Management: centered confirmation popup with Admin password authorizes user deletion and blocks self-delete', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    let expectingExpected401 = false;
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        const text = msg.text();
+        if (expectingExpected401 && text.includes('status of 401')) {
+          return;
+        }
+        runtimeErrors.push(`console.error: ${text}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="users"]');
+
+    // Signed-in Super User's own Delete button is disabled (self-delete lock)
+    const ownRow = page.locator('tr', { hasText: TEST_ADMIN.username });
+    await expect(ownRow).toBeVisible();
+    await expect(ownRow.locator('button[data-admin-delete-user]')).toBeDisabled();
+
+    // Create a new user account to delete
+    await page.fill('#admin-user-name', 'Delete Target Operator');
+    await page.fill('#admin-user-username', 'delete.target.user');
+    await page.fill('#admin-user-password', 'ValidPass123!');
+    await page.selectOption('#admin-user-role', 'INWARD_CLERK');
+    await page.click('#btn-admin-add-system-user');
+
+    const targetRow = page.locator('tr', { hasText: 'delete.target.user' });
+    await expect(targetRow).toBeVisible();
+    const deleteBtn = targetRow.locator('button[data-admin-delete-user]');
+    await expect(deleteBtn).toBeEnabled();
+
+    // Zero horizontal overflow with Delete action column present
+    const overflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth
+    }));
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+
+    // Click Delete -> opens centered confirmation popup requiring Admin password
+    await deleteBtn.click();
+    const modal = page.locator('#global-modal.open');
+    await expect(modal).toBeVisible();
+    const modalBox = await modal.locator('.modal-box').boundingBox();
+    expect(modalBox).not.toBeNull();
+    const modalCenterX = modalBox!.x + modalBox!.width / 2;
+    const modalCenterY = modalBox!.y + modalBox!.height / 2;
+    expect(Math.abs(modalCenterX - 720)).toBeLessThanOrEqual(20);
+    expect(Math.abs(modalCenterY - 450)).toBeLessThanOrEqual(40);
+    await expect(page.locator('#modal-body')).toContainText('delete.target.user');
+    const adminPwInput = page.locator('#confirm-admin-password');
+    await expect(adminPwInput).toBeVisible();
+    await expect(adminPwInput).toBeFocused();
+
+    // Blank Admin password shows inline validation error and keeps modal open
+    await page.click('#confirm-dialog-confirm');
+    await expect(adminPwInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#confirm-admin-password-error')).toContainText('Enter your Admin password');
+    await expect(modal).toBeVisible();
+
+    // Wrong Admin password keeps modal open and shows server error inline (expects 401 Unauthorized)
+    await adminPwInput.fill('Wrong-Admin-Pass');
+    expectingExpected401 = true;
+    try {
+      await Promise.all([
+        page.waitForResponse(res => res.url().includes('/api/admin/users/') && res.request().method() === 'DELETE' && res.status() === 401),
+        page.click('#confirm-dialog-confirm')
+      ]);
+      await expect(page.locator('#confirm-admin-password-error')).toHaveText('Incorrect Admin password. User was not deleted.');
+    } finally {
+      expectingExpected401 = false;
+    }
+    await expect(adminPwInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(modal).toBeVisible();
+    await expect(targetRow).toBeVisible();
+
+    // Correct Admin password deletes the user, closes popup, and removes row
+    await adminPwInput.fill(TEST_ADMIN.password);
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes('/api/admin/users/') && res.request().method() === 'DELETE' && res.status() === 200),
+      page.click('#confirm-dialog-confirm')
+    ]);
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+    await expect(page.locator('tr', { hasText: 'delete.target.user' })).toHaveCount(0);
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('Packing Hall: hides Print Requisition and M-/A-prefix fields, and locks Material Requisition until Stage 3 is cleared', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await page.addInitScript(() => {
+      window.print = () => {};
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const makerOption = await page.locator('#admin-pending-order-maker option').nth(1).getAttribute('value');
+    await page.selectOption('#admin-pending-order-buyer', 'Globex Supply Co.');
+    await page.selectOption('#admin-pending-order-maker', makerOption!);
+    await page.selectOption('#admin-pending-order-article', 'Model A1');
+    await page.fill('#admin-pending-order-po', 'PO-PH-GATE');
+    await page.fill('#admin-pending-order-color', 'Slate Black');
+    await page.fill('.admin-order-size-val[data-size="7"]', '100');
+    await page.click('#btn-admin-add-pending-order');
+
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    // Receive 100 pairs at Inward Register
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await page.fill('#grn-received-from', 'Tariq Carrier');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+    await page.click('#btn-return-admin');
+
+    // Create Packing Hall Requisition for the order
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-create-req"][data-order-id="${orderId}"]`);
+    await expect(page.locator('#btn-confirm-lot-draw')).toBeVisible();
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes(`/api/orders/${encodeURIComponent(orderId)}/requisitions`) && res.status() === 200),
+      page.click('#btn-confirm-lot-draw')
+    ]);
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+    await expect(page.locator('#wip-batch-select')).toBeVisible();
+
+    // 1 & 2: Print Requisition button & M-/A-prefix fields must be removed in Packing Hall
+    await expect(page.locator('#btn-wip-print-req')).toHaveCount(0);
+    await expect(page.locator('#wip-disp-mreq')).toHaveCount(0);
+    await expect(page.locator('#wip-disp-areq')).toHaveCount(0);
+    await expect(page.locator('#btn-wip-new-req')).toBeVisible();
+    await expect(page.locator('[data-testid="wip-analytics-dashboard"]')).not.toContainText('M-REQ');
+    await expect(page.locator('[data-testid="wip-analytics-dashboard"]')).not.toContainText('A-REQ');
+
+    // 3a: Before inward issue & Stage 3, Material Requisition & Stage 4 are locked and Sets = 0
+    await expect(page.locator('#wip-mreq-qty')).toHaveText('0 Sets');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-step4')).toBeDisabled();
+
+    // Issue requisition at Inward Register
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await expect(page.locator('#btn-issue-req-to-packing')).toBeEnabled();
+    await page.click('#btn-issue-req-to-packing');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    // Open active requisition in Packing Hall via Super User tracking
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    const openPackingBtn = page.locator(`#tracking-order-card-${orderId} button[data-su-action="open-req-screen"][data-target-screen="screen-packing"]`).first();
+    await expect(openPackingBtn).toBeVisible();
+    await openPackingBtn.click();
+
+    // After Inward Issue -> Stage 1 active, Material Requisition STILL locked until Stage 3 clears
+    await expect(page.locator('#wip-stg1-in')).toHaveText('100');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-step4')).toBeDisabled();
+
+    // Clear Stage 1 -> still locked during Stage 2
+    await page.click('#btn-wip-step1');
+    await page.click('#btn-submit-step1-action');
+    await expect(page.locator('#wip-stg2-in')).toHaveText('100');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeDisabled();
+
+    // Clear Stage 2 -> still locked during Stage 3
+    await page.click('#btn-wip-step2');
+    await page.click('#btn-submit-step2-action');
+    await expect(page.locator('#wip-stg3-in')).toHaveText('100');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeDisabled();
+    await expect(page.locator('#btn-wip-step4')).toBeDisabled();
+
+    // Clear Stage 3 (Pair Matching) -> Material Requisition unlocks (100 Sets), Stage 4 waits for slip generation
+    await page.click('#btn-wip-step3');
+    await page.click('#btn-submit-step3-action');
+    await expect(page.locator('#wip-mreq-qty')).toHaveText('100 Sets');
+    await expect(page.locator('#btn-wip-generate-mreq-slip')).toBeEnabled();
+    await expect(page.locator('#btn-wip-print-mreq-slip')).toBeEnabled();
+    await expect(page.locator('#btn-wip-step4')).toBeDisabled();
+
+    // Generate & Issue Material Requisition -> opens slip modal and unlocks Stage 4
+    await page.click('#btn-wip-generate-mreq-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await expect(page.locator('#modal-body')).toContainText('100');
+    await page.click('#modal-btn-close');
+    await expect(page.locator('#btn-wip-step4')).toBeEnabled();
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('Sections 2-6 Master Registries: expand full-width when open, persist open state after saving, and toggle cleanly', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    const gridBox = await page.locator('.su-registries-grid').boundingBox();
+    expect(gridBox).not.toBeNull();
+
+    // Open Section 2 spans full grid width while closed Section 4 stays compact (~half grid width)
+    const buyersCard = page.locator('details.su-collapsible-registry[data-registry-id="buyers"]');
+    const makersCard = page.locator('details.su-collapsible-registry[data-registry-id="makers_pos"]');
+    await expect(buyersCard).toHaveAttribute('open', '');
+    await expect(makersCard).not.toHaveAttribute('open', '');
+
+    const buyersOpenBox = await buyersCard.boundingBox();
+    const makersClosedBox = await makersCard.boundingBox();
+    expect(buyersOpenBox!.width).toBeGreaterThan(gridBox!.width * 0.9);
+    expect(makersClosedBox!.width).toBeLessThan(gridBox!.width * 0.55);
+
+    // Clicking Section 4 summary opens it full width and switches toggle pill to Collapse
+    await makersCard.locator('summary').click();
+    await expect(makersCard).toHaveAttribute('open', '');
+    const makersOpenBox = await makersCard.boundingBox();
+    expect(makersOpenBox!.width).toBeGreaterThan(gridBox!.width * 0.9);
+
+    // Adding a Maker calls renderApp() — Section 4 must stay open
+    await page.fill('#admin-add-maker-input', 'Hall Z Persistent');
+    await page.click('#btn-admin-add-maker');
+    await expect(makersCard).toHaveAttribute('open', '');
+    await expect(makersCard).toContainText('Hall Z Persistent');
+
+    // Collapse All / Expand All toolbar controls operate all 6 registry drawers
+    await page.click('button[data-su-action="toggle-all-registries"][data-expanded="false"]');
+    await expect(page.locator('details.su-collapsible-registry[open]')).toHaveCount(0);
+
+    await page.click('button[data-su-action="toggle-all-registries"][data-expanded="true"]');
+    await expect(page.locator('details.su-collapsible-registry[open]')).toHaveCount(6);
+
+    expect(runtimeErrors).toEqual([]);
+  });
 });

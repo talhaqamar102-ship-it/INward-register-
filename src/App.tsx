@@ -99,7 +99,7 @@ function buildGrnSlipHtml(rec: ReceivingRecord): string {
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin:0; font-size:16px; font-weight:800; color: var(--ink-950);">MERIDIAN WORKS &bull; GOODS RECEIVING NOTE (GRN)</h2>
+        <h2 style="margin:0; font-size:16px; font-weight:800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; GOODS RECEIVING NOTE (GRN)</h2>
         <p style="margin:2px 0 0; font-size:11px; text-transform:uppercase; color: var(--ink-600);">
           Dock #1 Inward Store Register &bull; Official Inward Goods Slip
         </p>
@@ -428,7 +428,7 @@ export default function App() {
     <>
       <header className="module-switcher-bar">
         <div className="module-switcher-left">
-          <span className="module-switcher-label">Meridian Works MES</span>
+          <span className="module-switcher-label">Hammad Industries MES</span>
           <button className={`module-nav-btn${screen === 'grn' ? ' active' : ''}`} onClick={() => setScreen('grn')}>Inward Receiving</button>
           <button className={`module-nav-btn${screen === 'wip' ? ' active' : ''}`} onClick={() => setScreen('wip')}>Packing Hall</button>
           <button className={`module-nav-btn${screen === 'admin' ? ' active' : ''}`} onClick={() => setScreen('admin')}>Admin</button>

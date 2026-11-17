@@ -1,4 +1,4 @@
-# Meridian Works MES
+# Hammad Industries MES
 
 Packaging & cobalting execution system for safety-glove manufacturing.
 
@@ -24,7 +24,6 @@ Packaging & cobalting execution system for safety-glove manufacturing.
 | Integration tests (node:test) | `npm test` |
 | Playwright E2E / visual QA | `npm run test:e2e` |
 | Full verification gate | `npm run verify:all` |
-| UI/UX Pro Max search | `npm run uupm -- "<query>" --domain <domain>` |
 | Docker run | `docker compose up -d --build` |
 
 ## ECC & Playwright Verification Harness (Hard Rule)
@@ -58,8 +57,8 @@ Rules:
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
 - A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.
 
-## ui-ux-pro-max
+## unslop Design Craft Harness
 
-Design intelligence database installed at `.claude/skills/ui-ux-pro-max/SKILL.md` (`python3 .claude/skills/ui-ux-pro-max/scripts/search.py`).
-- Run `npm run uupm:design-system -- "manufacturing erp enterprise analytics dashboard" -p "Meridian Works MES"` for system-wide palette, typography, and layout reasoning.
-- Run `npm run uupm -- "<query>" --domain <color|ux|chart|typography|style>` for targeted component, chart, or table UX rules.
+Design system & UI craft guidance is installed at `.agents/skills/unslop/SKILL.md` (`heydamir/unslop`, `CC BY 4.0`):
+- Follow `.agents/skills/unslop/SKILL.md` ("quiet chrome, one bright moment", Warm/Graphite neutral ramps from `references/tokens.md`, sentence-case labels, weights `400`/`500`, `tabular-nums`, and the 9 passes in order) when designing or refining screens.
+- Keep shop-floor paper slips (`GRN`, `REQ`, `M-REQ`, `A-REQ`, `@media print`) strictly 100% monochrome black-and-white.

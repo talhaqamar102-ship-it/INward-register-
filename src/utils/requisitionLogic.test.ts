@@ -18,7 +18,9 @@ import {
   applyPendingOrderSelection,
   evaluateRequisitionIssuance,
   determineOrderActiveStage,
+  isMaterialRequisitionIssuedForStage4,
   isPackingAwaitingFinalQc,
+  isStage3ClearedForMaterialReq,
   isStage5ReadyForCartons,
   computeWipRolledYieldPct,
   canExecuteStage5CartonPacking,
@@ -54,6 +56,8 @@ import {
   renderRequisitionWipAnalyticsChart,
   buildConfirmDialogHtml,
   validatePendingOrderInputs,
+  validateContractorAllocations,
+  computeDeliveryCountdown,
   validateCustomerMasterInputs,
   validateProductMasterInputs,
   validateSystemUserInputs,
@@ -1571,6 +1575,26 @@ test('Phase 4.2: confirm dialog HTML escapes hostile payloads and form validator
   assert.ok(html.includes('id="confirm-dialog-confirm"'), 'Includes explicit Confirm button');
   assert.ok(html.includes('btn-danger'), 'Danger tone applies btn-danger class');
 
+  const pwDialogHtml = buildConfirmDialogHtml({
+    message: `Delete user <img src=x onerror=alert(1)>?`,
+    detail: 'Permanent delete.',
+    confirmLabel: 'Delete User',
+    cancelLabel: 'Cancel',
+    tone: 'danger',
+    passwordField: {
+      id: 'confirm-admin-password',
+      label: 'Admin Password "test"',
+      placeholder: 'Enter Admin <password>',
+      hint: 'Required to authorize deletion.'
+    }
+  });
+  assert.doesNotMatch(pwDialogHtml, /<img\b/i, 'Password confirm dialog escapes message HTML');
+  assert.ok(pwDialogHtml.includes('id="confirm-admin-password"'), 'Renders expected password field ID');
+  assert.ok(pwDialogHtml.includes('type="password"'), 'Renders password input type');
+  assert.ok(pwDialogHtml.includes('aria-required="true"'), 'Marks admin password input as aria-required');
+  assert.ok(pwDialogHtml.includes('Admin Password &quot;test&quot;'), 'Escapes password label');
+  assert.ok(pwDialogHtml.includes('Enter Admin &lt;password&gt;'), 'Escapes password placeholder');
+
   assert.deepEqual(validatePendingOrderInputs({ maker: '', article: '' }), {
     maker: 'Select a Contractor / Maker.',
     article: 'Select an Article.'
@@ -1688,5 +1712,114 @@ test('Phase 4.4: Customer Master and Article/BOM Master forms use responsive CSS
     html,
     /grid-template-columns:\s*(?:1\.1fr|1\.2fr)/,
     'Master forms must not use brittle fixed inline fr track lists'
+  );
+});
+
+test('Multi-contractor order split validation & per-contractor rollup tracking', () => {
+  const orderSizes = { '7': 40, '8': 50, '9': 60, '10': 30, '11': 20 };
+
+  const valid = validateContractorAllocations(orderSizes, [
+    { maker: 'Hall A', sizes: { '7': 25, '8': 30, '9': 40, '10': 15, '11': 10 } },
+    { maker: 'Hall B', sizes: { '7': 15, '8': 20, '9': 20, '10': 15, '11': 10 } }
+  ]);
+  assert.equal(valid.valid, true);
+  assert.equal(valid.totalUnassigned, 0);
+
+  const dup = validateContractorAllocations(orderSizes, [
+    { maker: 'Hall A', sizes: { '7': 20, '8': 25, '9': 30, '10': 15, '11': 10 } },
+    { maker: 'hall a', sizes: { '7': 20, '8': 25, '9': 30, '10': 15, '11': 10 } }
+  ]);
+  assert.equal(dup.valid, false);
+  assert.match(dup.error || '', /Duplicate contractor/);
+
+  const mismatch = validateContractorAllocations(orderSizes, [
+    { maker: 'Hall A', sizes: { '7': 20, '8': 30, '9': 40, '10': 15, '11': 10 } },
+    { maker: 'Hall B', sizes: { '7': 15, '8': 20, '9': 20, '10': 15, '11': 10 } }
+  ]);
+  assert.equal(mismatch.valid, false);
+  assert.equal(mismatch.unassignedBySize['7'], 5);
+  assert.equal(mismatch.totalUnassigned, 5);
+
+  const rollupSummary = buildOrderTraceability({
+    pendingOrders: [{
+      orderId: 'ORD-SPLIT-1',
+      buyer: 'Globex Supply Co.',
+      maker: 'Hall A, Hall B',
+      po: 'PO-SPLIT-1',
+      article: 'Model A1',
+      sizes: orderSizes,
+      totalQty: 200,
+      contractorAllocations: [
+        { maker: 'Hall A', sizes: { '7': 25, '8': 30, '9': 40, '10': 15, '11': 10 }, totalQty: 120 },
+        { maker: 'Hall B', sizes: { '7': 15, '8': 20, '9': 20, '10': 15, '11': 10 }, totalQty: 80 }
+      ]
+    }],
+    grnList: [
+      { sr: 1, grnCode: 'RCV-2026-9001', date: '2026-11-16', pendingOrderId: 'ORD-SPLIT-1', maker: 'Hall A', article: 'Model A1', rcvdPairs: 90, sizes: { '7': 25, '8': 30, '9': 35, '10': 0, '11': 0 } },
+      { sr: 2, grnCode: 'RCV-2026-9002', date: '2026-11-16', pendingOrderId: 'ORD-SPLIT-1', maker: 'Hall B', article: 'Model A1', rcvdPairs: 80, sizes: { '7': 15, '8': 20, '9': 20, '10': 15, '11': 10 } }
+    ],
+    requisitions: [],
+    defectList: []
+  });
+
+  const ord = rollupSummary.orderRollups[0];
+  assert.equal(ord.contractorAllocations?.length, 2);
+  assert.equal(ord.contractorAllocations?.[0].receivedPairs, 90);
+  assert.equal(ord.contractorAllocations?.[0].remainingPairs, 30);
+  assert.equal(ord.contractorAllocations?.[1].receivedPairs, 80);
+  assert.equal(ord.contractorAllocations?.[1].remainingPairs, 0);
+});
+
+test('Delivery countdown handles NO_DATE, OVERDUE, Due Today, DUE_SOON, ON_TRACK, and DELIVERED', () => {
+  assert.equal(computeDeliveryCountdown({ dueDate: '', nowIso: '2026-11-16' }).status, 'NO_DATE');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-12', nowIso: '2026-11-16' }).badgeText, 'Overdue by 4d');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-12', nowIso: '2026-11-16' }).status, 'OVERDUE');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-16', nowIso: '2026-11-16' }).badgeText, 'Due Today');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-20', nowIso: '2026-11-16' }).status, 'DUE_SOON');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-20', nowIso: '2026-11-16' }).badgeText, '4d left');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-30', createdAt: '2026-11-01', nowIso: '2026-11-16' }).status, 'ON_TRACK');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-30', createdAt: '2026-11-01', nowIso: '2026-11-16' }).badgeText, '14d left');
+  assert.equal(computeDeliveryCountdown({ dueDate: '2026-11-10', isCompleted: true, nowIso: '2026-11-16' }).status, 'DELIVERED');
+});
+
+test('Material Requisition and Stage 4 unlock only stage-by-stage after Stage 3 Pair Matching is cleared', () => {
+  // Pending / Stage 1 in progress: Material Requisition locked
+  assert.equal(
+    isStage3ClearedForMaterialReq({ stage1In: 100, stage1Passed: 0, stage2In: 0, stage2Passed: 0, stage3In: 0, stage3Passed: 0 }),
+    false
+  );
+  // Stage 1 done, Stage 2 still has pending pairs: Material Requisition locked
+  assert.equal(
+    isStage3ClearedForMaterialReq({ stage1In: 100, stage1Passed: 100, stage2In: 100, stage2Passed: 60, stage3In: 60, stage3Passed: 60 }),
+    false
+  );
+  // Partial Stage 3 matching (remaining in Stage 3): Material Requisition locked
+  assert.equal(
+    isStage3ClearedForMaterialReq({ stage1In: 100, stage1Passed: 100, stage2In: 100, stage2Passed: 100, stage3In: 100, stage3Passed: 80, stage3Defects: 0 }),
+    false
+  );
+  // Stage 1, Stage 2, and Stage 3 all cleared with matched pairs > 0: Material Requisition unlocks, Stage 4 stays locked until issued
+  const unlockedForMatReq = {
+    stage1In: 100,
+    stage1Passed: 100,
+    stage2In: 100,
+    stage2Passed: 95,
+    stage2Defects: 5,
+    stage3In: 95,
+    stage3Passed: 95,
+    stage3Defects: 0,
+    mreqStatus: 'Ready'
+  };
+  assert.equal(isStage3ClearedForMaterialReq(unlockedForMatReq), true);
+  assert.equal(isMaterialRequisitionIssuedForStage4(unlockedForMatReq), false);
+
+  // Once Material Requisition is issued/printed, Stage 4 unlocks
+  assert.equal(
+    isMaterialRequisitionIssuedForStage4({ ...unlockedForMatReq, mreqStatus: 'ISSUED' }),
+    true
+  );
+  assert.equal(
+    isMaterialRequisitionIssuedForStage4({ ...unlockedForMatReq, mreqStatus: 'Printed' }),
+    true
   );
 });

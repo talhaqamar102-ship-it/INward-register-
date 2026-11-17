@@ -191,6 +191,8 @@ export function initDatabase() {
       challan_no TEXT DEFAULT '',
       gate_pass_no TEXT DEFAULT '',
       vehicle_no TEXT DEFAULT '',
+      received_from TEXT NOT NULL DEFAULT '',
+      color_shade TEXT NOT NULL DEFAULT 'Standard',
       overage_allowed_pct REAL DEFAULT 2.0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -270,10 +272,29 @@ export function initDatabase() {
       size_11 INTEGER NOT NULL DEFAULT 0,
       size_12 INTEGER NOT NULL DEFAULT 0,
       total_qty INTEGER NOT NULL DEFAULT 0,
+      due_date TEXT DEFAULT '',
       short_closed INTEGER NOT NULL DEFAULT 0,
       short_close_reason TEXT DEFAULT '',
       notes TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 17b. Per-Contractor Order Allocation Splits
+    CREATE TABLE IF NOT EXISTS order_contractor_allocations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT NOT NULL,
+      maker_contractor TEXT NOT NULL,
+      size_6 INTEGER NOT NULL DEFAULT 0,
+      size_7 INTEGER NOT NULL DEFAULT 0,
+      size_8 INTEGER NOT NULL DEFAULT 0,
+      size_9 INTEGER NOT NULL DEFAULT 0,
+      size_10 INTEGER NOT NULL DEFAULT 0,
+      size_11 INTEGER NOT NULL DEFAULT 0,
+      size_12 INTEGER NOT NULL DEFAULT 0,
+      total_qty INTEGER NOT NULL DEFAULT 0,
+      due_date TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(order_id, maker_contractor)
     );
 
     CREATE TABLE IF NOT EXISTS order_seq (
@@ -406,6 +427,13 @@ function migrateDatabase() {
     if (!rcvCols.includes('void_reason')) {
       db.exec(`ALTER TABLE store_receivings ADD COLUMN void_reason TEXT DEFAULT ''`);
     }
+    if (!rcvCols.includes('received_from')) {
+      db.exec(`ALTER TABLE store_receivings ADD COLUMN received_from TEXT NOT NULL DEFAULT ''`);
+      db.exec(`UPDATE store_receivings SET received_from = maker_contractor WHERE received_from = '' OR received_from IS NULL`);
+    }
+    if (!rcvCols.includes('color_shade')) {
+      db.exec(`ALTER TABLE store_receivings ADD COLUMN color_shade TEXT NOT NULL DEFAULT 'Standard'`);
+    }
   }
 
   // glove_requisitions
@@ -440,7 +468,32 @@ function migrateDatabase() {
     if (!ordCols.includes('short_close_reason')) {
       db.exec(`ALTER TABLE pending_orders ADD COLUMN short_close_reason TEXT DEFAULT ''`);
     }
+    if (!ordCols.includes('due_date')) {
+      db.exec(`ALTER TABLE pending_orders ADD COLUMN due_date TEXT DEFAULT ''`);
+    }
   }
+
+  db.exec(`
+    INSERT OR IGNORE INTO order_contractor_allocations (
+      order_id, maker_contractor, size_6, size_7, size_8, size_9, size_10, size_11, size_12, total_qty, due_date
+    )
+    SELECT
+      p.order_id,
+      p.maker_contractor,
+      COALESCE(p.size_6, 0),
+      COALESCE(p.size_7, 0),
+      COALESCE(p.size_8, 0),
+      COALESCE(p.size_9, 0),
+      COALESCE(p.size_10, 0),
+      COALESCE(p.size_11, 0),
+      COALESCE(p.size_12, 0),
+      COALESCE(p.total_qty, 0),
+      COALESCE(p.due_date, '')
+    FROM pending_orders p
+    WHERE NOT EXISTS (
+      SELECT 1 FROM order_contractor_allocations a WHERE a.order_id = p.order_id
+    );
+  `);
 
   // alterations
   const altCols = getCols('alterations');

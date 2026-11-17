@@ -21,3 +21,8 @@ coverage/
 test-results/
 playwright-report/
 .playwright-tmp/
+
+# HyperFrames video workspace runtime cache & dependencies
+hyperframes-video/node_modules/
+hyperframes-video/.hyperframes/
+hyperframes-video/*.mp4
