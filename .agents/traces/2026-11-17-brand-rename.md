@@ -1,0 +1,9 @@
+# Trace — 2026-11-17 Meridian -> Hammad Industries Brand Rename
+
+- `run_command`: Node ESM replacement across `29` active files (`src/`, `public/`, `vanilla/`, `index.html`, `server.ts`, `Dockerfile`, `scripts/graphify.ts`, docs, `hyperframes-video/` specs) + post-edit `Select-String` -> `TOTAL FILES UPDATED: 29 | TOTAL REPLACEMENTS: 73`; remaining active matches = `2` (stale `dist/index.html` pre-rebuild) -> All active app UI, print slips, logs, and doc sources switched to `Hammad Industries` / `HAMMAD INDUSTRIES`.
+- `run_command`: `npm run verify:all` -> Exited `0`: `tsc --noEmit` clean, `test:unit` `29/29` passed (`0` fail/skip), `test` `45/45` passed (`0` fail/skip), `vite build` clean (`143ms`), `test:e2e` `10/10` passed (`25.4s`, `0` fail/skip), `graphify` rebuilt (`1068` nodes, `2149` edges) -> Zero functional or UI regressions across all automated tests.
+- `run_command`: Post-build `Select-String` across `src`, `dist`, `public`, `vanilla`, `scripts`, `index.html`, `server.ts`, `Dockerfile`, `graphify-out` -> `Remaining active/dist/graphify hits: 5` (all `5` are folder path references to `design-system/meridian-works-mes/MASTER.md` inside `graphify-out/`) -> `0` matches remain in `src/`, rebuilt `dist/`, `public/` (excl. `.aistudio/`), `vanilla/`, `scripts/`, `index.html`, `server.ts`, or `Dockerfile`.
+
+## ASSUMED WITHOUT CHECKING
+- Intentionally untouched to avoid breaking live Docker DB volumes or historical archives: `docker-compose.yml` (`name: meridian-works-mes`, `container_name: meridian-mes-app`), `design-system/meridian-works-mes/` folder name, `hyperframes-video/meridian-works-mes-showcase.mp4` rendered binary & `prepare-assets.mjs` demo password, `.aistudio/` / `public/assets/aistudio/` archives.
+- Live Docker container at `:3000` (`docker compose up -d --build`) -> `NOT RUN` (rebuilt static `dist/` only; Docker container rebuild not requested).
