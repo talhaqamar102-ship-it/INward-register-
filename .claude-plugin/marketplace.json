@@ -1,7 +1,7 @@
 {
-  "name": "meridian-works-mes",
+  "name": "hammad-industries-mes",
   "owner": {
-    "name": "Meridian Works"
+    "name": "Hammad Industries"
   },
   "metadata": {
     "description": "Packing & cobalting MES with the bdfinst/agentic-dev-team plugin vendored at .agentic-dev-team/"

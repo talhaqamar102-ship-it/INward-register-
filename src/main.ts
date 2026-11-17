@@ -1,5 +1,5 @@
 /**
- * Meridian Works - Factory ERP & QA Management Portal
+ * Hammad Industries - Factory ERP & QA Management Portal
  * Tech Stack: Pure Vanilla HTML5 / CSS / JavaScript (Zero External Libraries)
  * Clean Real Data Entry Mode: All mockup details removed; unified Requisition with M/A prefixes.
  */
@@ -109,7 +109,7 @@ interface GrnRemainingCaps {
 }
 
 const DEFAULT_REQ_NUMBER = 'REQ-0001';
-const SAVED_TAILORS_STORAGE_KEY = 'meridian-works-saved-tailors';
+const SAVED_TAILORS_STORAGE_KEY = 'hammad-industries-saved-tailors';
 
 /** Build a blank REQ-0001 Packing Hall WIP state without stale order/article/size fields. */
 function createEmptyPackingWipState() {
@@ -917,14 +917,14 @@ function stationName(role: SystemUserRecord['role']): string {
 
 function renderAuthScreen(): string {
   if (state.authMode === 'checking') {
-    return '<main class="auth-screen"><section class="auth-card"><h1>Meridian Works MES</h1><p>Checking sign-in status…</p></section></main>';
+    return '<main class="auth-screen"><section class="auth-card"><h1>Hammad Industries MES</h1><p>Checking sign-in status…</p></section></main>';
   }
 
   if (state.authMode === 'error') {
     return `
       <main class="auth-screen">
         <section class="auth-card" aria-labelledby="auth-title">
-          <h1 id="auth-title">Meridian Works MES</h1>
+          <h1 id="auth-title">Hammad Industries MES</h1>
           <p class="auth-error" role="alert">${escapeHtml(state.authError)}</p>
           <button type="button" class="btn-primary" id="btn-auth-retry">Try Again</button>
         </section>
@@ -936,7 +936,7 @@ function renderAuthScreen(): string {
   return `
     <main class="auth-screen">
       <section class="auth-card" aria-labelledby="auth-title">
-        <div class="auth-brand">${LOGO_SVG}<span>MERIDIAN WORKS</span></div>
+        <div class="auth-brand">${LOGO_SVG}<span>HAMMAD INDUSTRIES</span></div>
         <h1 id="auth-title">${isSetup ? 'Create the first Super User' : 'Sign in to your station'}</h1>
         <p>${isSetup
           ? 'Set up the initial administrator account. This one-time step unlocks user and station management.'
@@ -984,9 +984,9 @@ function renderModuleSwitcher(): string {
   return `
     <header class="module-switcher-bar">
       <a href="#main-content" class="skip-to-content">Skip to main content</a>
-      <div class="header-brand" title="Meridian Works">
+      <div class="header-brand" title="Hammad Industries">
         ${LOGO_SVG}
-        <span class="brand-title">MERIDIAN WORKS</span>
+        <span class="brand-title">HAMMAD INDUSTRIES</span>
       </div>
       <div class="module-switcher-left">
         <span class="station-label">${escapeHtml(stationName(viewingOtherScreen
@@ -1988,7 +1988,7 @@ function attachEventHandlers(): void {
   document.getElementById('modal-close-x')?.addEventListener('click', closeModal);
   document.getElementById('modal-btn-close')?.addEventListener('click', closeModal);
   document.getElementById('modal-btn-print')?.addEventListener('click', () => {
-    const title = document.getElementById('modal-title')?.textContent || 'Meridian Works Document';
+    const title = document.getElementById('modal-title')?.textContent || 'Hammad Industries Document';
     const preview = document.getElementById('doc-preview-container');
     const content = preview ? preview.innerHTML : (document.getElementById('modal-body')?.innerHTML || '');
     printDocument(title, content);
@@ -2485,7 +2485,7 @@ function attachGRNHandlers(): void {
     const docHtml = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; DAILY INWARD GOODS REGISTER SUMMARY</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; DAILY INWARD GOODS REGISTER SUMMARY</h2>
           <p style="margin: 3px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             Dock #1 Store Receiving Master Sheet &bull; Date: 31-10-2026
           </p>
@@ -2697,7 +2697,7 @@ function attachRepairHandlers(): void {
     const docHtml = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; DAILY DEFECT &amp; ALTERATION SUMMARY LOG</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; DAILY DEFECT &amp; ALTERATION SUMMARY LOG</h2>
           <p style="margin: 3px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             Alteration &amp; Repair Bay #2 (${defaultAltId}) &bull; Date: 31-10-2026
           </p>
@@ -2746,7 +2746,7 @@ function attachQCHandlers(): void {
     const docHtml = `
       <div style="border: 2px solid var(--ink-950); padding: 20px; font-family: monospace; background: var(--white);">
         <div style="text-align: center; border-bottom: 2px solid var(--ink-950); padding-bottom: 10px; margin-bottom: 14px;">
-          <div style="font-size: 19px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; EXPORT MASTER CARTON</div>
+          <div style="font-size: 19px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; EXPORT MASTER CARTON</div>
           <div style="font-size: 11px; color: var(--ink-600);">INTERNATIONAL EXPORT SHIPPING LABEL &bull; THERMAL DIRECT / A4</div>
         </div>
         <div class="printable-meta-grid" style="font-size: 12.5px;">
@@ -3589,7 +3589,7 @@ function attachPackingHandlers(): void {
     }
     openDocumentCenterModal('carton');
     const preview = document.getElementById('doc-preview-container');
-    if (preview) printDocument('Meridian-Doc-carton', preview.innerHTML);
+    if (preview) printDocument('Hammad-Doc-carton', preview.innerHTML);
   });
 
   document.getElementById('btn-wip-final-clearance')?.addEventListener('click', () => {
@@ -3929,7 +3929,7 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
       return `
         <div style="border: 2px solid var(--ink-950); padding: 18px; font-family: monospace; background: var(--white);">
           <div style="text-align: center; border-bottom: 2px solid var(--ink-950); padding-bottom: 8px; margin-bottom: 12px;">
-            <div style="font-size: 18px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; EXPORT MASTER CARTON</div>
+            <div style="font-size: 18px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; EXPORT MASTER CARTON</div>
             <div style="font-size: 11px; color: var(--ink-600);">INTERNATIONAL EXPORT SHIPPING LABEL &bull; THERMAL DIRECT / A4</div>
           </div>
           <div class="printable-meta-grid">
@@ -3958,10 +3958,10 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
         <div class="printable-slip-box">
           <div class="printable-slip-header">
             <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">COMMERCIAL EXPORT PACKING LIST MANIFEST</h2>
-            <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">Meridian Works &bull; Customs Clearance &amp; Container Gate Release</p>
+            <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">Hammad Industries &bull; Customs Clearance &amp; Container Gate Release</p>
           </div>
           <div class="printable-meta-grid">
-            <div><span>Shipper:</span> <strong>Meridian Works (Pvt) Ltd</strong></div>
+            <div><span>Shipper:</span> <strong>Hammad Industries (Pvt) Ltd</strong></div>
             <div><span>Requisition #:</span> <strong>${baseReq}</strong></div>
             <div><span>Article:</span> <strong>${state.packingWip.article || '---'}</strong></div>
             <div><span>Total Cartons:</span> <strong>${state.cartons.length} Cartons</strong></div>
@@ -4022,7 +4022,7 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
   document.getElementById('btn-quick-print-doc')?.addEventListener('click', () => {
     const docContainer = document.getElementById('doc-preview-container');
     const content = docContainer ? docContainer.innerHTML : '';
-    printDocument(`Meridian-Doc-${defaultDoc}`, content);
+    printDocument(`Hammad-Doc-${defaultDoc}`, content);
   });
 }
 
@@ -4855,7 +4855,7 @@ function attachAdminHandlers(): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `meridian_industries_full_erp_dump_${Date.now()}.json`;
+    a.download = `hammad_industries_full_erp_dump_${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

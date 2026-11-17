@@ -644,6 +644,7 @@
       "file:.agents/agents/typescript-reviewer.md",
       "file:.agents/agents/vue-reviewer.md",
       "file:.agents/ecc-install-state.json",
+      "file:.agents/env.md",
       "file:.agents/rules/common-agents.md",
       "file:.agents/rules/common-code-review.md",
       "file:.agents/rules/common-coding-style.md",
@@ -656,6 +657,7 @@
       "file:.agents/rules/common-testing.md",
       "file:.agents/rules/ecc-harness.md",
       "file:.agents/rules/graphify.md",
+      "file:.agents/rules/senior-verification.md",
       "file:.agents/rules/typescript-coding-style.md",
       "file:.agents/rules/typescript-hooks.md",
       "file:.agents/rules/typescript-patterns.md",
@@ -740,6 +742,8 @@
       "file:.agents/skills/unslop/scripts/story.mjs",
       "file:.agents/skills/verification-loop/SKILL.md",
       "file:.agents/skills/windows-desktop-e2e/SKILL.md",
+      "file:.agents/traces/2026-11-17-catalog-integration-plan.md",
+      "file:.agents/traces/2026-11-17-rule-tiers.md",
       "file:.agents/workflows/aside.md",
       "file:.agents/workflows/auto-update.md",
       "file:.agents/workflows/build-fix.md",
@@ -853,6 +857,9 @@
       "file:SKILL.md",
       "file:TODO.md",
       "file:design-system/meridian-works-mes/MASTER.md",
+      "file:docs/catalog-integration-plan.md",
+      "file:docs/domain-integration-reasoning.md",
+      "file:docs/last-5-turns-senior-audit.md",
       "file:docs/ui-remediation-plan.md",
       "file:e2e/start-test-server.mjs",
       "file:e2e/superuser-nav.spec.ts",
@@ -1083,10 +1090,10 @@
     "1": 0.63,
     "2": 0.6,
     "3": 0.61,
-    "4": 0.58,
-    "5": 0.52,
+    "4": 0.57,
+    "5": 0.51,
     "6": 0.69,
-    "7": 0.75
+    "7": 0.73
   },
   "gods": [
     {
@@ -1098,7 +1105,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 325
+      "degree": 328
     },
     {
       "id": "file:src/utils/requisitionLogic.ts",
@@ -1109,7 +1116,7 @@
       "source_location": "L1",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 92
+      "degree": 95
     },
     {
       "id": "file:src/components/superUserView.ts",
@@ -1120,7 +1127,7 @@
       "source_location": "L1",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 86
+      "degree": 88
     },
     {
       "id": "file:src/routes/api.js",
@@ -1131,7 +1138,7 @@
       "source_location": "L1",
       "community": 2,
       "community_label": "Express API & HTTP Server Layer (server.ts, api.js)",
-      "degree": 67
+      "degree": 68
     },
     {
       "id": "fn:vanilla/app.js:showToast",
@@ -1186,7 +1193,7 @@
       "source_location": "L1",
       "community": 4,
       "community_label": "SQLite WAL Database & 17-Table Schema (src/db.js)",
-      "degree": 43
+      "degree": 45
     },
     {
       "id": "file:src/components/packingHallView.ts",
@@ -1197,7 +1204,7 @@
       "source_location": "L1",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 41
+      "degree": 43
     },
     {
       "id": "table:cartons",

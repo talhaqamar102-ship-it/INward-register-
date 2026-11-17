@@ -1,4 +1,4 @@
-# Meridian Works MES
+# Hammad Industries MES
 
 Packaging & cobalting execution system for safety-glove manufacturing.
 

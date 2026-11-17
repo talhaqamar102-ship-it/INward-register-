@@ -1,6 +1,6 @@
 {
-  "total_files": 346,
-  "total_words": 370987,
+  "total_files": 353,
+  "total_words": 379405,
   "files": {
     "code": [
       ".agents/skills/ck/commands/forget.mjs",
@@ -134,6 +134,7 @@
       ".agents/agents/typescript-reviewer.md",
       ".agents/agents/vue-reviewer.md",
       ".agents/ecc-install-state.json",
+      ".agents/env.md",
       ".agents/rules/common-agents.md",
       ".agents/rules/common-code-review.md",
       ".agents/rules/common-coding-style.md",
@@ -146,6 +147,7 @@
       ".agents/rules/common-testing.md",
       ".agents/rules/ecc-harness.md",
       ".agents/rules/graphify.md",
+      ".agents/rules/senior-verification.md",
       ".agents/rules/typescript-coding-style.md",
       ".agents/rules/typescript-hooks.md",
       ".agents/rules/typescript-patterns.md",
@@ -217,6 +219,8 @@
       ".agents/skills/unslop/references/visuals.md",
       ".agents/skills/verification-loop/SKILL.md",
       ".agents/skills/windows-desktop-e2e/SKILL.md",
+      ".agents/traces/2026-11-17-catalog-integration-plan.md",
+      ".agents/traces/2026-11-17-rule-tiers.md",
       ".agents/workflows/aside.md",
       ".agents/workflows/auto-update.md",
       ".agents/workflows/build-fix.md",
@@ -330,6 +334,9 @@
       "SKILL.md",
       "TODO.md",
       "design-system/meridian-works-mes/MASTER.md",
+      "docs/catalog-integration-plan.md",
+      "docs/domain-integration-reasoning.md",
+      "docs/last-5-turns-senior-audit.md",
       "docs/ui-remediation-plan.md",
       "hyperframes-video/.hyperframes/artifacts/checks/7dcc6b52-d5c6-43c6-8673-12eaedafe94b.json",
       "hyperframes-video/.hyperframes/artifacts/checks/f33b3b90-1cde-4ac2-b7fa-7f562af0ad9a.json",

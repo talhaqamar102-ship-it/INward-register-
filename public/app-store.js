@@ -1,5 +1,5 @@
 // =========================================================================
-// MERIDIAN — STORE KEEPER & STORE MANAGER PORTAL ENGINE
+// HAMMAD INDUSTRIES — STORE KEEPER & STORE MANAGER PORTAL ENGINE
 // Covers:
 // 1. Inward Contractor Shipments & Receiving Entry (Shipment Record)
 // 2. Glove Requisitions & Floor Issuance

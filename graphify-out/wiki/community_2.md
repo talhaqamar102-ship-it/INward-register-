@@ -4,7 +4,7 @@ Cohesion Score: `0.6` • Total Nodes: 63
 
 ## Nodes in Community
 
-- **src/routes/api.js** (`file:src/routes/api.js`) — `src/routes/api.js:L1` (degree: 67)
+- **src/routes/api.js** (`file:src/routes/api.js`) — `src/routes/api.js:L1` (degree: 68)
 - **GET /api/inventory/gloves** (`route:GET:/api/inventory/gloves`) — `src/routes/api.js:L139` (degree: 8)
 - **GET /api/inventory/materials** (`route:GET:/api/inventory/materials`) — `src/routes/api.js:L140` (degree: 8)
 - **GET /api/customers** (`route:GET:/api/customers`) — `src/routes/api.js:L141` (degree: 8)

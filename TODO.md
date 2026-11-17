@@ -1,4 +1,4 @@
-# Meridian Works MES — Active TODOs & Verified Fixes
+# Hammad Industries MES — Active TODOs & Verified Fixes
 
 ## Completed
 - [x] **Packing Hall API Persistence & Hydration (`src/main.ts`, `src/services/packingService.js`)**

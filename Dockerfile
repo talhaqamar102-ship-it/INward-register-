@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Meridian Works MES & QA Portal
+# Multi-stage Dockerfile for Hammad Industries MES & QA Portal
 # Requires Node 22+ for native node:sqlite DatabaseSync support
 
 # Stage 1: Build the frontend bundle

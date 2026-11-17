@@ -4,7 +4,7 @@ Cohesion Score: `0.72` • Total Nodes: 216
 
 ## Nodes in Community
 
-- **src/main.ts** (`file:src/main.ts`) — `src/main.ts:L1` (degree: 325)
+- **src/main.ts** (`file:src/main.ts`) — `src/main.ts:L1` (degree: 328)
 - **attachAdminHandlers()** (`fn:src/main.ts:attachAdminHandlers`) — `src/main.ts:L4172-L4864` (degree: 53)
 - **attachPackingHandlers()** (`fn:src/main.ts:attachPackingHandlers`) — `src/main.ts:L2998-L3600` (degree: 36)
 - **attachGRNHandlers()** (`fn:src/main.ts:attachGRNHandlers`) — `src/main.ts:L2049-L2523` (degree: 29)
@@ -20,6 +20,7 @@ Cohesion Score: `0.72` • Total Nodes: 216
 - **logAuditEvent()** (`fn:src/main.ts:logAuditEvent`) — `src/main.ts:L538-L557` (degree: 11)
 - **saveCurrentOrderWipState()** (`fn:src/main.ts:saveCurrentOrderWipState`) — `src/main.ts:L2875-L2879` (degree: 11)
 - **openAqlCalculatorModal()** (`fn:src/main.ts:openAqlCalculatorModal`) — `src/main.ts:L4030-L4169` (degree: 11)
+- **src/style.css** (`file:src/style.css`) — `src/style.css:L1` (degree: 10)
 - **printDocument()** (`fn:src/main.ts:printDocument`) — `src/main.ts:L813-L894` (degree: 10)
 - **mapServerRequisitionToWip()** (`fn:src/main.ts:mapServerRequisitionToWip`) — `src/main.ts:L2881-L2959` (degree: 10)
 - **switchActiveOrder()** (`fn:src/main.ts:switchActiveOrder`) — `src/main.ts:L2977-L2995` (degree: 10)
@@ -27,7 +28,6 @@ Cohesion Score: `0.72` • Total Nodes: 216
 - **interface Dropdowns** (`iface:src/App.tsx:Dropdowns`) — `src/App.tsx:L32` (degree: 9)
 - **getCurrentRollupSummary()** (`fn:src/main.ts:getCurrentRollupSummary`) — `src/main.ts:L1015-L1043` (degree: 9)
 - **window.adminAddSystemUser()** (`fn:src/main.ts:window.adminAddSystemUser`) — `src/main.ts:L5198-L5245` (degree: 9)
-- **src/style.css** (`file:src/style.css`) — `src/style.css:L1` (degree: 8)
 - **applyFieldValidationErrors()** (`fn:src/main.ts:applyFieldValidationErrors`) — `src/main.ts:L799-L811` (degree: 8)
 - **getDocHTML()** (`fn:src/main.ts:getDocHTML`) — `src/main.ts:L3868-L3984` (degree: 8)
 - **createEmptyPackingWipState()** (`fn:src/main.ts:createEmptyPackingWipState`) — `src/main.ts:L115-L150` (degree: 7)

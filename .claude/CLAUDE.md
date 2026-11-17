@@ -1,4 +1,4 @@
-# Meridian Works MES — Project Constitution for the Dev Team
+# Hammad Industries MES — Project Constitution for the Dev Team
 
 Packaging & cobalting execution system for safety-glove manufacturing.
 Full-stack: vanilla TS/HTML/CSS frontend (`src/main.ts`, 5 screens), Express

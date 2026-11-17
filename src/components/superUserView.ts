@@ -2190,7 +2190,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
     const html = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; ORDER VS. INWARD GRN &amp; CONTRACTOR BALANCE REPORT</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; ORDER VS. INWARD GRN &amp; CONTRACTOR BALANCE REPORT</h2>
           <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             Super User Reconciliation Statement &bull; Parent Order to Multiple GRN Batches (0001, 0002...)
           </p>
@@ -2287,7 +2287,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
     const html = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; ORDER-TO-REQUISITION (REQ / M-REQ / A-REQ) TRACEABILITY LEDGER</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; ORDER-TO-REQUISITION (REQ / M-REQ / A-REQ) TRACEABILITY LEDGER</h2>
           <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             5-Stage Packing Hall Execution &bull; Stage 4 Final QC Gate &amp; Pair Reconciliation
           </p>
@@ -2377,7 +2377,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
     const html = `
       <div class="printable-slip-box">
         <div class="printable-slip-header">
-          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; CONTRACTOR QUALITY, ALTERATION (A-REQ) &amp; SCRAP DEDUCTION STATEMENT</h2>
+          <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; CONTRACTOR QUALITY, ALTERATION (A-REQ) &amp; SCRAP DEDUCTION STATEMENT</h2>
           <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
             Alteration Bay #2 Rework Audit &bull; Max 2-Cycle Condemned Scrap Financial Debit Note
           </p>
@@ -2461,7 +2461,7 @@ export function buildSuperUserReportHtml(ctx: SuperUserRenderContext): {
   const html = `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; FINAL QC (AQL 1.5) &amp; STAGE 5 EXPORT DISPATCH MANIFEST</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; FINAL QC (AQL 1.5) &amp; STAGE 5 EXPORT DISPATCH MANIFEST</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           ISO 2859-1 Level II Final Inspection Gate &bull; Master Carton Sealing &amp; Container Release
         </p>

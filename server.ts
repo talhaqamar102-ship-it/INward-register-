@@ -47,7 +47,7 @@ async function startServer() {
   }
 
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`Meridian Works Full-Stack MES Server listening on port ${PORT}`);
+    console.log(`Hammad Industries Full-Stack MES Server listening on port ${PORT}`);
   });
 }
 

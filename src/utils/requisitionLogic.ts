@@ -2875,7 +2875,7 @@ export function buildPackingRequisitionSlipHtml(params: PackingRequisitionSlipPa
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; PACKING HALL REQUISITION SLIP</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; PACKING HALL REQUISITION SLIP</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           Packing Floor &bull; Unified Production, Material (M) &amp; Alteration (A) Requisition
         </p>
@@ -2989,7 +2989,7 @@ export function buildMaterialRequisitionSlipHtml(params: {
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; STAGE 4 MATERIAL REQUISITION SLIP (M-REQ)</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; STAGE 4 MATERIAL REQUISITION SLIP (M-REQ)</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           1st Packing (Polybag &amp; Trims) &bull; Official Packaging Accessories Issue Voucher
         </p>
@@ -3070,7 +3070,7 @@ export function buildAlterationRouteSlipHtml(params: {
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; ALTERATION &amp; REWORK ROUTE SLIP (A-REQ)</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; ALTERATION &amp; REWORK ROUTE SLIP (A-REQ)</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           Alteration Bay &bull; 2-Cycle Rework Limit &amp; Scrap Condemnation Voucher
         </p>
@@ -3140,7 +3140,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
   return `
     <div class="printable-slip-box">
       <div class="printable-slip-header">
-        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">MERIDIAN WORKS &bull; INWARD GOODS RECEIVING SLIP</h2>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink-950);">HAMMAD INDUSTRIES &bull; INWARD GOODS RECEIVING SLIP</h2>
         <p style="margin: 2px 0 0; font-size: 11px; text-transform: uppercase; color: var(--ink-600);">
           Dock Receiving Register &bull; Official Received Goods Voucher
         </p>

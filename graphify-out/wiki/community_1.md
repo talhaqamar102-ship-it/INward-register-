@@ -4,8 +4,8 @@ Cohesion Score: `0.63` • Total Nodes: 85
 
 ## Nodes in Community
 
-- **src/utils/requisitionLogic.ts** (`file:src/utils/requisitionLogic.ts`) — `src/utils/requisitionLogic.ts:L1` (degree: 92)
-- **src/utils/requisitionLogic.test.ts** (`file:src/utils/requisitionLogic.test.ts`) — `src/utils/requisitionLogic.test.ts:L1` (degree: 28)
+- **src/utils/requisitionLogic.ts** (`file:src/utils/requisitionLogic.ts`) — `src/utils/requisitionLogic.ts:L1` (degree: 95)
+- **src/utils/requisitionLogic.test.ts** (`file:src/utils/requisitionLogic.test.ts`) — `src/utils/requisitionLogic.test.ts:L1` (degree: 29)
 - **normalizeBaseReqNumber()** (`fn:src/utils/requisitionLogic.ts:normalizeBaseReqNumber`) — `src/utils/requisitionLogic.ts:L271-L274` (degree: 25)
 - **escapeHtml()** (`fn:src/utils/requisitionLogic.ts:escapeHtml`) — `src/utils/requisitionLogic.ts:L26-L34` (degree: 23)
 - **extractBlocks()** (`fn:src/utils/requisitionLogic.test.ts:extractBlocks`) — `src/utils/requisitionLogic.test.ts:L1308-L1826` (degree: 22)
