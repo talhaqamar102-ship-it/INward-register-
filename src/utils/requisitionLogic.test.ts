@@ -33,6 +33,9 @@ import {
   buildSuperUserOrderRollups,
   buildOrderTraceability,
   computeOrderReconciliationMetrics,
+  filterProductsByBuyer,
+  getScaleSizeCodes,
+  formatSizeColumnLabel,
   computeActualStageWipPairs,
   evaluateReqReconciliation,
   evaluateOrderReconciliation,
@@ -1822,4 +1825,228 @@ test('Material Requisition and Stage 4 unlock only stage-by-stage after Stage 3 
     isMaterialRequisitionIssuedForStage4({ ...unlockedForMatReq, mreqStatus: 'Printed' }),
     true
   );
+});
+
+test('Slice 2: Dynamic sizing helpers and Buyer -> Article -> Color -> Sizes Order Creation cascade', () => {
+  assert.equal(calculateSizeTotal({ XS: 60, S: 120, M: 240, L: 300, XL: 180, '2XL': 80 }), 980);
+  assert.deepEqual(createEmptySizes(['2XS', 'XS', 'S']), { '2XS': 0, XS: 0, S: 0 });
+  assert.equal(formatSizeColumnLabel('7', 'LEGACY_7_11'), '7 / S');
+  assert.equal(formatSizeColumnLabel('XS', 'GENRAL'), 'XS');
+
+  const sizeStandards = [
+    { code: 'LEGACY_7_11', rawLabel: 'LEGACY_7_11', sizes: ['7', '8', '9', '10', '11'], isLegacy: true },
+    { code: 'GENRAL', rawLabel: 'GENRAL', sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'], isLegacy: false },
+    { code: 'IXS MEN', rawLabel: 'IXS MEN', sizes: ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'], isLegacy: false }
+  ];
+  assert.deepEqual(getScaleSizeCodes(sizeStandards, 'IXS MEN'), ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL']);
+
+  const customers = [
+    { id: 'BUY-0004', name: 'BERIK' },
+    { id: 'BUY-0020', name: 'OXFORD' }
+  ];
+  const products = [
+    { id: 'CAT-0040', name: 'G-175102-BK 132 RED', customer_id: 'BUY-0004', customer_name: 'BERIK', article_code: 'Zoldar', color_spec: 'Black,Red,White', size_format: 'IXS MEN' },
+    { id: 'CAT-0450', name: 'BRISBANE AIR MS TECH GREY/BLACK', customer_id: 'BUY-0020', customer_name: 'OXFORD', article_code: '', color_spec: 'GREY,Black', size_format: 'GENRAL' }
+  ];
+  const oxfordArticles = filterProductsByBuyer(products, customers, 'OXFORD');
+  assert.equal(oxfordArticles.length, 1);
+  assert.equal(oxfordArticles[0].name, 'BRISBANE AIR MS TECH GREY/BLACK');
+
+  const splitCheck = validateContractorAllocations(
+    { '2XS': 10, XS: 20, S: 0, M: 0, L: 0, XL: 0, '2XL': 0, '3XL': 0, '4XL': 0, '5XL': 0 },
+    [
+      { maker: 'Hall A', sizes: { '2XS': 6, XS: 10 } },
+      { maker: 'Hall B', sizes: { '2XS': 4, XS: 10 } }
+    ],
+    ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL']
+  );
+  assert.equal(splitCheck.valid, true);
+  assert.equal(splitCheck.totalUnassigned, 0);
+
+  const cascadeHtml = renderSuperUserScreen({
+    activeTab: 'creation',
+    activeReport: 'order_grn_balance',
+    trackingSearch: '',
+    trackingStatusFilter: 'ALL',
+    expandedOrderIds: {},
+    pendingOrders: [{
+      orderId: 'ORD-2026-999',
+      buyer: 'BERIK',
+      maker: 'Hall A',
+      po: 'PO-999',
+      article: 'G-175102-BK 132 RED',
+      color: 'Black,Red,White',
+      sizeFormat: 'IXS MEN',
+      sizeCodes: ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'],
+      sizes: { '2XS': 10, XS: 20, S: 0, M: 0, L: 0, XL: 0, '2XL': 0, '3XL': 0, '4XL': 0, '5XL': 0 },
+      totalQty: 30
+    }],
+    dropdownOptions: { makers: ['Hall A'], customers: ['BERIK', 'OXFORD'], articles: products.map(p => p.name), poList: [] },
+    adminOverview: {
+      dbHealth: { journalMode: 'wal', integrity: 'ok', tableCounts: {}, totalTables: 0 },
+      customers,
+      products,
+      sizeStandards,
+      receivings: [],
+      alterations: [],
+      scrapLedger: []
+    },
+    lastBackupPath: '',
+    rollupSummary: buildSuperUserOrderRollups({ pendingOrders: [], grnList: [], requisitions: [], defectList: [] }),
+    orderDraft: {
+      buyer: 'BERIK',
+      maker: 'Hall A',
+      po: '',
+      article: 'G-175102-BK 132 RED',
+      color: 'Black,Red,White',
+      sizeFormat: 'IXS MEN',
+      dueDate: '',
+      sizes: { '2XS': 10, XS: 20 }
+    }
+  });
+
+  const articleSelectMatch = cascadeHtml.match(/<select id="admin-pending-order-article"[\s\S]*?<\/select>/);
+  assert.ok(articleSelectMatch, 'Renders #admin-pending-order-article select element');
+  const articleSelectHtml = articleSelectMatch[0];
+  assert.ok(articleSelectHtml.includes('G-175102-BK 132 RED'), 'Selected buyer BERIK renders its article');
+  assert.ok(!articleSelectHtml.includes('BRISBANE AIR MS TECH GREY/BLACK'), 'Selecting BERIK excludes OXFORD articles from #admin-pending-order-article');
+  assert.ok(cascadeHtml.includes('Scale: IXS MEN, 10 Sizes'), 'Displays active IXS MEN scale header');
+  assert.ok(cascadeHtml.includes('Catalog colorway: Black,Red,White'), 'Displays combined catalog colorway caption');
+  assert.ok(cascadeHtml.includes('data-size="2XS"'), 'Renders 2XS input for IXS MEN');
+  assert.ok(cascadeHtml.includes('data-size="5XL"'), 'Renders 5XL input for IXS MEN');
+  assert.ok(!cascadeHtml.includes('data-size="7"'), 'Does not render legacy size 7 for IXS MEN');
+});
+
+test('Slice 3: Dynamic multi-scale rollups, monochrome GRN/REQ slips, and WIP analytics preserve catalog sizes', () => {
+  const ixsCodes = ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+  const ixsSizes = { '2XS': 10, XS: 20, S: 0, M: 30, L: 0, XL: 0, '2XL': 0, '3XL': 0, '4XL': 0, '5XL': 0 };
+
+  // scaleSizeBreakdown preserves non-legacy keys cleanly without leaking 7..11
+  const scaled = scaleSizeBreakdown(ixsSizes, 30);
+  assert.equal(calculateSizeTotal(scaled), 30);
+  assert.equal(scaled['2XS'], 5);
+  assert.equal(scaled.XS, 10);
+  assert.equal(scaled.M, 15);
+  assert.equal(scaled['7'], undefined);
+
+  // Printable GRN & REQ slips render all 10 IXS MEN columns dynamically in monochrome (zero Buyer leakage)
+  const grnSlip = buildGrnReceivingSlipHtml({
+    grnRef: 'GRN-2026-0099',
+    pendingOrderId: 'ORD-2026-099',
+    date: '31-10-2026',
+    maker: 'Hall A',
+    article: 'G-175102-BK 132 RED',
+    color: 'Black,Red,White',
+    receivedFrom: 'Hall A Carrier',
+    rcvdPairs: 60,
+    sizes: ixsSizes,
+    sizeFormat: 'IXS MEN',
+    sizeCodes: ixsCodes
+  });
+  assert.ok(grnSlip.includes('>2XS<'), 'GRN slip renders IXS MEN 2XS column');
+  assert.ok(grnSlip.includes('>5XL<'), 'GRN slip renders IXS MEN 5XL column');
+  assert.ok(grnSlip.includes('30 Prs'), 'GRN slip renders 30 Prs for M');
+  assert.ok(!grnSlip.includes('7 / S'), 'GRN slip does not hardcode legacy 7 / S for IXS MEN');
+  assert.ok(!grnSlip.includes('BERIK'), 'GRN shop-floor slip hides buyer name');
+
+  const reqSlip = buildPackingRequisitionSlipHtml({
+    reqNo: 'REQ-0099',
+    date: '31-10-2026',
+    article: 'G-175102-BK 132 RED',
+    sizes: ixsSizes,
+    totalPairs: 60,
+    issueStatus: 'Issued by Inward Register',
+    sizeFormat: 'IXS MEN',
+    sizeCodes: ixsCodes
+  });
+  assert.ok(reqSlip.includes('>2XS<'), 'REQ slip renders IXS MEN 2XS column');
+  assert.ok(reqSlip.includes('>5XL<'), 'REQ slip renders IXS MEN 5XL column');
+  assert.ok(!reqSlip.includes('7 / S'), 'REQ shop-floor slip does not hardcode legacy 7 / S for IXS MEN');
+
+  // Rollup & WIP analytics chart render non-legacy scales
+  const rollup = buildSuperUserOrderRollups({
+    pendingOrders: [{
+      orderId: 'ORD-2026-099',
+      buyer: 'BERIK',
+      maker: 'Hall A',
+      po: 'PO-IXS',
+      article: 'G-175102-BK 132 RED',
+      color: 'Black,Red,White',
+      sizeFormat: 'IXS MEN',
+      sizeCodes: ixsCodes,
+      sizes: ixsSizes,
+      totalQty: 60
+    }],
+    grnList: [{
+      sr: 1,
+      grnCode: 'GRN-0099',
+      date: '31-10-2026',
+      pendingOrderId: 'ORD-2026-099',
+      maker: 'Hall A',
+      article: 'G-175102-BK 132 RED',
+      rcvdPairs: 60,
+      sizes: ixsSizes,
+      status: 'Received'
+    }],
+    requisitions: [{
+      reqNumber: 'REQ-0099',
+      parentOrderId: 'ORD-2026-099',
+      article: 'G-175102-BK 132 RED',
+      plannedQty: 60,
+      issueStatus: 'Issued by Inward Register',
+      sizeFormat: 'IXS MEN',
+      sizeCodes: ixsCodes,
+      sizes: ixsSizes,
+      stage1In: 60,
+      stage1Passed: 60,
+      stage1Defects: 0,
+      stage2In: 60,
+      stage2Passed: 60,
+      stage2Defects: 0,
+      stage3In: 60,
+      stage3Passed: 60,
+      stage3Defects: 0,
+      mreqNo: 'M-REQ-0099',
+      altReqNo: 'A-REQ-0099',
+      mreqQty: '60 Sets',
+      mreqStatus: 'ISSUED',
+      stage4In: 60,
+      stage4Passed: 60,
+      stage4Pending: 0,
+      stage5Cartons: '2 Cartons (60 Prs)',
+      stage5Pending: '0 Cartons',
+      lineEfficiency: '100.0%',
+      outputPairs: 60,
+      outputCartons: 2,
+      inAlteration: 0,
+      finalQcApproved: true
+    }],
+    defectList: []
+  });
+  assert.equal(rollup.orderRollups[0].sizeFormat, 'IXS MEN');
+  assert.equal(rollup.orderRollups[0].packedSizes.M, 30);
+  assert.equal(rollup.orderRollups[0].packedSizes['7'], undefined);
+
+  const suTrackingHtml = renderSuperUserScreen({
+    activeTab: 'tracking',
+    activeReport: 'order_grn_balance',
+    trackingSearch: '',
+    trackingStatusFilter: 'ALL',
+    expandedOrderIds: { 'ORD-2026-099': true },
+    pendingOrders: [],
+    dropdownOptions: { makers: ['Hall A'], customers: ['BERIK'], articles: [], poList: [] },
+    adminOverview: {
+      dbHealth: { journalMode: 'wal', integrity: 'ok', tableCounts: {}, totalTables: 0 },
+      customers: [],
+      products: [],
+      sizeStandards: [],
+      receivings: [],
+      alterations: [],
+      scrapLedger: []
+    },
+    lastBackupPath: '',
+    rollupSummary: rollup
+  });
+  assert.ok(suTrackingHtml.includes('2XS:10'), 'Live tracking displays dynamic Planned Sizes for IXS MEN');
+  assert.ok(!suTrackingHtml.includes('7:0 | 8:0 | 9:0 | 10:0 | 11:0'), 'Live tracking hides legacy 7..11 for IXS MEN');
 });

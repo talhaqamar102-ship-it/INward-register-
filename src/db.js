@@ -43,10 +43,23 @@ export function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- 1b. Normalized Glove Sizing Standards Master
+    CREATE TABLE IF NOT EXISTS size_standards (
+      code TEXT PRIMARY KEY,
+      raw_label TEXT NOT NULL,
+      sizes_json TEXT NOT NULL,
+      is_legacy INTEGER NOT NULL DEFAULT 0
+    );
+
     -- 2. Glove Products Master
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      raw_name TEXT NOT NULL DEFAULT '',
+      article_code TEXT NOT NULL DEFAULT '',
+      raw_color TEXT NOT NULL DEFAULT '',
+      color_spec TEXT NOT NULL DEFAULT '',
+      size_format TEXT NOT NULL DEFAULT 'LEGACY_7_11',
       customer_id TEXT NOT NULL REFERENCES customers(id),
       polybag_per_pair INTEGER NOT NULL DEFAULT 1,
       silica_gel_per_pair INTEGER NOT NULL DEFAULT 1,
@@ -259,11 +272,15 @@ export function initDatabase() {
     -- 17. Super User Pending Orders Master (Buyer, Contractor, PO, Article, Colour & Size Breakdown)
     CREATE TABLE IF NOT EXISTS pending_orders (
       order_id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL DEFAULT '',
       buyer_name TEXT NOT NULL DEFAULT '',
       maker_contractor TEXT NOT NULL,
       po_number TEXT NOT NULL DEFAULT '',
+      product_id TEXT NOT NULL DEFAULT '',
       article_name TEXT NOT NULL,
       color_shade TEXT NOT NULL DEFAULT 'Standard',
+      size_format TEXT NOT NULL DEFAULT 'LEGACY_7_11',
+      sizes_json TEXT NOT NULL DEFAULT '{}',
       size_6 INTEGER NOT NULL DEFAULT 0,
       size_7 INTEGER NOT NULL DEFAULT 0,
       size_8 INTEGER NOT NULL DEFAULT 0,
@@ -284,6 +301,8 @@ export function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       order_id TEXT NOT NULL,
       maker_contractor TEXT NOT NULL,
+      size_format TEXT NOT NULL DEFAULT 'LEGACY_7_11',
+      sizes_json TEXT NOT NULL DEFAULT '{}',
       size_6 INTEGER NOT NULL DEFAULT 0,
       size_7 INTEGER NOT NULL DEFAULT 0,
       size_8 INTEGER NOT NULL DEFAULT 0,
@@ -373,6 +392,7 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_mrv_req ON material_return_vouchers(mat_req_number);
     CREATE INDEX IF NOT EXISTS idx_scrap_req ON scrap_ledger(req_number);
     CREATE INDEX IF NOT EXISTS idx_pending_orders_po ON pending_orders(po_number);
+    CREATE INDEX IF NOT EXISTS idx_products_customer_id ON products(customer_id);
     CREATE INDEX IF NOT EXISTS idx_grn_req_alloc_order ON grn_req_allocations(order_id, rcv_number, req_number);
     CREATE INDEX IF NOT EXISTS idx_audit_trail_entity ON audit_trail(entity_id, action);
   `);
@@ -383,6 +403,8 @@ export function initDatabase() {
   // seedDemoSheet();
   seedPackagingBOM();
   seedSizeBreakdowns();
+  seedCatalogMaster();
+  installSizeFormatTriggers();
 }
 
 function migrateDatabase() {
@@ -453,9 +475,41 @@ function migrateDatabase() {
     }
   }
 
+  // products
+  const prodCols = getCols('products');
+  if (prodCols.length > 0) {
+    if (!prodCols.includes('raw_name')) {
+      db.exec(`ALTER TABLE products ADD COLUMN raw_name TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!prodCols.includes('article_code')) {
+      db.exec(`ALTER TABLE products ADD COLUMN article_code TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!prodCols.includes('raw_color')) {
+      db.exec(`ALTER TABLE products ADD COLUMN raw_color TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!prodCols.includes('color_spec')) {
+      db.exec(`ALTER TABLE products ADD COLUMN color_spec TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!prodCols.includes('size_format')) {
+      db.exec(`ALTER TABLE products ADD COLUMN size_format TEXT NOT NULL DEFAULT 'LEGACY_7_11'`);
+    }
+  }
+
   // pending_orders
   const ordCols = getCols('pending_orders');
   if (ordCols.length > 0) {
+    if (!ordCols.includes('customer_id')) {
+      db.exec(`ALTER TABLE pending_orders ADD COLUMN customer_id TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!ordCols.includes('product_id')) {
+      db.exec(`ALTER TABLE pending_orders ADD COLUMN product_id TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!ordCols.includes('size_format')) {
+      db.exec(`ALTER TABLE pending_orders ADD COLUMN size_format TEXT NOT NULL DEFAULT 'LEGACY_7_11'`);
+    }
+    if (!ordCols.includes('sizes_json')) {
+      db.exec(`ALTER TABLE pending_orders ADD COLUMN sizes_json TEXT NOT NULL DEFAULT '{}'`);
+    }
     if (!ordCols.includes('size_6')) {
       db.exec(`ALTER TABLE pending_orders ADD COLUMN size_6 INTEGER DEFAULT 0`);
     }
@@ -470,6 +524,17 @@ function migrateDatabase() {
     }
     if (!ordCols.includes('due_date')) {
       db.exec(`ALTER TABLE pending_orders ADD COLUMN due_date TEXT DEFAULT ''`);
+    }
+  }
+
+  // order_contractor_allocations
+  const allocCols = getCols('order_contractor_allocations');
+  if (allocCols.length > 0) {
+    if (!allocCols.includes('size_format')) {
+      db.exec(`ALTER TABLE order_contractor_allocations ADD COLUMN size_format TEXT NOT NULL DEFAULT 'LEGACY_7_11'`);
+    }
+    if (!allocCols.includes('sizes_json')) {
+      db.exec(`ALTER TABLE order_contractor_allocations ADD COLUMN sizes_json TEXT NOT NULL DEFAULT '{}'`);
     }
   }
 
@@ -678,6 +743,103 @@ function seedSizeBreakdowns() {
   insertSize.run('RCV-2026-0001', '8/M', 1500, 1500, 0);
   insertSize.run('RCV-2026-0001', '9/L', 1500, 1500, 0);
   insertSize.run('RCV-2026-0001', '10/XL', 785, 784, 1);
+}
+
+function seedCatalogMaster() {
+  const seedPath = path.join(__dirname, 'catalog', 'catalog-seed.json');
+  if (!fs.existsSync(seedPath)) return;
+  const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+
+  const upsertStandard = db.prepare(`
+    INSERT INTO size_standards (code, raw_label, sizes_json, is_legacy)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(code) DO UPDATE SET
+      raw_label = excluded.raw_label,
+      sizes_json = excluded.sizes_json,
+      is_legacy = excluded.is_legacy
+  `);
+  const upsertCustomer = db.prepare(`
+    INSERT INTO customers (id, name, country, inspection_preference)
+    VALUES (?, ?, 'Export', 'RANDOM')
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name
+  `);
+  const upsertProduct = db.prepare(`
+    INSERT INTO products (
+      id, name, raw_name, article_code, raw_color, color_spec, size_format,
+      customer_id, polybag_per_pair, silica_gel_per_pair, stickers_per_pair, pairs_per_carton
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 2, 50)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name,
+      raw_name = excluded.raw_name,
+      article_code = excluded.article_code,
+      raw_color = excluded.raw_color,
+      color_spec = excluded.color_spec,
+      size_format = excluded.size_format,
+      customer_id = excluded.customer_id
+  `);
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    for (const s of seed.sizeStandards || []) {
+      upsertStandard.run(s.code, s.rawLabel || s.code, JSON.stringify(s.sizes || []), s.isLegacy ? 1 : 0);
+    }
+    for (const c of seed.customers || []) {
+      upsertCustomer.run(c.id, c.name);
+    }
+    for (const p of seed.products || []) {
+      upsertProduct.run(
+        p.id,
+        p.name,
+        p.rawName ?? p.name,
+        p.articleCode ?? '',
+        p.rawColor ?? '',
+        p.colorSpec ?? '',
+        p.sizeFormat || 'LEGACY_7_11',
+        p.customerId
+      );
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch {}
+    throw err;
+  }
+}
+
+function installSizeFormatTriggers() {
+  const triggerCondition = `
+    NOT EXISTS (SELECT 1 FROM size_standards WHERE code = NEW.size_format)
+    OR (NEW.size_format = 'LEGACY_7_11' AND NEW.sizes_json <> '{}')
+    OR (NEW.size_format <> 'LEGACY_7_11' AND
+        COALESCE(NEW.size_6,0)+COALESCE(NEW.size_7,0)+COALESCE(NEW.size_8,0)+COALESCE(NEW.size_9,0)+
+        COALESCE(NEW.size_10,0)+COALESCE(NEW.size_11,0)+COALESCE(NEW.size_12,0) <> 0)
+    OR (NEW.size_format <> 'LEGACY_7_11' AND
+        (SELECT COALESCE(SUM(value),0) FROM json_each(NEW.sizes_json)) <> NEW.total_qty)
+  `;
+
+  db.exec(`
+    DROP TRIGGER IF EXISTS pending_orders_size_fmt_ins;
+    DROP TRIGGER IF EXISTS pending_orders_size_fmt_upd;
+    DROP TRIGGER IF EXISTS order_contractor_allocations_size_fmt_ins;
+    DROP TRIGGER IF EXISTS order_contractor_allocations_size_fmt_upd;
+
+    CREATE TRIGGER pending_orders_size_fmt_ins BEFORE INSERT ON pending_orders
+    WHEN ${triggerCondition}
+    BEGIN SELECT RAISE(ABORT, 'size_format invariant violated'); END;
+
+    CREATE TRIGGER pending_orders_size_fmt_upd BEFORE UPDATE ON pending_orders
+    WHEN ${triggerCondition}
+    BEGIN SELECT RAISE(ABORT, 'size_format invariant violated'); END;
+
+    CREATE TRIGGER order_contractor_allocations_size_fmt_ins BEFORE INSERT ON order_contractor_allocations
+    WHEN ${triggerCondition}
+    BEGIN SELECT RAISE(ABORT, 'size_format invariant violated'); END;
+
+    CREATE TRIGGER order_contractor_allocations_size_fmt_upd BEFORE UPDATE ON order_contractor_allocations
+    WHEN ${triggerCondition}
+    BEGIN SELECT RAISE(ABORT, 'size_format invariant violated'); END;
+  `);
 }
 
 export function backupDatabase(targetPath) {

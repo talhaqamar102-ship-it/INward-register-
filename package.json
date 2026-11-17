@@ -8,7 +8,7 @@
     "start": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test --test-concurrency=1 test/packing-system.test.js test/http.test.js test/enterprise-gaps.test.js test/db-reliability.test.js test/order-integrity.test.js",
+    "test": "node --test --test-concurrency=1 test/packing-system.test.js test/http.test.js test/enterprise-gaps.test.js test/db-reliability.test.js test/order-integrity.test.js test/catalog-integration.test.js",
     "test:unit": "tsx --test src/utils/requisitionLogic.test.ts",
     "test:e2e": "playwright test",
     "verify:all": "npm run lint && npm run test:unit && npm test && npm run build && npm run test:e2e && npm run graphify",

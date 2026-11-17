@@ -1,12 +1,28 @@
+import { randomUUID } from 'node:crypto';
 import { db, backupDatabase, initDatabase } from '../db.js';
 import { AQLService } from './aqlService.js';
 import { createPendingOrder, deletePendingOrder } from './orderService.js';
 
 const REQUISITION_SIZES = ['7', '8', '9', '10', '11'];
 
-function parseRequisitionSizes(value) {
+function getScaleCodesForFormat(sizeFormat = 'LEGACY_7_11') {
+  const normalized = String(sizeFormat || '').trim() || 'LEGACY_7_11';
+  if (normalized === 'LEGACY_7_11') return [...REQUISITION_SIZES];
+  try {
+    const row = db.prepare(`SELECT sizes_json FROM size_standards WHERE code = ?`).get(normalized);
+    if (row?.sizes_json) {
+      const parsed = JSON.parse(row.sizes_json);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String);
+    }
+  } catch {
+    // Fall back to legacy array only if size_standards has not been initialized yet.
+  }
+  return [...REQUISITION_SIZES];
+}
+
+function parseRequisitionSizes(value, allowedSizes = REQUISITION_SIZES) {
   const parsed = JSON.parse(value || '{}');
-  return Object.fromEntries(REQUISITION_SIZES.map(size => [size, Number(parsed[size] || 0)]));
+  return Object.fromEntries(allowedSizes.map(size => [size, Number(parsed[size] || 0)]));
 }
 
 function runAtomicWipStep(fn) {
@@ -59,6 +75,19 @@ export class PackingService {
     return db.prepare(`SELECT * FROM customers ORDER BY name`).all();
   }
 
+  static getSizeStandards() {
+    try {
+      return db.prepare(`SELECT code, raw_label, sizes_json, is_legacy FROM size_standards ORDER BY is_legacy DESC, code ASC`).all().map(row => ({
+        code: row.code,
+        rawLabel: row.raw_label,
+        sizes: JSON.parse(row.sizes_json || '[]'),
+        isLegacy: Boolean(row.is_legacy)
+      }));
+    } catch {
+      return [{ code: 'LEGACY_7_11', rawLabel: 'LEGACY_7_11', sizes: [...REQUISITION_SIZES], isLegacy: true }];
+    }
+  }
+
   static getProducts(customerId = null) {
     if (customerId) {
       return db.prepare(`SELECT * FROM products WHERE customer_id = ? ORDER BY name`).all(customerId);
@@ -94,20 +123,6 @@ export class PackingService {
     const normalizedOrderId = String(orderId || '').trim();
     if (!normalizedOrderId) throw new Error('Parent order is required.');
 
-    const sizes = {};
-    for (const size of REQUISITION_SIZES) {
-      const value = Number(requestedSizes?.[size] ?? 0);
-      if (!Number.isSafeInteger(value) || value < 0) {
-        throw new Error(`Size ${size} quantity must be a whole number greater than or equal to zero.`);
-      }
-      sizes[size] = value;
-    }
-    if (Object.keys(requestedSizes || {}).some(size => !REQUISITION_SIZES.includes(size))) {
-      throw new Error('Only sizes 7 through 11 are supported for this requisition.');
-    }
-    const requestedPairs = REQUISITION_SIZES.reduce((total, size) => total + sizes[size], 0);
-    if (requestedPairs <= 0) throw new Error('Enter a quantity for at least one size.');
-
     db.exec('BEGIN IMMEDIATE');
     try {
       const order = db.prepare(`SELECT * FROM pending_orders WHERE order_id = ?`).get(normalizedOrderId);
@@ -122,21 +137,40 @@ export class PackingService {
         throw error;
       }
 
-      const buyer = db.prepare(`
+      const scaleCodes = getScaleCodesForFormat(order.size_format || 'LEGACY_7_11');
+      const sizes = {};
+      for (const size of scaleCodes) {
+        const value = Number(requestedSizes?.[size] ?? 0);
+        if (!Number.isSafeInteger(value) || value < 0) {
+          throw new Error(`Size ${size} quantity must be a whole number greater than or equal to zero.`);
+        }
+        sizes[size] = value;
+      }
+      if (Object.keys(requestedSizes || {}).some(size => !scaleCodes.includes(size))) {
+        throw new Error(`Only sizes [${scaleCodes.join(', ')}] are supported for this requisition (${order.size_format || 'LEGACY_7_11'}).`);
+      }
+      const requestedPairs = scaleCodes.reduce((total, size) => total + sizes[size], 0);
+      if (requestedPairs <= 0) throw new Error('Enter a quantity for at least one size.');
+
+      const buyer = (order.customer_id
+        ? db.prepare(`SELECT id FROM customers WHERE id = ? LIMIT 1`).get(order.customer_id)
+        : null) || db.prepare(`
         SELECT id FROM customers WHERE name = ? COLLATE NOCASE LIMIT 1
       `).get(order.buyer_name);
-      const product = buyer && db.prepare(`
+      const product = (order.product_id
+        ? db.prepare(`SELECT id FROM products WHERE id = ? LIMIT 1`).get(order.product_id)
+        : null) || (buyer && db.prepare(`
         SELECT id FROM products
         WHERE customer_id = ? AND name = ? COLLATE NOCASE
         LIMIT 1
-      `).get(buyer.id, order.article_name);
+      `).get(buyer.id, order.article_name));
       if (!buyer || !product) {
         throw new Error('The parent order must match a customer and article in the master lists.');
       }
 
       const stockSummary = this.getOrderStockSummary(order);
-      for (const size of REQUISITION_SIZES) {
-        const remaining = stockSummary.remainingOrderSizes[size];
+      for (const size of scaleCodes) {
+        const remaining = Number(stockSummary.remainingOrderSizes[size] || 0);
         if (sizes[size] > remaining) {
           throw new Error(
             `Size ${size} request (${sizes[size]}) exceeds remaining unrequested order balance (${remaining} remaining of ${stockSummary.plannedSizes[size]} planned).`
@@ -205,33 +239,45 @@ export class PackingService {
 
   static getRequisitions() {
     return db.prepare(`
-      SELECT r.*, c.name AS customer_name, c.inspection_preference, p.name AS product_name
+      SELECT r.*, c.name AS customer_name, c.inspection_preference, p.name AS product_name,
+             COALESCE(NULLIF(o.size_format, ''), NULLIF(p.size_format, ''), 'LEGACY_7_11') AS effective_size_format
       FROM glove_requisitions r
       JOIN customers c ON r.customer_id = c.id
       JOIN products p ON r.product_id = p.id
+      LEFT JOIN pending_orders o ON r.order_id = o.order_id
       ORDER BY r.created_at DESC
-    `).all().map(row => ({
-      ...row,
-      sizes: parseRequisitionSizes(row.sizes_json),
-      wip: db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(row.req_number) || null,
-      materialReq: db.prepare(`SELECT * FROM material_requisitions WHERE req_number = ?`).get(row.req_number) || null,
-      cartons: db.prepare(`SELECT * FROM cartons WHERE req_number = ? ORDER BY carton_number`).all(row.req_number),
-      alterations: db.prepare(`SELECT * FROM alterations WHERE req_number = ? ORDER BY id DESC`).all(row.req_number)
-    }));
+    `).all().map(row => {
+      const scaleCodes = getScaleCodesForFormat(row.effective_size_format);
+      return {
+        ...row,
+        sizeFormat: row.effective_size_format,
+        sizeCodes: scaleCodes,
+        sizes: parseRequisitionSizes(row.sizes_json, scaleCodes),
+        wip: db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(row.req_number) || null,
+        materialReq: db.prepare(`SELECT * FROM material_requisitions WHERE req_number = ?`).get(row.req_number) || null,
+        cartons: db.prepare(`SELECT * FROM cartons WHERE req_number = ? ORDER BY carton_number`).all(row.req_number),
+        alterations: db.prepare(`SELECT * FROM alterations WHERE req_number = ? ORDER BY id DESC`).all(row.req_number)
+      };
+    });
   }
 
   static getRequisition(reqNumber) {
     const req = db.prepare(`
       SELECT r.*, c.name AS customer_name, c.inspection_preference, p.name AS product_name,
-             p.polybag_per_pair, p.silica_gel_per_pair, p.stickers_per_pair, p.pairs_per_carton
+             p.polybag_per_pair, p.silica_gel_per_pair, p.stickers_per_pair, p.pairs_per_carton,
+             COALESCE(NULLIF(o.size_format, ''), NULLIF(p.size_format, ''), 'LEGACY_7_11') AS effective_size_format
       FROM glove_requisitions r
       JOIN customers c ON r.customer_id = c.id
       JOIN products p ON r.product_id = p.id
+      LEFT JOIN pending_orders o ON r.order_id = o.order_id
       WHERE r.req_number = ?
     `).get(reqNumber);
 
     if (!req) return null;
-    req.sizes = parseRequisitionSizes(req.sizes_json);
+    const scaleCodes = getScaleCodesForFormat(req.effective_size_format);
+    req.sizeFormat = req.effective_size_format;
+    req.sizeCodes = scaleCodes;
+    req.sizes = parseRequisitionSizes(req.sizes_json, scaleCodes);
 
     const wip = db.prepare(`SELECT * FROM packing_wip WHERE req_number = ?`).get(reqNumber);
     const materialReq = db.prepare(`SELECT * FROM material_requisitions WHERE req_number = ?`).get(reqNumber);
@@ -860,19 +906,41 @@ export class PackingService {
       }
     }
 
-    // Update raw gloves store inventory automatically
-    let product = db.prepare(`SELECT * FROM products WHERE name = ? COLLATE NOCASE`).get(effectiveArticle);
-    let customer = db.prepare(`SELECT * FROM customers WHERE name LIKE ?`).get(`%${effectiveCustomer}%`);
+    // Update raw gloves store inventory automatically (prefer explicit IDs, then customer-scoped exact match)
+    const explicitCustId = String(data.customerId || data.customer_id || linkedOrder?.customer_id || '').trim();
+    const explicitProdId = String(data.productId || data.product_id || linkedOrder?.product_id || '').trim();
+
+    let customer = explicitCustId
+      ? db.prepare(`SELECT * FROM customers WHERE id = ?`).get(explicitCustId)
+      : null;
+    if (!customer) {
+      customer = db.prepare(`SELECT * FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1`).get(effectiveCustomer);
+    }
+    if (!customer) {
+      customer = db.prepare(`SELECT * FROM customers WHERE name LIKE ? ORDER BY id ASC LIMIT 1`).get(`${effectiveCustomer}%`);
+    }
 
     if (!customer) {
-      const custId = `CUST-${effectiveCustomer.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)}`;
+      const slug = effectiveCustomer.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'CUST';
+      const custId = `CUST-${slug}-${randomUUID().slice(0, 6).toUpperCase()}`;
       db.prepare(`INSERT OR IGNORE INTO customers (id, name, country, inspection_preference) VALUES (?, ?, 'Global', 'RANDOM')`)
         .run(custId, effectiveCustomer);
       customer = { id: custId, name: effectiveCustomer };
     }
 
+    let product = explicitProdId
+      ? db.prepare(`SELECT * FROM products WHERE id = ?`).get(explicitProdId)
+      : null;
     if (!product) {
-      const prodId = `GLV-${effectiveArticle.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)}`;
+      product = db.prepare(`SELECT * FROM products WHERE customer_id = ? AND name = ? COLLATE NOCASE LIMIT 1`).get(customer.id, effectiveArticle);
+    }
+    if (!product) {
+      product = db.prepare(`SELECT * FROM products WHERE name = ? COLLATE NOCASE LIMIT 1`).get(effectiveArticle);
+    }
+
+    if (!product) {
+      const slug = effectiveArticle.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'ITEM';
+      const prodId = `GLV-${slug}-${randomUUID().slice(0, 6).toUpperCase()}`;
       db.prepare(`INSERT OR IGNORE INTO products (id, name, customer_id, polybag_per_pair, silica_gel_per_pair, stickers_per_pair, pairs_per_carton) VALUES (?, ?, ?, 1, 1, 2, 50)`)
         .run(prodId, effectiveArticle, customer.id);
       product = { id: prodId, name: effectiveArticle };
@@ -935,7 +1003,8 @@ export class PackingService {
       SELECT DISTINCT po_number FROM store_receivings WHERE po_number IS NOT NULL AND po_number != '' ORDER BY po_number
     `).all().map(r => r.po_number);
 
-    return { makers, customers, articles, poList };
+    const sizeStandards = this.getSizeStandards();
+    return { makers, customers, articles, poList, sizeStandards };
   }
 
   // --- PACKAGING BOM LOOKUP ---
@@ -1176,6 +1245,7 @@ export class PackingService {
     const mrvList = db.prepare(`SELECT * FROM material_return_vouchers ORDER BY created_at DESC`).all();
     const customers = this.getCustomers();
     const products = this.getProducts();
+    const sizeStandards = this.getSizeStandards();
     const gloveInventory = this.getGloveInventory();
     const materialInventory = this.getMaterialInventory();
     const materialReqs = this.getMaterialRequisitions();
@@ -1191,6 +1261,7 @@ export class PackingService {
       },
       customers,
       products,
+      sizeStandards,
       gloveInventory,
       materialInventory,
       receivings,
@@ -1206,13 +1277,19 @@ export class PackingService {
 
   static getOrderStockSummary(orderRow) {
     const orderId = orderRow.order_id;
-    const plannedSizes = {
-      '7': Number(orderRow.size_7 || 0),
-      '8': Number(orderRow.size_8 || 0),
-      '9': Number(orderRow.size_9 || 0),
-      '10': Number(orderRow.size_10 || 0),
-      '11': Number(orderRow.size_11 || 0)
-    };
+    const sizeFormat = String(orderRow.size_format || 'LEGACY_7_11').trim() || 'LEGACY_7_11';
+    const scaleCodes = getScaleCodesForFormat(sizeFormat);
+    const isLegacy = sizeFormat === 'LEGACY_7_11';
+    const parsedOrderJson = isLegacy ? {} : JSON.parse(orderRow.sizes_json || '{}');
+    const plannedSizes = isLegacy
+      ? {
+          '7': Number(orderRow.size_7 || 0),
+          '8': Number(orderRow.size_8 || 0),
+          '9': Number(orderRow.size_9 || 0),
+          '10': Number(orderRow.size_10 || 0),
+          '11': Number(orderRow.size_11 || 0)
+        }
+      : Object.fromEntries(scaleCodes.map(sz => [sz, Number(parsedOrderJson[sz] || 0)]));
 
     const existingReqs = db.prepare(`
       SELECT requested_pairs, sizes_json, status
@@ -1220,24 +1297,24 @@ export class PackingService {
       WHERE order_id = ? AND COALESCE(is_voided, 0) = 0
     `).all(orderId);
 
-    const requestedSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+    const requestedSizes = Object.fromEntries(scaleCodes.map(sz => [sz, 0]));
     let requestedPairs = 0;
     let pendingReqPairs = 0;
     for (const reqRow of existingReqs) {
-      const parsed = parseRequisitionSizes(reqRow.sizes_json);
+      const parsed = parseRequisitionSizes(reqRow.sizes_json, scaleCodes);
       const reqQty = Number(reqRow.requested_pairs || 0);
       requestedPairs += reqQty;
       if (reqRow.status === 'PENDING') {
         pendingReqPairs += reqQty;
       }
-      for (const size of REQUISITION_SIZES) {
+      for (const size of scaleCodes) {
         requestedSizes[size] += Number(parsed[size] || 0);
       }
     }
 
-    const remainingOrderSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
-    for (const size of REQUISITION_SIZES) {
-      remainingOrderSizes[size] = Math.max(0, plannedSizes[size] - requestedSizes[size]);
+    const remainingOrderSizes = Object.fromEntries(scaleCodes.map(sz => [sz, 0]));
+    for (const size of scaleCodes) {
+      remainingOrderSizes[size] = Math.max(0, Number(plannedSizes[size] || 0) - Number(requestedSizes[size] || 0));
     }
 
     const grnRows = db.prepare(`
@@ -1247,15 +1324,15 @@ export class PackingService {
     `).all(orderId, orderId);
     const receivedPairs = grnRows.reduce((sum, row) => sum + Number(row.rcvd_pairs || 0), 0);
 
-    const receivedSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+    const receivedSizes = Object.fromEntries(scaleCodes.map(sz => [sz, 0]));
     const grnSizeMap = new Map();
     if (grnRows.length > 0) {
       const sizeStmt = db.prepare(`SELECT size_code, rcvd_pairs FROM receiving_size_breakdowns WHERE rcv_number = ?`);
       for (const grn of grnRows) {
-        const sMap = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+        const sMap = Object.fromEntries(scaleCodes.map(sz => [sz, 0]));
         for (const sRow of sizeStmt.all(grn.rcv_number)) {
           const code = String(sRow.size_code || '');
-          if (REQUISITION_SIZES.includes(code)) {
+          if (scaleCodes.includes(code)) {
             const qty = Number(sRow.rcvd_pairs || 0);
             receivedSizes[code] += qty;
             sMap[code] += qty;
@@ -1272,6 +1349,8 @@ export class PackingService {
       ? allocRows
       : [{
           maker_contractor: orderRow.maker_contractor,
+          size_format: sizeFormat,
+          sizes_json: orderRow.sizes_json || '{}',
           size_7: orderRow.size_7,
           size_8: orderRow.size_8,
           size_9: orderRow.size_9,
@@ -1282,29 +1361,34 @@ export class PackingService {
         }];
     const contractorAllocations = effectiveAllocRows.map(a => {
       const makerName = String(a.maker_contractor || '').trim();
-      const allocSizes = {
-        '7': Number(a.size_7 || 0),
-        '8': Number(a.size_8 || 0),
-        '9': Number(a.size_9 || 0),
-        '10': Number(a.size_10 || 0),
-        '11': Number(a.size_11 || 0)
-      };
-      const allocTotal = Number(a.total_qty || (allocSizes['7'] + allocSizes['8'] + allocSizes['9'] + allocSizes['10'] + allocSizes['11']));
+      const allocFormat = String(a.size_format || sizeFormat || 'LEGACY_7_11').trim();
+      const parsedAllocJson = allocFormat === 'LEGACY_7_11' ? {} : JSON.parse(a.sizes_json || '{}');
+      const allocSizes = allocFormat === 'LEGACY_7_11'
+        ? {
+            '7': Number(a.size_7 || 0),
+            '8': Number(a.size_8 || 0),
+            '9': Number(a.size_9 || 0),
+            '10': Number(a.size_10 || 0),
+            '11': Number(a.size_11 || 0)
+          }
+        : Object.fromEntries(scaleCodes.map(sz => [sz, Number(parsedAllocJson[sz] || 0)]));
+      const allocSum = scaleCodes.reduce((s, sz) => s + Number(allocSizes[sz] || 0), 0);
+      const allocTotal = Number(a.total_qty ?? allocSum);
       const makerGrns = grnRows.filter(
         g => String(g.maker_contractor || '').trim().toLowerCase() === makerName.toLowerCase()
       );
       const makerRcvdPairs = makerGrns.reduce((sum, g) => sum + Number(g.rcvd_pairs || 0), 0);
-      const makerRcvdSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+      const makerRcvdSizes = Object.fromEntries(scaleCodes.map(sz => [sz, 0]));
       for (const mg of makerGrns) {
         const sMap = grnSizeMap.get(mg.rcv_number);
         if (!sMap) continue;
-        for (const sz of REQUISITION_SIZES) {
+        for (const sz of scaleCodes) {
           makerRcvdSizes[sz] += Number(sMap[sz] || 0);
         }
       }
-      const makerRemainingSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
-      for (const sz of REQUISITION_SIZES) {
-        makerRemainingSizes[sz] = Math.max(0, allocSizes[sz] - makerRcvdSizes[sz]);
+      const makerRemainingSizes = Object.fromEntries(scaleCodes.map(sz => [sz, 0]));
+      for (const sz of scaleCodes) {
+        makerRemainingSizes[sz] = Math.max(0, Number(allocSizes[sz] || 0) - Number(makerRcvdSizes[sz] || 0));
       }
       return {
         maker: makerName,
@@ -1328,6 +1412,8 @@ export class PackingService {
     const unclaimedDockPairs = Math.max(0, availableDockPairs - pendingReqPairs);
 
     return {
+      sizeFormat,
+      scaleCodes,
       plannedSizes,
       requestedSizes,
       remainingOrderSizes,
@@ -1349,11 +1435,15 @@ export class PackingService {
         const stock = this.getOrderStockSummary(r);
         return {
           orderId: r.order_id,
+          customerId: r.customer_id || '',
           buyer: r.buyer_name,
           maker: r.maker_contractor,
           po: r.po_number,
+          productId: r.product_id || '',
           article: r.article_name,
           color: r.color_shade,
+          sizeFormat: stock.sizeFormat,
+          sizeCodes: stock.scaleCodes,
           sizes: stock.plannedSizes,
           totalQty: Number(r.total_qty || 0),
           dueDate: r.due_date || '',
@@ -1464,14 +1554,34 @@ export class PackingService {
     return this.getCustomers();
   }
 
-  static upsertProductAdmin({ id, name, customerId, polybagPerPair, silicaGelPerPair, stickersPerPair, pairsPerCarton }) {
+  static upsertProductAdmin({
+    id,
+    name,
+    customerId,
+    articleCode,
+    colorSpec,
+    sizeFormat,
+    polybagPerPair,
+    silicaGelPerPair,
+    stickersPerPair,
+    pairsPerCarton
+  }) {
     if (!name || !customerId) throw new Error('Article name and customerId are required');
-    const prodId = id || `GLV-${name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)}-${Date.now().toString().slice(-2)}`;
+    const cleanName = name.trim();
+    const slug = cleanName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'ITEM';
+    const prodId = id || `GLV-${slug}-${randomUUID().slice(0, 6).toUpperCase()}`;
+    const format = String(sizeFormat || 'LEGACY_7_11').trim() || 'LEGACY_7_11';
     db.prepare(`
-      INSERT INTO products (id, name, customer_id, polybag_per_pair, silica_gel_per_pair, stickers_per_pair, pairs_per_carton)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (
+        id, name, raw_name, article_code, raw_color, color_spec, size_format,
+        customer_id, polybag_per_pair, silica_gel_per_pair, stickers_per_pair, pairs_per_carton
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
+        article_code = excluded.article_code,
+        color_spec = excluded.color_spec,
+        size_format = excluded.size_format,
         customer_id = excluded.customer_id,
         polybag_per_pair = excluded.polybag_per_pair,
         silica_gel_per_pair = excluded.silica_gel_per_pair,
@@ -1479,7 +1589,12 @@ export class PackingService {
         pairs_per_carton = excluded.pairs_per_carton
     `).run(
       prodId,
-      name.trim(),
+      cleanName,
+      cleanName,
+      String(articleCode || '').trim(),
+      String(colorSpec || '').trim(),
+      String(colorSpec || '').trim(),
+      format,
       customerId,
       Number(polybagPerPair ?? 1),
       Number(silicaGelPerPair ?? 1),

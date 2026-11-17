@@ -1001,4 +1001,220 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
 
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('Catalog cascading Buyer -> Article -> Color -> Dynamic Sizes (GENRAL & IXS MEN) with split allocation & reload persistence', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    // 1. Selecting OXFORD filters articles to OXFORD catalog & switches size grid to GENRAL (9 sizes)
+    await page.selectOption('#admin-pending-order-buyer', 'OXFORD');
+    const oxfordArticleOptions = await page.locator('#admin-pending-order-article option').allTextContents();
+    expect(oxfordArticleOptions.length).toBeGreaterThan(2);
+    expect(oxfordArticleOptions.some(t => t.includes('BRISBANE AIR MS TECH GREY/BLACK'))).toBe(true);
+    expect(oxfordArticleOptions.some(t => t.includes('G-175102-BK 132 RED'))).toBe(false);
+
+    await page.selectOption('#admin-pending-order-article', 'BRISBANE AIR MS TECH GREY/BLACK');
+    await expect(page.locator('.su-order-matrix-header')).toContainText('Scale: GENRAL, 9 Sizes');
+    await expect(page.locator('.admin-order-size-val')).toHaveCount(9);
+    await expect(page.locator('.admin-order-size-val[data-size="XS"]')).toBeVisible();
+    await expect(page.locator('.admin-order-size-val[data-size="5XL"]')).toBeVisible();
+    await expect(page.locator('.admin-order-size-val[data-size="7"]')).toHaveCount(0);
+
+    // 2. Switching Buyer to BERIK filters to BERIK & auto-fills combined colorway + IXS MEN (10 sizes)
+    await page.selectOption('#admin-pending-order-buyer', 'BERIK');
+    const berikArticleOptions = await page.locator('#admin-pending-order-article option').allTextContents();
+    expect(berikArticleOptions.some(t => t.includes('G-175102-BK 132 RED'))).toBe(true);
+    expect(berikArticleOptions.some(t => t.includes('BRISBANE AIR MS TECH GREY/BLACK'))).toBe(false);
+
+    await page.selectOption('#admin-pending-order-article', 'G-175102-BK 132 RED');
+    await expect(page.locator('#admin-pending-order-color')).toHaveValue('Black,Red,White');
+    await expect(page.locator('.su-order-matrix-header')).toContainText('Scale: IXS MEN, 10 Sizes');
+    await expect(page.locator('.admin-order-size-val')).toHaveCount(10);
+
+    // 3. Enter dynamic IXS MEN quantities + split across 2 contractors -> verify 100% balance
+    await page.fill('#admin-pending-order-po', 'PO-CASCADE-IXS');
+    await page.fill('.admin-order-size-val[data-size="2XS"]', '10');
+    await page.fill('.admin-order-size-val[data-size="XS"]', '20');
+    await page.fill('.admin-order-size-val[data-size="M"]', '30');
+    await expect(page.locator('#admin-order-size-total')).toHaveText('60');
+
+    await page.click('#btn-admin-toggle-split');
+    await expect(page.locator('[data-testid="admin-contractor-split-panel"]')).toBeVisible();
+
+    const splitMaker0 = page.locator('.admin-split-maker[data-split-index="0"]');
+    const splitMaker1 = page.locator('.admin-split-maker[data-split-index="1"]');
+    await splitMaker0.selectOption({ index: 1 });
+    await splitMaker1.selectOption({ index: 2 });
+
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="2XS"]', '10');
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="XS"]', '20');
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="M"]', '0');
+    await page.fill('.admin-split-size-val[data-split-index="1"][data-size="M"]', '30');
+    await expect(page.locator('#admin-split-balance-bar')).toContainText('Split Matches Order 100%');
+
+    // 4. Desktop (1440px) & Mobile (375px) zero horizontal page overflow check with 10-column split grid
+    const overflow1440 = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow1440).toBe(false);
+    await page.setViewportSize({ width: 375, height: 812 });
+    const overflow375 = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow375).toBe(false);
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    // 5. Save Master Order & verify table display + SQLite reload persistence
+    await page.click('#btn-admin-add-pending-order');
+    const ordersTable = page.locator('[data-testid="superuser-command-center"] table.data-table').first();
+    const savedRow = ordersTable.locator('tr', { hasText: 'PO-CASCADE-IXS' });
+    await expect(savedRow).toContainText('BERIK');
+    await expect(savedRow).toContainText('G-175102-BK 132 RED');
+    await expect(savedRow).toContainText('Black,Red,White');
+    await expect(savedRow).toContainText('IXS MEN');
+    await expect(savedRow).toContainText('2XS:10');
+    await expect(savedRow).toContainText('XS:20');
+    await expect(savedRow).toContainText('M:30');
+    await expect(savedRow).toContainText('60');
+
+    await page.reload();
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+    const reloadedRow = page.locator('[data-testid="superuser-command-center"] table.data-table').first().locator('tr', { hasText: 'PO-CASCADE-IXS' });
+    await expect(reloadedRow).toContainText('IXS MEN');
+    await expect(reloadedRow).toContainText('2XS:10');
+    await expect(reloadedRow).toContainText('M:30');
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('Slice 3: Non-legacy IXS MEN order flows through Inward GRN -> Packing REQ -> Issue -> Monochrome Slips -> Reload', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await page.addInitScript(() => {
+      window.print = () => {};
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    // Create BERIK IXS MEN order
+    await page.selectOption('#admin-pending-order-buyer', 'BERIK');
+    await page.selectOption('#admin-pending-order-article', 'G-175102-BK 132 RED');
+    await page.selectOption('#admin-pending-order-maker', { index: 1 });
+    await page.fill('#admin-pending-order-po', 'PO-SLICE3-IXS');
+    await page.fill('.admin-order-size-val[data-size="2XS"]', '15');
+    await page.fill('.admin-order-size-val[data-size="XS"]', '25');
+    await page.fill('.admin-order-size-val[data-size="M"]', '20');
+    await page.click('#btn-admin-add-pending-order');
+
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    // Navigate to Dock #1 via + Receive GRN Batch
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+
+    await expect(page.locator('#grn-article')).toHaveValue('G-175102-BK 132 RED');
+    await expect(page.locator('#grn-color')).toHaveValue('Black,Red,White');
+    await expect(page.locator('.grn-size-val')).toHaveCount(10);
+    await expect(page.locator('.grn-size-val[data-size="2XS"]')).toHaveValue('15');
+    await expect(page.locator('.grn-size-val[data-size="XS"]')).toHaveValue('25');
+    await expect(page.locator('.grn-size-val[data-size="M"]')).toHaveValue('20');
+    await expect(page.locator('.grn-size-val[data-size="7"]')).toHaveCount(0);
+
+    await page.fill('#grn-received-from', 'Tariq Carrier');
+    await page.click('#btn-print-grn-slip');
+
+    // Verify monochrome GRN receiving slip uses IXS MEN columns & hides Buyer
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await expect(page.locator('#modal-body')).toContainText('Scale: IXS MEN');
+    await expect(page.locator('#modal-body')).toContainText('2XS');
+    await expect(page.locator('#modal-body')).toContainText('5XL');
+    await expect(page.locator('#modal-body')).toContainText('Black,Red,White');
+    await expect(page.locator('#modal-body')).toContainText('60 Pairs');
+    await expect(page.locator('#modal-body')).not.toContainText('BERIK');
+    await expect(page.locator('#modal-body')).not.toContainText('7 / S');
+    await page.click('#modal-btn-close');
+
+    // Store Register table renders dynamic IXS MEN GRN sizes
+    await expect(page.locator('table.data-table')).toContainText('IXS MEN');
+    await expect(page.locator('table.data-table')).toContainText('2XS:15');
+
+    // Navigate to Packing Hall & create REQ on IXS MEN scale
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-create-req"][data-order-id="${orderId}"]`);
+
+    await expect(page.locator('#new-req-size-matrix-container')).toContainText('Scale: IXS MEN, 10 Sizes');
+    await expect(page.locator('.req-size-val')).toHaveCount(10);
+    await expect(page.locator('.req-size-val[data-size="2XS"]')).toHaveValue('15');
+    await expect(page.locator('#new-req-pairs')).toHaveValue('60');
+
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes(`/api/orders/${encodeURIComponent(orderId)}/requisitions`) && res.status() === 200),
+      page.click('#btn-confirm-lot-draw')
+    ]);
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+    await expect(page.locator('[data-testid="wip-analytics-dashboard"]')).toContainText('Size 2XS');
+    await expect(page.locator('[data-testid="wip-analytics-dashboard"]')).toContainText('Size M');
+
+    // Return to Dock #1 & Issue REQ to Packing Hall
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await expect(page.locator('#main-content')).toContainText('2XS:15');
+    await expect(page.locator('#btn-issue-req-to-packing')).toBeEnabled();
+    await page.click('#btn-issue-req-to-packing');
+
+    // Verify monochrome Packing Requisition slip renders IXS MEN sizes cleanly
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await expect(page.locator('#modal-body')).toContainText('Scale: IXS MEN');
+    await expect(page.locator('#modal-body')).toContainText('2XS');
+    await expect(page.locator('#modal-body')).toContainText('5XL');
+    await expect(page.locator('#modal-body')).toContainText('60 Pairs');
+    await expect(page.locator('#modal-body')).not.toContainText('7 / S');
+    await page.click('#modal-btn-close');
+
+    // Viewport overflow checks at 1440px and 375px on GRN screen with 10-column size matrix
+    const overflow1440 = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow1440).toBe(false);
+    await page.setViewportSize({ width: 375, height: 812 });
+    const overflow375 = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow375).toBe(false);
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    // Reload persistence check in Super User Live Tracking
+    await page.reload();
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    const orderCard = page.locator(`#tracking-order-card-${orderId}`);
+    await expect(orderCard).toContainText('IXS MEN');
+    await expect(orderCard).toContainText('2XS:15');
+    await expect(orderCard).toContainText('XS:25');
+    await expect(orderCard).toContainText('M:20');
+
+    expect(runtimeErrors).toEqual([]);
+  });
 });

@@ -48,7 +48,11 @@ import {
   validateSystemUserInputs,
   validatePasswordResetInput,
   buildFocusRestoreSelector,
-  getDefaultStationForRole
+  getDefaultStationForRole,
+  getScaleSizeCodes,
+  formatSizeColumnLabel,
+  resolveScaleKeysForBreakdown,
+  SizeStandardOption
 } from './utils/requisitionLogic';
 import {
   renderSuperUserScreen,
@@ -69,6 +73,8 @@ interface GRNRecord {
   color?: string;
   receivedFrom?: string;
   rcvdPairs: number;
+  sizeFormat?: string;
+  sizeCodes?: string[];
   sizes: SizeBreakdown;
   status: string;
   isVoided?: boolean;
@@ -101,11 +107,11 @@ interface CartonRecord {
   status: string;
 }
 
-type StandardSizeKey = typeof STANDARD_GLOVE_SIZES[number];
-
 interface GrnRemainingCaps {
-  sizeRemaining: Record<StandardSizeKey, number>;
+  sizeRemaining: Record<string, number>;
   totalRemaining: number;
+  sizeFormat: string;
+  sizeCodes: string[];
 }
 
 const DEFAULT_REQ_NUMBER = 'REQ-0001';
@@ -120,6 +126,8 @@ function createEmptyPackingWipState() {
     article: '',
     plannedQty: 0,
     issueStatus: 'Pending Inward Issue' as 'Pending Inward Issue' | 'Issued by Inward Register',
+    sizeFormat: 'LEGACY_7_11',
+    sizeCodes: [...STANDARD_GLOVE_SIZES] as string[],
     sizes: createEmptySizes(),
     wipBatch: DEFAULT_REQ_NUMBER,
     stage1In: 0,
@@ -205,6 +213,8 @@ const state = {
     color: '',
     receivedFrom: '',
     rcvdPairs: '',
+    sizeFormat: 'LEGACY_7_11',
+    sizeCodes: undefined as string[] | undefined,
     sizes: createEmptySizes()
   },
 
@@ -296,11 +306,14 @@ const state = {
     phased_rollout: false
   } as Record<string, boolean>,
   adminOrderDraft: {
+    customerId: '',
     buyer: '',
     maker: '',
     po: '',
+    productId: '',
     article: '',
     color: '',
+    sizeFormat: 'LEGACY_7_11',
     dueDate: '',
     sizes: createEmptySizes()
   },
@@ -317,16 +330,26 @@ const state = {
     },
     customers: [] as any[],
     products: [] as any[],
+    sizeStandards: [] as SizeStandardOption[],
     receivings: [] as any[],
     alterations: [] as any[],
     scrapLedger: [] as any[]
   }
 };
 
+function getOrderSizeCodes(orderId?: string, explicitCodes?: readonly string[], explicitFormat?: string): string[] {
+  if (Array.isArray(explicitCodes) && explicitCodes.length > 0) return [...explicitCodes];
+  const matched = orderId ? state.pendingOrders.find(candidate => candidate.orderId === orderId) : undefined;
+  if (matched?.sizeCodes && matched.sizeCodes.length > 0) return [...matched.sizeCodes];
+  const fmt = explicitFormat || matched?.sizeFormat || 'LEGACY_7_11';
+  return getScaleSizeCodes(state.adminOverview.sizeStandards, fmt);
+}
+
 function getGrnRemainingCaps(orderId: string, maker?: string): GrnRemainingCaps | null {
   const order = state.pendingOrders.find(candidate => candidate.orderId === orderId);
   if (!order?.sizes) return null;
-  const orderPlannedTotal = STANDARD_GLOVE_SIZES.reduce((sum, size) => sum + Number(order.sizes?.[size] || 0), 0);
+  const activeSizes = getOrderSizeCodes(orderId, order.sizeCodes, order.sizeFormat);
+  const orderPlannedTotal = activeSizes.reduce((sum, size) => sum + Number(order.sizes?.[size] || 0), 0);
   if (orderPlannedTotal <= 0) return null;
 
   const allocs = order.contractorAllocations || [];
@@ -339,10 +362,10 @@ function getGrnRemainingCaps(orderId: string, maker?: string): GrnRemainingCaps 
 
   const targetSizes = matchedAlloc?.sizes || order.sizes;
   const targetPlannedTotal = matchedAlloc
-    ? STANDARD_GLOVE_SIZES.reduce((sum, size) => sum + Number(matchedAlloc.sizes?.[size] || 0), 0)
+    ? activeSizes.reduce((sum, size) => sum + Number(matchedAlloc.sizes?.[size] || 0), 0)
     : orderPlannedTotal;
 
-  const receivedBySize = createEmptySizes();
+  const receivedBySize = createEmptySizes(activeSizes);
   let receivedTotal = 0;
   for (const grn of state.grnList) {
     if (grn.pendingOrderId !== orderId || grn.isVoided || grn.status.toUpperCase() === 'VOIDED') continue;
@@ -350,25 +373,28 @@ function getGrnRemainingCaps(orderId: string, maker?: string): GrnRemainingCaps 
       continue;
     }
     receivedTotal += Math.max(0, Number(grn.rcvdPairs) || 0);
-    for (const size of STANDARD_GLOVE_SIZES) {
+    for (const size of activeSizes) {
       receivedBySize[size] += Math.max(0, Number(grn.sizes?.[size]) || 0);
     }
   }
 
-  const sizeRemaining = {} as Record<StandardSizeKey, number>;
-  for (const size of STANDARD_GLOVE_SIZES) {
+  const sizeRemaining: Record<string, number> = {};
+  for (const size of activeSizes) {
     sizeRemaining[size] = Math.max(0, Number(targetSizes[size] || 0) - receivedBySize[size]);
   }
 
   return {
     sizeRemaining,
-    totalRemaining: Math.max(0, targetPlannedTotal - receivedTotal)
+    totalRemaining: Math.max(0, targetPlannedTotal - receivedTotal),
+    sizeFormat: order.sizeFormat || 'LEGACY_7_11',
+    sizeCodes: activeSizes
   };
 }
 
 function formatGrnRemainingCaps(caps: GrnRemainingCaps, enteredSizes: SizeBreakdown): string {
-  const remainingBySize = STANDARD_GLOVE_SIZES
-    .map(size => `${size}: ${Math.max(0, caps.sizeRemaining[size] - Number(enteredSizes[size] || 0)).toLocaleString()}`)
+  const activeSizes = caps.sizeCodes.length > 0 ? caps.sizeCodes : [...STANDARD_GLOVE_SIZES];
+  const remainingBySize = activeSizes
+    .map(size => `${size}: ${Math.max(0, (caps.sizeRemaining[size] || 0) - Number(enteredSizes[size] || 0)).toLocaleString()}`)
     .join(' | ');
   const remainingTotal = Math.max(0, caps.totalRemaining - calculateSizeTotal(enteredSizes));
   return `Remaining after current entry: ${remainingBySize} | Total: ${remainingTotal.toLocaleString()} pairs`;
@@ -386,8 +412,9 @@ function getOrderStockState(orderId: string): {
   hasServerCounts: boolean;
 } {
   const order = state.pendingOrders.find(candidate => candidate.orderId === orderId);
+  const activeSizes = getOrderSizeCodes(orderId, order?.sizeCodes, order?.sizeFormat);
   if (order && order.availableDockPairs !== undefined) {
-    const remainingOrderSizes = { ...createEmptySizes(), ...(order.remainingOrderSizes || order.sizes || {}) };
+    const remainingOrderSizes = { ...createEmptySizes(activeSizes), ...(order.remainingOrderSizes || order.sizes || {}) };
     return {
       totalReceived: Number(order.receivedPairs || 0),
       totalIssued: Number(order.issuedPairs || 0),
@@ -396,31 +423,31 @@ function getOrderStockState(orderId: string): {
       unclaimedPairs: Math.max(0, Number(order.unclaimedDockPairs ?? order.availableDockPairs ?? 0)),
       remainingOrderSizes,
       remainingOrderTotal: calculateSizeTotal(remainingOrderSizes),
-      receivedSizes: { ...createEmptySizes(), ...(order.receivedSizes || {}) },
+      receivedSizes: { ...createEmptySizes(activeSizes), ...(order.receivedSizes || {}) },
       hasServerCounts: true
     };
   }
 
   let totalReceived = 0;
-  const receivedSizes = createEmptySizes();
+  const receivedSizes = createEmptySizes(activeSizes);
   for (const grn of state.grnList) {
     if (grn.isVoided || grn.status.toUpperCase() === 'VOIDED') continue;
     if (orderId && grn.pendingOrderId !== orderId) continue;
     totalReceived += Math.max(0, Number(grn.rcvdPairs) || 0);
-    for (const size of STANDARD_GLOVE_SIZES) {
+    for (const size of activeSizes) {
       receivedSizes[size] += Math.max(0, Number(grn.sizes?.[size]) || 0);
     }
   }
 
   let totalIssued = 0;
   let pendingReqPairs = 0;
-  const requestedSizes = createEmptySizes();
+  const requestedSizes = createEmptySizes(activeSizes);
   const wipItems = Object.values(state.ordersWipMap);
   for (const item of wipItems) {
     if (!item || (item as any).isVoided) continue;
     if (orderId && item.parentOrderId !== orderId) continue;
     const qty = Number(item.plannedQty || calculateSizeTotal(item.sizes) || 0);
-    for (const size of STANDARD_GLOVE_SIZES) {
+    for (const size of activeSizes) {
       requestedSizes[size] += Number(item.sizes?.[size] || 0);
     }
     if (item.issueStatus === 'Issued by Inward Register') {
@@ -433,8 +460,8 @@ function getOrderStockState(orderId: string): {
     totalIssued = state.issuedPairsTotal;
   }
 
-  const remainingOrderSizes = createEmptySizes();
-  for (const size of STANDARD_GLOVE_SIZES) {
+  const remainingOrderSizes = createEmptySizes(activeSizes);
+  for (const size of activeSizes) {
     remainingOrderSizes[size] = Math.max(0, Number(order?.sizes?.[size] || 0) - requestedSizes[size]);
   }
   const availablePairs = Math.max(0, totalReceived - totalIssued);
@@ -1051,6 +1078,8 @@ function renderScreenGRN(): string {
     .reduce((acc, row) => acc + row.rcvdPairs, 0);
   const currentSizeTotal = calculateSizeTotal(state.grnForm.sizes);
   const selectedGrnOrder = state.pendingOrders.find(o => o.orderId === state.grnForm.pendingOrderId);
+  const grnActiveFormat = selectedGrnOrder?.sizeFormat || state.grnForm.sizeFormat || 'LEGACY_7_11';
+  const grnActiveCodes = getOrderSizeCodes(state.grnForm.pendingOrderId, selectedGrnOrder?.sizeCodes || state.grnForm.sizeCodes, grnActiveFormat);
   const orderAllocations = selectedGrnOrder?.contractorAllocations || [];
   const grnCaps = getGrnRemainingCaps(state.grnForm.pendingOrderId, state.grnForm.maker);
   const wip = state.packingWip;
@@ -1133,36 +1162,30 @@ function renderScreenGRN(): string {
 
         <!-- Front-and-Center Size Breakdown Allocation on Main Page -->
         <div style="background: var(--ink-50); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px 12px; margin-top: 4px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
             <span style="font-weight: 700; color: var(--ink-950); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;">
-              Received Size Breakdown Allocation (Pairs)
+              Received Size Breakdown Allocation (Pairs &bull; Scale: ${escapeHtml(grnActiveFormat)}, ${grnActiveCodes.length} Sizes)
             </span>
             <span style="font-size: 11.5px; color: var(--ink-600);">
               Front desk enters received pairs only &mdash; automatically updates Received Pairs &amp; Inward Slip
             </span>
           </div>
-          <table class="size-matrix-table" style="margin: 0;">
-            <thead>
-              <tr>
-                <th>7 / S</th>
-                <th>8 / M</th>
-                <th>9 / L</th>
-                <th>10 / XL</th>
-                <th>11 / XXL</th>
-                <th style="background: var(--ink-200); color: var(--ink-950);">Total Received</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><input type="number" aria-label="Size 7 / S Pairs" class="size-matrix-input grn-size-val" data-size="7" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['7']}"` : ''} placeholder="0" value="${state.grnForm.sizes['7'] || ''}" /></td>
-                <td><input type="number" aria-label="Size 8 / M Pairs" class="size-matrix-input grn-size-val" data-size="8" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['8']}"` : ''} placeholder="0" value="${state.grnForm.sizes['8'] || ''}" /></td>
-                <td><input type="number" aria-label="Size 9 / L Pairs" class="size-matrix-input grn-size-val" data-size="9" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['9']}"` : ''} placeholder="0" value="${state.grnForm.sizes['9'] || ''}" /></td>
-                <td><input type="number" aria-label="Size 10 / XL Pairs" class="size-matrix-input grn-size-val" data-size="10" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['10']}"` : ''} placeholder="0" value="${state.grnForm.sizes['10'] || ''}" /></td>
-                <td><input type="number" aria-label="Size 11 / XXL Pairs" class="size-matrix-input grn-size-val" data-size="11" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining['11']}"` : ''} placeholder="0" value="${state.grnForm.sizes['11'] || ''}" /></td>
-                <td style="font-weight: 800; font-size: 14px; color: var(--ink-950);" id="grn-size-total-display">${currentSizeTotal.toLocaleString()}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-responsive">
+            <table class="size-matrix-table" style="margin: 0;">
+              <thead>
+                <tr>
+                  ${grnActiveCodes.map(sz => `<th>${escapeHtml(formatSizeColumnLabel(sz, grnActiveFormat))}</th>`).join('')}
+                  <th style="background: var(--ink-200); color: var(--ink-950);">Total Received</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  ${grnActiveCodes.map(sz => `<td><input type="number" aria-label="Size ${escapeHtml(formatSizeColumnLabel(sz, grnActiveFormat))} Pairs" class="size-matrix-input grn-size-val" data-size="${escapeHtml(sz)}" min="0" ${grnCaps ? `max="${grnCaps.sizeRemaining[sz] ?? 0}"` : ''} placeholder="0" value="${state.grnForm.sizes?.[sz] || ''}" /></td>`).join('')}
+                  <td style="font-weight: 800; font-size: 14px; color: var(--ink-950);" id="grn-size-total-display">${currentSizeTotal.toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div id="grn-size-caps" style="font-size: 11.5px; color: var(--ink-600); margin-top: 6px;">
             ${grnCaps
               ? formatGrnRemainingCaps(grnCaps, state.grnForm.sizes)
@@ -1217,7 +1240,10 @@ function renderScreenGRN(): string {
             </div>
             <div style="font-size: 12px;">
               <span style="color: var(--ink-600);">Asking Sizes:</span>
-              <strong>7:${wip.sizes['7']} | 8:${wip.sizes['8']} | 9:${wip.sizes['9']} | 10:${wip.sizes['10']} | 11:${wip.sizes['11']}</strong>
+              <strong>${(() => {
+                const wipCodes = resolveScaleKeysForBreakdown(wip.sizes, (wip as any).sizeCodes);
+                return wipCodes.map(sz => `${escapeHtml(sz)}:${wip.sizes?.[sz] ?? 0}`).join(' | ');
+              })()}</strong>
             </div>
             <div style="font-size: 12px;">
               <span style="color: var(--ink-600);">Asking Qty:</span>
@@ -1274,11 +1300,24 @@ function renderScreenGRN(): string {
                   <td>${escapeHtml(row.maker)}</td>
                   <td>${escapeHtml(row.receivedFrom || row.maker || '---')}</td>
                   <td class="font-bold">${escapeHtml(row.article)}${row.color ? ` <span style="font-weight: 500; color: var(--ink-600);">(${escapeHtml(row.color)})</span>` : ''}</td>
+                  ${(() => {
+                    const rowOrder = state.pendingOrders.find(o => o.orderId === row.pendingOrderId);
+                    const rowFmt = row.sizeFormat || rowOrder?.sizeFormat || (resolveScaleKeysForBreakdown(row.sizes, row.sizeCodes).every(c => ['7', '8', '9', '10', '11'].includes(c)) ? 'LEGACY_7_11' : 'CATALOG');
+                    const rowCodes = resolveScaleKeysForBreakdown(row.sizes, row.sizeCodes || rowOrder?.sizeCodes);
+                    if (rowFmt === 'LEGACY_7_11') {
+                      return `
                   <td class="text-center">${(row.sizes?.['7'] ?? 0).toLocaleString()}</td>
                   <td class="text-center">${(row.sizes?.['8'] ?? 0).toLocaleString()}</td>
                   <td class="text-center">${(row.sizes?.['9'] ?? 0).toLocaleString()}</td>
                   <td class="text-center">${(row.sizes?.['10'] ?? 0).toLocaleString()}</td>
-                  <td class="text-center">${(row.sizes?.['11'] ?? 0).toLocaleString()}</td>
+                  <td class="text-center">${(row.sizes?.['11'] ?? 0).toLocaleString()}</td>`;
+                    }
+                    const badgeTxt = rowCodes
+                      .filter(sz => Number(row.sizes?.[sz] || 0) > 0)
+                      .map(sz => `${escapeHtml(sz)}:${Number(row.sizes?.[sz] || 0).toLocaleString()}`)
+                      .join(' &middot; ') || '0';
+                    return `<td colspan="5" class="text-center" style="font-size: 11px;"><span class="status-pill">${escapeHtml(rowFmt)}</span> ${badgeTxt}</td>`;
+                  })()}
                   <td class="text-right font-bold">${row.rcvdPairs.toLocaleString()}</td>
                   <td class="text-center">
                     <span class="status-pill status-pill-neutral">
@@ -1956,6 +1995,8 @@ function attachEventHandlers(): void {
       color: '',
       receivedFrom: '',
       rcvdPairs: '',
+      sizeFormat: 'LEGACY_7_11',
+      sizeCodes: undefined,
       sizes: createEmptySizes()
     };
     state.packingWip = createEmptyPackingWipState();
@@ -2059,35 +2100,38 @@ function attachGRNHandlers(): void {
   function syncSizesAndReceived(changedInput?: HTMLInputElement) {
     const activeMaker = makerSelect?.value || state.grnForm.maker;
     const caps = getGrnRemainingCaps(state.grnForm.pendingOrderId, activeMaker);
+    const activeCodes = caps?.sizeCodes?.length
+      ? caps.sizeCodes
+      : getOrderSizeCodes(state.grnForm.pendingOrderId, state.grnForm.sizeCodes, state.grnForm.sizeFormat);
     const sizeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('.grn-size-val'));
-    const sizes: SizeBreakdown = createEmptySizes();
+    const sizes: SizeBreakdown = createEmptySizes(activeCodes);
     sizeInputs.forEach(inp => {
-      const key = inp.getAttribute('data-size') as keyof SizeBreakdown;
-      if (key) {
+      const key = inp.getAttribute('data-size') || '';
+      if (key && activeCodes.includes(key)) {
         const entered = Math.max(0, parseInt(inp.value || '0', 10) || 0);
-        const cap = caps && STANDARD_GLOVE_SIZES.includes(key as StandardSizeKey)
-          ? caps.sizeRemaining[key as StandardSizeKey]
-          : Number.POSITIVE_INFINITY;
+        const cap = caps ? (caps.sizeRemaining[key] ?? 0) : Number.POSITIVE_INFINITY;
         sizes[key] = Math.min(entered, cap);
       }
     });
 
     if (caps && calculateSizeTotal(sizes) > caps.totalRemaining) {
       if (changedInput) {
-        const changedSize = changedInput.getAttribute('data-size') as StandardSizeKey;
-        const otherTotal = STANDARD_GLOVE_SIZES.reduce(
+        const changedSize = changedInput.getAttribute('data-size') || '';
+        const otherTotal = activeCodes.reduce(
           (sum, size) => sum + (size === changedSize ? 0 : Number(sizes[size] || 0)),
           0
         );
-        sizes[changedSize] = Math.max(0, Math.min(
-          Number(sizes[changedSize] || 0),
-          caps.totalRemaining - otherTotal
-        ));
+        if (changedSize) {
+          sizes[changedSize] = Math.max(0, Math.min(
+            Number(sizes[changedSize] || 0),
+            caps.totalRemaining - otherTotal
+          ));
+        }
       } else {
         let excess = calculateSizeTotal(sizes) - caps.totalRemaining;
-        for (const size of [...STANDARD_GLOVE_SIZES].reverse()) {
+        for (const size of [...activeCodes].reverse()) {
           const reduction = Math.min(Number(sizes[size] || 0), excess);
-          sizes[size] -= reduction;
+          sizes[size] = Math.max(0, Number(sizes[size] || 0) - reduction);
           excess -= reduction;
           if (excess <= 0) break;
         }
@@ -2095,14 +2139,14 @@ function attachGRNHandlers(): void {
     }
 
     sizeInputs.forEach(inp => {
-      const key = inp.getAttribute('data-size') as StandardSizeKey;
-      if (!STANDARD_GLOVE_SIZES.includes(key)) return;
-      const otherTotal = STANDARD_GLOVE_SIZES.reduce(
+      const key = inp.getAttribute('data-size') || '';
+      if (!key || !activeCodes.includes(key)) return;
+      const otherTotal = activeCodes.reduce(
         (sum, size) => sum + (size === key ? 0 : Number(sizes[size] || 0)),
         0
       );
       if (caps) {
-        inp.max = String(Math.max(0, Math.min(caps.sizeRemaining[key], caps.totalRemaining - otherTotal)));
+        inp.max = String(Math.max(0, Math.min(caps.sizeRemaining[key] ?? 0, caps.totalRemaining - otherTotal)));
       } else {
         inp.removeAttribute('max');
       }
@@ -2134,6 +2178,9 @@ function attachGRNHandlers(): void {
       state.grnForm.article = '';
       state.grnForm.color = '';
       state.grnForm.receivedFrom = '';
+      state.grnForm.sizeFormat = 'LEGACY_7_11';
+      state.grnForm.sizeCodes = undefined;
+      state.grnForm.sizes = createEmptySizes();
       renderApp();
       return;
     }
@@ -2143,10 +2190,14 @@ function attachGRNHandlers(): void {
       return;
     }
 
+    const activeCodes = getOrderSizeCodes(val, filled.sizeCodes, filled.sizeFormat);
     state.grnForm.pendingOrderId = filled.pendingOrderId;
     state.grnForm.maker = filled.maker;
     state.grnForm.article = filled.article;
     state.grnForm.color = filled.color || 'Standard';
+    state.grnForm.sizeFormat = filled.sizeFormat || 'LEGACY_7_11';
+    state.grnForm.sizeCodes = activeCodes;
+    state.grnForm.sizes = createEmptySizes(activeCodes);
     if (!state.grnForm.receivedFrom?.trim() || state.grnForm.receivedFrom.endsWith(' Representative')) {
       state.grnForm.receivedFrom = filled.maker ? `${filled.maker} Representative` : '';
     }
@@ -2185,6 +2236,8 @@ function attachGRNHandlers(): void {
       color: '',
       receivedFrom: '',
       rcvdPairs: '',
+      sizeFormat: 'LEGACY_7_11',
+      sizeCodes: undefined,
       sizes: createEmptySizes()
     };
     renderApp();
@@ -2202,9 +2255,14 @@ function attachGRNHandlers(): void {
     const sizeTotal = calculateSizeTotal(state.grnForm.sizes);
     const rcvdPairs = Math.max(0, parseInt(rcvdPairsInput?.value || '0', 10) || sizeTotal);
     const caps = getGrnRemainingCaps(formPendingOrder, formMaker);
+    const activeOrder = state.pendingOrders.find(order => order.orderId === (formPendingOrder || 'ORD-INWARD'));
+    const activeCodes = caps?.sizeCodes?.length
+      ? caps.sizeCodes
+      : getOrderSizeCodes(formPendingOrder, activeOrder?.sizeCodes || state.grnForm.sizeCodes, activeOrder?.sizeFormat || state.grnForm.sizeFormat);
+    const activeFormat = activeOrder?.sizeFormat || caps?.sizeFormat || state.grnForm.sizeFormat || 'LEGACY_7_11';
     if (caps && (
       rcvdPairs > caps.totalRemaining ||
-      STANDARD_GLOVE_SIZES.some(size => Number(state.grnForm.sizes[size] || 0) > caps.sizeRemaining[size])
+      activeCodes.some(size => Number(state.grnForm.sizes[size] || 0) > (caps.sizeRemaining[size] ?? 0))
     )) {
       showToast('Received quantities exceed the selected contractor allocation remaining size or total cap.');
       return;
@@ -2222,7 +2280,7 @@ function attachGRNHandlers(): void {
         return;
       }
       const entryPendingOrder = formPendingOrder || 'ORD-INWARD';
-      const selectedOrder = state.pendingOrders.find(order => order.orderId === entryPendingOrder);
+      const selectedOrder = activeOrder;
       const entryMaker = formMaker || '---';
       const entryArticle = selectedOrder?.article || formArt || '---';
       const entryColor = selectedOrder?.color || formColor || 'Standard';
@@ -2245,11 +2303,11 @@ function attachGRNHandlers(): void {
             receivedFrom: formReceivedFrom,
             strictInwardEntry: true,
             orderQty: selectedOrder
-              ? STANDARD_GLOVE_SIZES.reduce((sum, sizeCode) => sum + Number(selectedOrder.sizes?.[sizeCode] || 0), 0)
+              ? activeCodes.reduce((sum, sizeCode) => sum + Number(selectedOrder.sizes?.[sizeCode] || 0), 0)
               : rcvdPairs,
             rcvdPairs,
             rcvDate: '31-10-2026',
-            sizes: STANDARD_GLOVE_SIZES.map(sizeCode => ({
+            sizes: activeCodes.map(sizeCode => ({
               sizeCode,
               orderPairs: Number(selectedOrder?.sizes?.[sizeCode] || 0),
               rcvdPairs: Number(entrySizes[sizeCode] || 0)
@@ -2282,6 +2340,8 @@ function attachGRNHandlers(): void {
         color: savedReceiving?.color_shade || entryColor,
         receivedFrom: savedReceiving?.received_from || formReceivedFrom,
         rcvdPairs: Number(savedReceiving?.rcvd_pairs || rcvdPairs),
+        sizeFormat: activeFormat,
+        sizeCodes: activeCodes,
         sizes: entrySizes,
         status: 'Received'
       });
@@ -2295,7 +2355,7 @@ function attachGRNHandlers(): void {
           selectedOrder.availableDockPairs - Number(selectedOrder.pendingReqPairs || 0)
         );
         if (selectedOrder.receivedSizes) {
-          for (const size of STANDARD_GLOVE_SIZES) {
+          for (const size of activeCodes) {
             selectedOrder.receivedSizes[size] =
               Number(selectedOrder.receivedSizes[size] || 0) + Number(entrySizes[size] || 0);
           }
@@ -2307,9 +2367,9 @@ function attachGRNHandlers(): void {
           if (alloc) {
             alloc.receivedPairs = Number(alloc.receivedPairs || 0) + addedPairs;
             alloc.remainingPairs = Math.max(0, alloc.totalQty - alloc.receivedPairs);
-            alloc.receivedSizes = alloc.receivedSizes || createEmptySizes();
+            alloc.receivedSizes = alloc.receivedSizes || createEmptySizes(activeCodes);
             alloc.remainingSizes = alloc.remainingSizes || { ...alloc.sizes };
-            for (const size of STANDARD_GLOVE_SIZES) {
+            for (const size of activeCodes) {
               alloc.receivedSizes[size] = Number(alloc.receivedSizes[size] || 0) + Number(entrySizes[size] || 0);
               alloc.remainingSizes[size] = Math.max(0, Number(alloc.sizes[size] || 0) - Number(alloc.receivedSizes[size] || 0));
             }
@@ -2333,7 +2393,7 @@ function attachGRNHandlers(): void {
     const receivedFrom = formReceivedFrom || latest?.receivedFrom || maker || '---';
     const sizes = calculateSizeTotal(state.grnForm.sizes) > 0
       ? state.grnForm.sizes
-      : (latest?.sizes || createEmptySizes());
+      : (latest?.sizes || createEmptySizes(activeCodes));
     const finalRcvd = rcvdPairs || latest?.rcvdPairs || calculateSizeTotal(sizes);
     const grnCode = latest?.grnCode || formatBatchSequence('GRN', state.grnList.length || 1);
 
@@ -2346,7 +2406,9 @@ function attachGRNHandlers(): void {
       color,
       receivedFrom,
       rcvdPairs: finalRcvd,
-      sizes
+      sizes,
+      sizeFormat: latest?.sizeFormat || activeFormat,
+      sizeCodes: latest?.sizeCodes || activeCodes
     });
 
     renderApp();
@@ -2452,7 +2514,9 @@ function attachGRNHandlers(): void {
       article: state.packingWip.article || '---',
       sizes: state.packingWip.sizes,
       totalPairs: evalIssue.askingPairs,
-      issueStatus: 'Issued by Inward Register'
+      issueStatus: 'Issued by Inward Register',
+      sizeFormat: (state.packingWip as any).sizeFormat,
+      sizeCodes: (state.packingWip as any).sizeCodes
     });
 
     renderApp();
@@ -2474,7 +2538,7 @@ function attachGRNHandlers(): void {
         <td style="border: 1px solid var(--border-strong); padding: 5px;"><strong>${g.maker}</strong></td>
         <td style="border: 1px solid var(--border-strong); padding: 5px;"><strong>${g.article}</strong></td>
         <td style="border: 1px solid var(--border-strong); padding: 5px; text-align: center;">
-          7:${g.sizes['7']} | 8:${g.sizes['8']} | 9:${g.sizes['9']} | 10:${g.sizes['10']} | 11:${g.sizes['11']}
+          ${resolveScaleKeysForBreakdown(g.sizes, g.sizeCodes).map(sz => `${escapeHtml(sz)}:${g.sizes?.[sz] ?? 0}`).join(' | ')}
         </td>
         <td style="border: 1px solid var(--border-strong); padding: 5px; text-align: right; font-weight: bold;">${g.rcvdPairs.toLocaleString()}</td>
       </tr>
@@ -2882,7 +2946,11 @@ function mapServerRequisitionToWip(requisition: any): typeof state.packingWip & 
   const reqNumber = normalizeBaseReqNumber(requisition.req_number || requisition.reqNumber);
   const order = state.pendingOrders.find(item => item.orderId === requisition.order_id);
   const wip = requisition.wip || {};
-  const sizes = { ...createEmptySizes(), ...(requisition.sizes || {}) };
+  const resolvedFormat = requisition.sizeFormat || requisition.effective_size_format || order?.sizeFormat || 'LEGACY_7_11';
+  const resolvedCodes = Array.isArray(requisition.sizeCodes) && requisition.sizeCodes.length > 0
+    ? requisition.sizeCodes
+    : getOrderSizeCodes(requisition.order_id, order?.sizeCodes, resolvedFormat);
+  const sizes = { ...createEmptySizes(resolvedCodes), ...(requisition.sizes || {}) };
   const plannedQty = Number(requisition.requested_pairs || 0);
   const stage1In = Number(wip.step1_checking_in || 0);
   const stage1Passed = Number(wip.step1_checking_good || 0);
@@ -2921,6 +2989,8 @@ function mapServerRequisitionToWip(requisition: any): typeof state.packingWip & 
     buyer: order?.buyer || '',
     plannedQty,
     issueStatus: issued ? 'Issued by Inward Register' : 'Pending Inward Issue',
+    sizeFormat: resolvedFormat,
+    sizeCodes: resolvedCodes,
     sizes,
     stage1In,
     stage1Passed,
@@ -3604,24 +3674,58 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
   function getOrderReqEntryCaps(orderId: string) {
     const matched = state.pendingOrders.find(o => o.orderId === orderId);
     const stock = getOrderStockState(orderId);
+    const sizeFormat = matched?.sizeFormat || 'LEGACY_7_11';
+    const sizeCodes = getOrderSizeCodes(orderId, matched?.sizeCodes, sizeFormat);
     const maxTotalAllowed = Math.max(0, Math.min(stock.remainingOrderTotal, stock.unclaimedPairs));
     const hasSizeGrnBreakdown = calculateSizeTotal(stock.receivedSizes) > 0;
-    const perSizeMax = createEmptySizes();
-    for (const size of STANDARD_GLOVE_SIZES) {
+    const perSizeMax = createEmptySizes(sizeCodes);
+    for (const size of sizeCodes) {
       const remOrder = Number(stock.remainingOrderSizes[size] || 0);
       perSizeMax[size] = hasSizeGrnBreakdown
         ? Math.min(remOrder, Math.max(0, Number(stock.receivedSizes[size] || 0)))
         : remOrder;
     }
-    const defaultSizes = createEmptySizes();
+    const defaultSizes = createEmptySizes(sizeCodes);
     let remainingBudget = Math.min(calculateSizeTotal(perSizeMax), maxTotalAllowed);
-    for (const size of STANDARD_GLOVE_SIZES) {
+    for (const size of sizeCodes) {
       if (remainingBudget <= 0) break;
       const take = Math.min(perSizeMax[size], remainingBudget);
       defaultSizes[size] = take;
       remainingBudget -= take;
     }
-    return { matched, stock, maxTotalAllowed, perSizeMax, defaultSizes };
+    return { matched, stock, sizeFormat, sizeCodes, maxTotalAllowed, perSizeMax, defaultSizes };
+  }
+
+  function renderReqSizeMatrixHtml(
+    sizeFormat: string,
+    sizeCodes: string[],
+    perSizeMax: SizeBreakdown,
+    currentSizes: SizeBreakdown,
+    totalVal: number
+  ): string {
+    return `
+      <div style="font-weight: 700; color: var(--ink-950); margin-bottom: 6px; font-size: 11.5px; text-transform: uppercase;">
+        Asking Size Breakdown Allocation (Pairs &bull; Scale: ${escapeHtml(sizeFormat)}, ${sizeCodes.length} Sizes)
+      </div>
+      <div class="table-responsive">
+        <table class="size-matrix-table" style="margin: 0;">
+          <thead>
+            <tr>
+              ${sizeCodes.map(sz => `<th scope="col">${escapeHtml(formatSizeColumnLabel(sz, sizeFormat))}</th>`).join('')}
+              <th scope="col" style="background: var(--ink-200); color: var(--ink-950);">Total Asking</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              ${sizeCodes
+                .map(sz => `<td><input type="number" class="size-matrix-input req-size-val" data-size="${escapeHtml(sz)}" aria-label="Asking pairs for Size ${escapeHtml(formatSizeColumnLabel(sz, sizeFormat))}" min="0" max="${perSizeMax[sz] || 0}" value="${currentSizes[sz] || ''}" placeholder="0" /></td>`)
+                .join('')}
+              <td style="font-weight: 800; font-size: 14px; color: var(--ink-950);" id="new-req-size-total">${totalVal}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   const defaultOrderId = preselectOrderId || state.packingWip.parentOrderId || state.pendingOrders[0]?.orderId || '';
@@ -3649,39 +3753,15 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
         </div>
         <div class="form-group">
           <label for="new-req-article">Article</label>
-          <input type="text" id="new-req-article" class="form-input" value="${defaultArticle}" readonly aria-readonly="true" />
+          <input type="text" id="new-req-article" class="form-input" value="${escapeHtml(defaultArticle)}" readonly aria-readonly="true" />
         </div>
       </div>
 
       <div id="new-req-cap-summary" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; font-size: 12px; background: var(--ink-50); border: 1px solid var(--border-strong); padding: 8px 12px; border-radius: 4px;">
       </div>
 
-      <div style="background: var(--ink-50); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px; margin-bottom: 14px;">
-        <div style="font-weight: 700; color: var(--ink-950); margin-bottom: 6px; font-size: 11.5px; text-transform: uppercase;">
-          Asking Size Breakdown Allocation (Pairs)
-        </div>
-        <table class="size-matrix-table">
-          <thead>
-            <tr>
-              <th scope="col">7 / S</th>
-              <th scope="col">8 / M</th>
-              <th scope="col">9 / L</th>
-              <th scope="col">10 / XL</th>
-              <th scope="col">11 / XXL</th>
-              <th scope="col" style="background: var(--ink-200); color: var(--ink-950);">Total Asking</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="7" aria-label="Asking pairs for Size 7 S" min="0" max="${initialCaps.perSizeMax['7']}" value="${currentSizes['7'] || ''}" placeholder="0" /></td>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="8" aria-label="Asking pairs for Size 8 M" min="0" max="${initialCaps.perSizeMax['8']}" value="${currentSizes['8'] || ''}" placeholder="0" /></td>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="9" aria-label="Asking pairs for Size 9 L" min="0" max="${initialCaps.perSizeMax['9']}" value="${currentSizes['9'] || ''}" placeholder="0" /></td>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="10" aria-label="Asking pairs for Size 10 XL" min="0" max="${initialCaps.perSizeMax['10']}" value="${currentSizes['10'] || ''}" placeholder="0" /></td>
-              <td><input type="number" class="size-matrix-input req-size-val" data-size="11" aria-label="Asking pairs for Size 11 XXL" min="0" max="${initialCaps.perSizeMax['11']}" value="${currentSizes['11'] || ''}" placeholder="0" /></td>
-              <td style="font-weight: 800; font-size: 14px; color: var(--ink-950);" id="new-req-size-total">${currentTotal}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div id="new-req-size-matrix-container" style="background: var(--ink-50); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px; margin-bottom: 14px;">
+        ${renderReqSizeMatrixHtml(initialCaps.sizeFormat, initialCaps.sizeCodes, initialCaps.perSizeMax, currentSizes, currentTotal)}
       </div>
 
       <div class="form-group" style="margin-bottom: 10px;">
@@ -3699,7 +3779,7 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
 
   const parentOrderSelect = document.getElementById('new-req-parent-order') as HTMLSelectElement;
   const articleInput = document.getElementById('new-req-article') as HTMLInputElement;
-  const sizeTotalCell = document.getElementById('new-req-size-total');
+  const matrixContainer = document.getElementById('new-req-size-matrix-container');
   const totalPairsInput = document.getElementById('new-req-pairs') as HTMLInputElement;
   const capSummaryEl = document.getElementById('new-req-cap-summary');
   const capWarningEl = document.getElementById('new-req-cap-warning');
@@ -3734,25 +3814,12 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
     }
   }
 
-  parentOrderSelect?.addEventListener('change', () => {
-    activeCaps = getOrderReqEntryCaps(parentOrderSelect.value);
-    if (articleInput) articleInput.value = activeCaps.matched?.article || '';
-    document.querySelectorAll('.req-size-val').forEach(el => {
-      const input = el as HTMLInputElement;
-      const size = input.getAttribute('data-size') as keyof SizeBreakdown;
-      if (!size) return;
-      input.max = String(activeCaps.perSizeMax[size] || 0);
-      input.value = String(activeCaps.defaultSizes[size] || 0);
-    });
-    recalcReqModalSizes();
-  });
-
   function recalcReqModalSizes() {
-    const sizes = createEmptySizes();
+    const sizes = createEmptySizes(activeCaps.sizeCodes);
     document.querySelectorAll('.req-size-val').forEach(el => {
       const input = el as HTMLInputElement;
-      const size = input.getAttribute('data-size') as keyof SizeBreakdown;
-      if (size) {
+      const size = input.getAttribute('data-size') || '';
+      if (size && activeCaps.sizeCodes.includes(size)) {
         const sizeCap = Number(activeCaps.perSizeMax[size] || 0);
         const raw = Math.max(0, parseInt(input.value || '0', 10) || 0);
         const clamped = Math.min(raw, sizeCap);
@@ -3763,25 +3830,48 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
       }
     });
     const total = calculateSizeTotal(sizes);
+    const sizeTotalCell = document.getElementById('new-req-size-total');
     if (sizeTotalCell) sizeTotalCell.textContent = total.toLocaleString();
     if (totalPairsInput) totalPairsInput.value = String(total);
     renderCapSummaryAndValidation(total);
   }
 
   function readRequestSizes(): SizeBreakdown {
-    const sizes = createEmptySizes();
+    const sizes = createEmptySizes(activeCaps.sizeCodes);
     document.querySelectorAll('.req-size-val').forEach(el => {
       const input = el as HTMLInputElement;
-      const size = input.getAttribute('data-size') as keyof SizeBreakdown;
-      if (size) sizes[size] = Math.max(0, parseInt(input.value || '0', 10) || 0);
+      const size = input.getAttribute('data-size') || '';
+      if (size && activeCaps.sizeCodes.includes(size)) {
+        sizes[size] = Math.max(0, parseInt(input.value || '0', 10) || 0);
+      }
     });
     return sizes;
   }
 
-  document.querySelectorAll('.req-size-val').forEach(input => {
-    input.addEventListener('input', recalcReqModalSizes);
+  function bindReqSizeMatrixInputs(): void {
+    document.querySelectorAll('.req-size-val').forEach(input => {
+      input.addEventListener('input', recalcReqModalSizes);
+    });
+  }
+
+  parentOrderSelect?.addEventListener('change', () => {
+    activeCaps = getOrderReqEntryCaps(parentOrderSelect.value);
+    if (articleInput) articleInput.value = activeCaps.matched?.article || '';
+    const nextTotal = calculateSizeTotal(activeCaps.defaultSizes);
+    if (matrixContainer) {
+      matrixContainer.innerHTML = renderReqSizeMatrixHtml(
+        activeCaps.sizeFormat,
+        activeCaps.sizeCodes,
+        activeCaps.perSizeMax,
+        activeCaps.defaultSizes,
+        nextTotal
+      );
+      bindReqSizeMatrixInputs();
+    }
+    recalcReqModalSizes();
   });
 
+  bindReqSizeMatrixInputs();
   renderCapSummaryAndValidation(currentTotal);
 
   let createReqInFlight = false;
@@ -3830,7 +3920,7 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
         parentOrder.pendingReqPairs = Number(parentOrder.pendingReqPairs || 0) + pairs;
         parentOrder.unclaimedDockPairs = Math.max(0, Number(parentOrder.availableDockPairs || 0) - parentOrder.pendingReqPairs);
         if (parentOrder.remainingOrderSizes) {
-          for (const size of STANDARD_GLOVE_SIZES) {
+          for (const size of activeCaps.sizeCodes) {
             parentOrder.remainingOrderSizes[size] = Math.max(
               0,
               Number(parentOrder.remainingOrderSizes[size] || 0) - Number(sizes[size] || 0)
@@ -3874,6 +3964,7 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
       const pendingOrderId = state.grnForm.pendingOrderId || latestGrn?.pendingOrderId || '---';
       const article = state.grnForm.article || latestGrn?.article || state.packingWip.article || '---';
       const maker = state.grnForm.maker || latestGrn?.maker || '---';
+      const matchedOrd = state.pendingOrders.find(o => o.orderId === pendingOrderId);
 
       return buildGrnReceivingSlipHtml({
         grnRef: latestGrn?.grnCode || formatBatchSequence('GRN', state.grnList.length || 1),
@@ -3882,7 +3973,9 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
         maker,
         article,
         rcvdPairs: rcvd,
-        sizes
+        sizes,
+        sizeFormat: latestGrn?.sizeFormat || matchedOrd?.sizeFormat || state.grnForm.sizeFormat,
+        sizeCodes: latestGrn?.sizeCodes || matchedOrd?.sizeCodes || state.grnForm.sizeCodes
       });
     } else if (type === 'route') {
       const latestDefect = state.defectList[0];
@@ -3922,7 +4015,9 @@ function openDocumentCenterModal(defaultDoc: string = 'grn'): void {
         article: state.packingWip.article || state.grnForm.article || '---',
         sizes,
         totalPairs,
-        issueStatus: state.packingWip.issueStatus
+        issueStatus: state.packingWip.issueStatus,
+        sizeFormat: (state.packingWip as any).sizeFormat || state.grnForm.sizeFormat,
+        sizeCodes: (state.packingWip as any).sizeCodes || state.grnForm.sizeCodes
       });
     } else if (type === 'carton') {
       const article = state.qcOrder.article || state.packingWip.article || '---';
@@ -4460,18 +4555,34 @@ function attachAdminHandlers(): void {
     });
   });
 
+  function getActiveAdminOrderSizeCodes(): string[] {
+    return getScaleSizeCodes(state.adminOverview.sizeStandards, state.adminOrderDraft.sizeFormat || 'LEGACY_7_11');
+  }
+
   function syncAdminOrderDraftFromDom(): void {
-    state.adminOrderDraft.buyer = (document.getElementById('admin-pending-order-buyer') as HTMLSelectElement)?.value?.trim() || '';
+    const buyerEl = document.getElementById('admin-pending-order-buyer') as HTMLSelectElement | null;
+    const articleEl = document.getElementById('admin-pending-order-article') as HTMLSelectElement | null;
+    const buyerOpt = buyerEl?.selectedOptions?.[0];
+    const articleOpt = articleEl?.selectedOptions?.[0];
+    state.adminOrderDraft.buyer = buyerEl?.value?.trim() || '';
+    state.adminOrderDraft.customerId = buyerOpt?.getAttribute('data-customer-id') || '';
     state.adminOrderDraft.maker = (document.getElementById('admin-pending-order-maker') as HTMLSelectElement)?.value?.trim() || '';
     state.adminOrderDraft.po = (document.getElementById('admin-pending-order-po') as HTMLInputElement)?.value?.trim() || '';
-    state.adminOrderDraft.article = (document.getElementById('admin-pending-order-article') as HTMLSelectElement)?.value?.trim() || '';
+    state.adminOrderDraft.productId = articleOpt?.getAttribute('data-product-id') || '';
+    state.adminOrderDraft.article = articleEl?.value?.trim() || '';
     state.adminOrderDraft.color = (document.getElementById('admin-pending-order-color') as HTMLInputElement)?.value?.trim() || '';
+    state.adminOrderDraft.sizeFormat = articleEl?.value
+      ? (articleOpt?.getAttribute('data-size-format') || 'LEGACY_7_11')
+      : 'LEGACY_7_11';
     state.adminOrderDraft.dueDate = (document.getElementById('admin-pending-order-due-date') as HTMLInputElement)?.value?.trim() || '';
-    const sizes = createEmptySizes();
+    const activeCodes = getActiveAdminOrderSizeCodes();
+    const sizes = createEmptySizes(activeCodes);
     document.querySelectorAll('.admin-order-size-val').forEach(el => {
       const inp = el as HTMLInputElement;
-      const k = inp.getAttribute('data-size') as keyof SizeBreakdown;
-      if (k) sizes[k] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+      const k = inp.getAttribute('data-size');
+      if (k && activeCodes.includes(k)) {
+        sizes[k] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+      }
     });
     state.adminOrderDraft.sizes = sizes;
   }
@@ -4484,16 +4595,13 @@ function attachAdminHandlers(): void {
     });
     const balanceBar = document.getElementById('admin-split-balance-bar');
     if (balanceBar) {
-      const check = validateContractorAllocations(state.adminOrderDraft.sizes, state.adminOrderSplitRows);
+      const activeCodes = getActiveAdminOrderSizeCodes();
+      const check = validateContractorAllocations(state.adminOrderDraft.sizes, state.adminOrderSplitRows, activeCodes);
       balanceBar.className = `su-split-balance-bar ${check.valid ? 'is-balanced' : 'is-unbalanced'}`;
       balanceBar.innerHTML = `
         <span>
           Unassigned Balance:
-          <strong>7:${check.unassignedBySize['7']}</strong> |
-          <strong>8:${check.unassignedBySize['8']}</strong> |
-          <strong>9:${check.unassignedBySize['9']}</strong> |
-          <strong>10:${check.unassignedBySize['10']}</strong> |
-          <strong>11:${check.unassignedBySize['11']}</strong>
+          ${activeCodes.map(sz => `<strong>${escapeHtml(sz)}:${check.unassignedBySize[sz] ?? 0}</strong>`).join(' | ')}
           (<strong>${check.totalUnassigned}</strong> Prs remaining)
         </span>
         <strong>${check.valid ? 'Split Matches Order 100% ✓' : escapeHtml(check.error || 'Adjust contractor quantities to match order totals')}</strong>
@@ -4514,11 +4622,63 @@ function attachAdminHandlers(): void {
     inp.addEventListener('input', recalcAdminOrderSizes);
   });
 
+  document.getElementById('admin-pending-order-buyer')?.addEventListener('change', () => {
+    const prevFormat = state.adminOrderDraft.sizeFormat || 'LEGACY_7_11';
+    syncAdminOrderDraftFromDom();
+    const buyerEl = document.getElementById('admin-pending-order-buyer') as HTMLSelectElement | null;
+    const buyerOpt = buyerEl?.selectedOptions?.[0];
+    state.adminOrderDraft.buyer = buyerEl?.value?.trim() || '';
+    state.adminOrderDraft.customerId = buyerOpt?.getAttribute('data-customer-id') || '';
+    state.adminOrderDraft.productId = '';
+    state.adminOrderDraft.article = '';
+    state.adminOrderDraft.color = '';
+    state.adminOrderDraft.sizeFormat = 'LEGACY_7_11';
+    if (prevFormat !== 'LEGACY_7_11') {
+      const legacyCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, 'LEGACY_7_11');
+      state.adminOrderDraft.sizes = createEmptySizes(legacyCodes);
+      state.adminOrderSplitRows = state.adminOrderSplitRows.map(r => ({
+        ...r,
+        sizes: createEmptySizes(legacyCodes)
+      }));
+    }
+    renderApp();
+    (document.getElementById('admin-pending-order-buyer') as HTMLSelectElement | null)?.focus();
+  });
+
+  document.getElementById('admin-pending-order-article')?.addEventListener('change', () => {
+    const prevFormat = state.adminOrderDraft.sizeFormat || 'LEGACY_7_11';
+    syncAdminOrderDraftFromDom();
+    const articleEl = document.getElementById('admin-pending-order-article') as HTMLSelectElement | null;
+    const opt = articleEl?.selectedOptions?.[0];
+    const optProductId = opt?.getAttribute('data-product-id') || '';
+    const optCustomerId = opt?.getAttribute('data-customer-id') || '';
+    const optCustomerName = opt?.getAttribute('data-customer-name') || '';
+    const nextFormat = articleEl?.value ? (opt?.getAttribute('data-size-format') || 'LEGACY_7_11') : 'LEGACY_7_11';
+    const optColorSpec = opt?.getAttribute('data-color-spec') || '';
+
+    state.adminOrderDraft.productId = optProductId;
+    state.adminOrderDraft.article = articleEl?.value?.trim() || '';
+    if (!state.adminOrderDraft.buyer && optCustomerName) {
+      state.adminOrderDraft.buyer = optCustomerName;
+      state.adminOrderDraft.customerId = optCustomerId;
+    }
+    state.adminOrderDraft.color = optColorSpec;
+    state.adminOrderDraft.sizeFormat = nextFormat;
+    if (nextFormat !== prevFormat) {
+      const nextCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, nextFormat);
+      state.adminOrderDraft.sizes = createEmptySizes(nextCodes);
+      state.adminOrderSplitRows = state.adminOrderSplitRows.map(r => ({
+        ...r,
+        sizes: createEmptySizes(nextCodes)
+      }));
+    }
+    renderApp();
+    (document.getElementById('admin-pending-order-article') as HTMLSelectElement | null)?.focus();
+  });
+
   for (const fieldId of [
-    'admin-pending-order-buyer',
     'admin-pending-order-maker',
     'admin-pending-order-po',
-    'admin-pending-order-article',
     'admin-pending-order-color',
     'admin-pending-order-due-date'
   ]) {
@@ -4527,6 +4687,7 @@ function attachAdminHandlers(): void {
 
   document.getElementById('btn-admin-toggle-split')?.addEventListener('click', () => {
     syncAdminOrderDraftFromDom();
+    const activeCodes = getActiveAdminOrderSizeCodes();
     if (state.adminOrderSplitRows.length > 0) {
       state.adminOrderSplitRows = [];
     } else {
@@ -4534,7 +4695,7 @@ function attachAdminHandlers(): void {
       const secondMaker = state.dropdownOptions.makers.find(m => m !== firstMaker) || '';
       state.adminOrderSplitRows = [
         { maker: firstMaker, sizes: { ...state.adminOrderDraft.sizes }, dueDate: state.adminOrderDraft.dueDate },
-        { maker: secondMaker, sizes: createEmptySizes(), dueDate: state.adminOrderDraft.dueDate }
+        { maker: secondMaker, sizes: createEmptySizes(activeCodes), dueDate: state.adminOrderDraft.dueDate }
       ];
     }
     renderApp();
@@ -4542,11 +4703,12 @@ function attachAdminHandlers(): void {
 
   document.getElementById('btn-admin-add-split-row')?.addEventListener('click', () => {
     syncAdminOrderDraftFromDom();
+    const activeCodes = getActiveAdminOrderSizeCodes();
     const used = new Set(state.adminOrderSplitRows.map(r => r.maker));
     const nextMaker = state.dropdownOptions.makers.find(m => !used.has(m)) || '';
     state.adminOrderSplitRows.push({
       maker: nextMaker,
-      sizes: createEmptySizes(),
+      sizes: createEmptySizes(activeCodes),
       dueDate: state.adminOrderDraft.dueDate
     });
     renderApp();
@@ -4565,7 +4727,7 @@ function attachAdminHandlers(): void {
   document.querySelectorAll<HTMLInputElement>('.admin-split-size-val').forEach(inp => {
     inp.addEventListener('input', () => {
       const idx = Number(inp.getAttribute('data-split-index'));
-      const sz = inp.getAttribute('data-size') as keyof SizeBreakdown;
+      const sz = inp.getAttribute('data-size');
       if (state.adminOrderSplitRows[idx] && sz) {
         state.adminOrderSplitRows[idx].sizes[sz] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
         updateAdminSplitBalanceDom();
@@ -4584,12 +4746,18 @@ function attachAdminHandlers(): void {
 
   document.getElementById('btn-admin-reset-pending-order')?.addEventListener('click', () => {
     const hadSplit = state.adminOrderSplitRows.length > 0;
+    const hadCatalogState =
+      Boolean(state.adminOrderDraft.buyer) ||
+      (state.adminOrderDraft.sizeFormat || 'LEGACY_7_11') !== 'LEGACY_7_11';
     state.adminOrderDraft = {
+      customerId: '',
       buyer: '',
       maker: '',
       po: '',
+      productId: '',
       article: '',
       color: '',
+      sizeFormat: 'LEGACY_7_11',
       dueDate: '',
       sizes: createEmptySizes()
     };
@@ -4613,7 +4781,7 @@ function attachAdminHandlers(): void {
     });
     const cell = document.getElementById('admin-order-size-total');
     if (cell) cell.textContent = '0';
-    if (hadSplit) renderApp();
+    if (hadSplit || hadCatalogState) renderApp();
   });
 
   document.getElementById('btn-admin-add-pending-order')?.addEventListener('click', (e) => {
@@ -4638,7 +4806,7 @@ function attachAdminHandlers(): void {
         showToast('Select the required Article.');
         return;
       }
-      const splitCheck = validateContractorAllocations(sizes, state.adminOrderSplitRows);
+      const splitCheck = validateContractorAllocations(sizes, state.adminOrderSplitRows, getActiveAdminOrderSizeCodes());
       if (!splitCheck.valid) {
         showToast(splitCheck.error || 'Contractor split quantities must equal the order size totals.');
         return;
@@ -4652,11 +4820,14 @@ function attachAdminHandlers(): void {
     }
 
     const newOrder = {
+      customerId: state.adminOrderDraft.customerId || undefined,
       buyer: buyer || 'Standard Client',
       maker,
       po: po || '---',
+      productId: state.adminOrderDraft.productId || undefined,
       article,
       color: color || 'Standard',
+      sizeFormat: state.adminOrderDraft.sizeFormat || 'LEGACY_7_11',
       dueDate,
       sizes,
       totalQty: totalPairs,
@@ -4667,7 +4838,7 @@ function attachAdminHandlers(): void {
             dueDate: r.dueDate || dueDate || ''
           }))
         : undefined,
-      notes: `Created by Super User: Buyer=${buyer}, PO=${po}, Color=${color}`
+      notes: `Created by Super User: Buyer=${buyer}, PO=${po}, Color=${color}, Scale=${state.adminOrderDraft.sizeFormat || 'LEGACY_7_11'}`
     };
 
     void runAdminAction('admin:create-pending-order', e.currentTarget as HTMLElement, async () => {
@@ -4687,11 +4858,14 @@ function attachAdminHandlers(): void {
         state.pendingOrders = orders;
         state.adminExpandedOrders[orderId] = true;
         state.adminOrderDraft = {
+          customerId: '',
           buyer: '',
           maker: '',
           po: '',
+          productId: '',
           article: '',
           color: '',
+          sizeFormat: 'LEGACY_7_11',
           dueDate: '',
           sizes: createEmptySizes()
         };
@@ -4957,7 +5131,9 @@ window.adminOpenDocumentSlip = function(
       maker: grn?.maker || matchedOrder?.maker || '---',
       article: grn?.article || matchedOrder?.article || '---',
       rcvdPairs: grn?.rcvdPairs || 0,
-      sizes: grn?.sizes || createEmptySizes()
+      sizes: grn?.sizes || createEmptySizes(matchedOrder?.sizeCodes),
+      sizeFormat: (grn as any)?.sizeFormat || matchedOrder?.sizeFormat,
+      sizeCodes: (grn as any)?.sizeCodes || matchedOrder?.sizeCodes
     });
     openModal(`Inward GRN Receiving Slip — ${refCode}`, slipHtml, true);
     return;
@@ -4998,9 +5174,11 @@ window.adminOpenDocumentSlip = function(
     reqNo: baseReq,
     date: '04-11-2026',
     article: reqBatch?.article || matchedOrder?.article || '---',
-    sizes: reqBatch?.sizes || matchedOrder?.sizes || createEmptySizes(),
+    sizes: reqBatch?.sizes || matchedOrder?.sizes || createEmptySizes(matchedOrder?.sizeCodes),
     totalPairs: reqBatch?.issuedPairs || reqBatch?.askingPairs || 0,
-    issueStatus: reqBatch?.issueStatus || 'Issued by Inward Register'
+    issueStatus: reqBatch?.issueStatus || 'Issued by Inward Register',
+    sizeFormat: matchedOrder?.sizeFormat,
+    sizeCodes: matchedOrder?.sizeCodes
   });
   openModal(`Packing Hall Requisition Slip — ${baseReq}`, slipHtml, true);
 };
@@ -5389,6 +5567,8 @@ window.adminQuickReceiveGrnForOrder = function(orderId: string) {
       color: order.color || 'Standard',
       receivedFrom: defaultMaker ? `${defaultMaker} Representative` : '',
       rcvdPairs: String(calculateSizeTotal(defaultSizes) || order.totalQty || ''),
+      sizeFormat: order.sizeFormat || 'LEGACY_7_11',
+      sizeCodes: getOrderSizeCodes(order.orderId, order.sizeCodes, order.sizeFormat),
       sizes: { ...defaultSizes }
     };
   } else {
@@ -5512,6 +5692,7 @@ window.viewGrnRecord = function(sr: number) {
   const item = state.grnList.find(r => r.sr === sr);
   if (item) {
     const grnCode = item.grnCode || formatBatchSequence('GRN', item.sr);
+    const linkedOrder = state.pendingOrders.find(o => o.orderId === item.pendingOrderId);
     const slipHtml = buildGrnReceivingSlipHtml({
       grnRef: grnCode,
       date: item.date,
@@ -5521,7 +5702,9 @@ window.viewGrnRecord = function(sr: number) {
       color: item.color,
       receivedFrom: item.receivedFrom,
       rcvdPairs: item.rcvdPairs,
-      sizes: item.sizes
+      sizes: item.sizes,
+      sizeFormat: item.sizeFormat || linkedOrder?.sizeFormat,
+      sizeCodes: item.sizeCodes || linkedOrder?.sizeCodes
     });
     openModal(`GRN Record ${grnCode}`, slipHtml, true);
   }
@@ -5537,6 +5720,8 @@ window.editGrnRecord = function(sr: number) {
       color: item.color || 'Standard',
       receivedFrom: item.receivedFrom || item.maker || '',
       rcvdPairs: String(item.rcvdPairs),
+      sizeFormat: item.sizeFormat || 'LEGACY_7_11',
+      sizeCodes: item.sizeCodes,
       sizes: { ...item.sizes }
     };
     renderApp();
@@ -5613,6 +5798,20 @@ async function syncBackendData(options: { manual?: boolean } = {}): Promise<void
   }
 
   try {
+    if (state.adminOverview.sizeStandards.length === 0) {
+      try {
+        const ssRes = await fetch('/api/size-standards');
+        if (ssRes.ok) {
+          const ssJson = await ssRes.json();
+          if (ssJson.success && Array.isArray(ssJson.data)) {
+            state.adminOverview.sizeStandards = ssJson.data;
+          }
+        }
+      } catch (e) {
+        console.debug('Size standards sync offline:', e);
+      }
+    }
+
     if (role === 'SUPER_USER' || role === 'INWARD_CLERK') {
       try {
         const res = await fetch('/api/store/dropdowns');
@@ -5638,10 +5837,15 @@ async function syncBackendData(options: { manual?: boolean } = {}): Promise<void
           const json = await res.json();
           if (json.success && Array.isArray(json.data) && json.data.length > 0) {
             state.grnList = json.data.map((r: any, idx: number) => {
-              const sizes = createEmptySizes();
-              for (const sizeRow of Array.isArray(r.sizes) ? r.sizes : []) {
-                const sizeCode = String(sizeRow.size_code) as StandardSizeKey;
-                if (STANDARD_GLOVE_SIZES.includes(sizeCode)) {
+              const rawSizeRows = Array.isArray(r.sizes) ? r.sizes : [];
+              const derivedCodes = rawSizeRows
+                .map((sr: any) => String(sr.size_code || '').trim())
+                .filter(Boolean);
+              const activeCodes = derivedCodes.length > 0 ? derivedCodes : [...STANDARD_GLOVE_SIZES];
+              const sizes = createEmptySizes(activeCodes);
+              for (const sizeRow of rawSizeRows) {
+                const sizeCode = String(sizeRow.size_code || '').trim();
+                if (sizeCode) {
                   sizes[sizeCode] = Number(sizeRow.rcvd_pairs) || 0;
                 }
               }
@@ -5656,6 +5860,8 @@ async function syncBackendData(options: { manual?: boolean } = {}): Promise<void
                 color: r.color_shade || 'Standard',
                 receivedFrom: r.received_from || r.maker_contractor || '',
                 rcvdPairs: Number(r.rcvd_pairs) || 0,
+                sizeFormat: activeCodes.every((c: string) => ['7', '8', '9', '10', '11'].includes(c)) ? 'LEGACY_7_11' : 'CATALOG',
+                sizeCodes: activeCodes,
                 sizes,
                 status: isVoided ? 'VOIDED' : 'Received',
                 isVoided,
@@ -5735,6 +5941,20 @@ async function syncBackendData(options: { manual?: boolean } = {}): Promise<void
     } catch (e) {
       console.warn('MES account data sync failed:', e);
       syncFailures.push('orders');
+    }
+
+    if (state.grnList.length > 0 && state.pendingOrders.length > 0) {
+      state.grnList = state.grnList.map(grn => {
+        const linked = state.pendingOrders.find(o => o.orderId === grn.pendingOrderId);
+        if (!linked) return grn;
+        const sizeFormat = linked.sizeFormat || grn.sizeFormat || 'LEGACY_7_11';
+        const sizeCodes = linked.sizeCodes?.length ? linked.sizeCodes : grn.sizeCodes;
+        return {
+          ...grn,
+          sizeFormat,
+          sizeCodes
+        };
+      });
     }
 
     if (['SUPER_USER', 'INWARD_CLERK', 'PACKING_SUPERVISOR'].includes(role)) {

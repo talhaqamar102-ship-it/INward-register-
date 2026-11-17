@@ -326,6 +326,8 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
         return renderRequisitionWipAnalyticsChart({
           series,
           activeWipSizes: wip.sizes,
+          activeSizeFormat: (wip as any).sizeFormat,
+          activeSizeCodes: (wip as any).sizeCodes,
           activeReqNumber: baseReq,
           activePlannedQty: wip.plannedQty,
           activeStage4Packed: wip.stage4Passed,

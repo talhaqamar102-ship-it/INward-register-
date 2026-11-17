@@ -55,12 +55,14 @@ Uncapped scan across `20` files (`src/`, `test/`, `e2e/`) returned **`200` total
 1. Resolve Open Decisions `1–3` below (`STOP-AND-ASK` items `#2` and `#3` must be answered before seeding `products` or implementing color selection semantics).
 2. Make a separate housekeeping commit for `.agents/env.md`, `.agents/rules/senior-verification.md`, `.agents/traces/*`, `docs/domain-integration-reasoning.md` (`SUPERSEDED`), and `docs/last-5-turns-senior-audit.md` (`SUPERSEDED`) before Slice `1` app changes.
 
+- Keep `catalog-id-map.json`, `catalog-renames.json`, and `catalog-seed.json` under `src/catalog/` (not `data/`, since `data/` is gitignored in `.gitignore:4` and shadowed by `VOLUME ["/app/data"]` in `Dockerfile:46`).
+
 ---
 
 ### Slice 1 — Persisted Catalog Seed + Schema + Backend Enforcement
 - **Files to create/modify:**
-  - `scripts/build-catalog-seed.ts` (new): Parses `Database_Master` with `declared == xmlRows == processed + 1` assertion, runs key-diff check against `data/catalog-id-map.json` + `data/catalog-renames.json` (aborts `exit 2` with `import-diff.json` on unmatched keys unless `--accept-diff`), emits clean deterministic `data/catalog-seed.json`.
-  - `data/catalog-id-map.json` & `data/catalog-renames.json` (new): Initial persisted buyer/product ID map.
+  - `scripts/build-catalog-seed.mjs` (new): Parses `Database_Master` via `node:zlib` ZIP/XML reader with `declared == xmlRows == processed + 1` assertion, runs key-diff check against `src/catalog/catalog-id-map.json` + `src/catalog/catalog-renames.json` (aborts `exit 2` with `import-diff.json` on unmatched keys unless `--accept-diff`), emits clean deterministic `src/catalog/catalog-seed.json`.
+  - `src/catalog/catalog-id-map.json` & `src/catalog/catalog-renames.json` (new): Initial persisted buyer/product ID map.
   - `src/db.js` (`L38-56, L260-295, L388+`): Add `size_standards`, `ALTER TABLE` migrations (`products`: `raw_name`, `article_code`, `raw_color`, `available_colors_json`, `size_format`; `pending_orders` & `order_contractor_allocations`: `customer_id`, `product_id`, `size_format`, `sizes_json`), `BEFORE INSERT`/`BEFORE UPDATE` invariant triggers (`pending_orders`, `order_contractor_allocations`), and idempotent catalog seeding.
   - `src/services/orderService.js` (`L30-275`): Accept `customerId`, `productId`, `sizeFormat`, `sizes`; validate dynamic scale sizes & contractor split sums per `size_standards` key; write strictly to `size_6..12` (`LEGACY_7_11`) OR `sizes_json` (`non-legacy`).
   - `src/services/packingService.js` (`L5-10, L58-145, L215, L234, L864-878, L1126-1380`):
@@ -114,10 +116,10 @@ Uncapped scan across `20` files (`src/`, `test/`, `e2e/`) returned **`200` total
 
 ---
 
-## 6. Open Decisions (`STOP-AND-ASK` Gate Before Slice `1`)
+## 6. Open Decisions (`STOP-AND-ASK` Gate — Resolved `2026-11-17`)
 
-| # | Question | Default | Cost if Wrong | Reversible? | Gate |
-| :-: | :--- | :--- | :--- | :---: | :--- |
-| `1` | **Row `R7` (`TECH-1 KX v3 ------`, `Art='-----------------'`, `Col='< None >'`):** Import as SKU `#716` or exclude as placeholder (`715` SKUs)? | Exclude `R7` (`715` rows) `[I: Art='---'` & `< None >`]` | Low | Yes (via rename/seed diff) | **Ask (`716` vs `715`)** |
-| `2` | **Color semantics (`285` comma/pipe/slash rows, e.g. `Black,Red,White`):** Workbook `Order_Selector` pulls `Col D` verbatim as one colorway spec via `INDEX/MATCH` (`B11`, `D29` `[V: PS sheet1 cmd]`). In the app, should `Col D` be **(A) one fixed colorway preset** or **(B) pick `1` color from split tokens** (plus custom override for `< None >`)? | None assumed (`STOP-AND-ASK`) | Medium (`color_shade` UX + order data consistency) | UI reversible; saved order strings remain text | **STOP AND ASK `(A)` vs `(B)`** |
-| `3` | **SKU granularity (`BERIK`, etc.):** Keep each of the `715/716` `(Customer, Item_Name)` rows `1:1` as an Article, or group multi-row colorways (e.g. `BERIK`'s `9` `Zoldar` rows) into `1` parent Article + color dropdown? | None assumed (`STOP-AND-ASK`) | **High once orders/GRNs reference `product_id`** | **No cleanly post-WIP** | **STOP AND ASK before Slice `1`** |
+| # | Question | Decision Recorded (`2026-11-17`) | Gate Status |
+| :-: | :--- | :--- | :---: |
+| `1` | **Row `R7` (`TECH-1 KX v3 ------`, `Art='-----------------'`, `Col='< None >'`):** Import or exclude? | **User decided `1. skip it`** -> Exclude `R7`, yielding `715` active catalog rows (`716 - 1 = 715`). | **RESOLVED** |
+| `2` | **Color semantics (`285` comma/pipe/slash rows, e.g. `Black,Red,White`):** Single combined glove spec vs. pick-1? | **User decided `2. one glove with three colours`** -> Verbatim multi-color colorway spec per row (`Col D`), matching `Order_Selector`. | **RESOLVED** |
+| `3` | **Dynamic Buyer → Article → Color → Sizes (`715` rows vs. size formats `5–10`):** Keep `715` unique rows + exact workbook size sets? | **User confirmed `as it is in the file` + `dynamic according to buyer and article`** -> `1:1` over `715` unique `(Customer, Item_Name)` rows; preserve exact `10` Excel size formats verbatim (`5` to `10` sizes each) while keeping `LEGACY_7_11` for old orders. | **RESOLVED** |

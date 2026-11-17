@@ -32,10 +32,67 @@ function getOrderSchemaSupport(database) {
   const allocTable = database.prepare(
     `SELECT name FROM sqlite_master WHERE type='table' AND name='order_contractor_allocations'`
   ).get();
+  const allocCols = allocTable
+    ? database.prepare(`PRAGMA table_info(order_contractor_allocations)`).all().map(c => c.name)
+    : [];
+  const sizeStdTable = database.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='size_standards'`
+  ).get();
+  const prodTable = database.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='products'`
+  ).get();
   return {
     hasDueDateCol: orderCols.includes('due_date'),
-    hasAllocTable: Boolean(allocTable)
+    hasSizeFormatCol: orderCols.includes('size_format') && orderCols.includes('sizes_json'),
+    hasIdsCol: orderCols.includes('customer_id') && orderCols.includes('product_id'),
+    hasAllocTable: Boolean(allocTable),
+    hasAllocSizeFormatCol: allocCols.includes('size_format') && allocCols.includes('sizes_json'),
+    hasSizeStandardsTable: Boolean(sizeStdTable),
+    hasProductsTable: Boolean(prodTable)
   };
+}
+
+function resolveScaleCodes(database, schema, { requestedFormat, productId }) {
+  let effectiveFormat = String(requestedFormat || '').trim();
+  if (!effectiveFormat && productId && schema.hasProductsTable) {
+    const prod = database.prepare(`SELECT size_format FROM products WHERE id = ?`).get(productId);
+    if (prod?.size_format) effectiveFormat = String(prod.size_format).trim();
+  }
+  if (!effectiveFormat) effectiveFormat = 'LEGACY_7_11';
+
+  if (effectiveFormat !== 'LEGACY_7_11' && !schema.hasSizeFormatCol) {
+    throw new Error(`Database schema does not support dynamic size_format "${effectiveFormat}".`);
+  }
+
+  if (schema.hasSizeStandardsTable) {
+    const std = database.prepare(`SELECT code, sizes_json FROM size_standards WHERE code = ?`).get(effectiveFormat);
+    if (std) {
+      return { sizeFormat: std.code, scaleCodes: JSON.parse(std.sizes_json) };
+    }
+    if (effectiveFormat === 'LEGACY_7_11') {
+      return { sizeFormat: 'LEGACY_7_11', scaleCodes: ['7', '8', '9', '10', '11'] };
+    }
+    throw new Error(`Unsupported size format "${effectiveFormat}".`);
+  }
+
+  if (effectiveFormat === 'LEGACY_7_11') {
+    return { sizeFormat: 'LEGACY_7_11', scaleCodes: ['7', '8', '9', '10', '11'] };
+  }
+  throw new Error(`Unsupported size format "${effectiveFormat}".`);
+}
+
+function parseScaleSizes(rawSizes, scaleCodes, labelPrefix = 'Order') {
+  const normalized = {};
+  let sum = 0;
+  for (const code of scaleCodes) {
+    const num = Number(rawSizes?.[code] ?? 0);
+    if (!Number.isSafeInteger(num) || num < 0) {
+      throw new Error(`${labelPrefix} size ${code} quantity must be a whole number >= 0.`);
+    }
+    normalized[code] = num;
+    sum += num;
+  }
+  return { normalized, sum };
 }
 
 export function createPendingOrder(database, payload, {
@@ -44,23 +101,36 @@ export function createPendingOrder(database, payload, {
   role = 'SUPER_USER',
   recordAuditLog
 } = {}) {
+  const schema = getOrderSchemaSupport(database);
+  const customerId = String(payload.customerId || payload.customer_id || '').trim();
+  const productId = String(payload.productId || payload.product_id || '').trim();
   const buyer = String(payload.buyer || '').trim();
   const po = String(payload.po || '').trim();
   const article = String(payload.article || '').trim();
   const color = String(payload.color || 'Standard').trim();
+  const { sizeFormat, scaleCodes } = resolveScaleCodes(database, schema, {
+    requestedFormat: payload.sizeFormat || payload.size_format,
+    productId
+  });
+  const isLegacy = sizeFormat === 'LEGACY_7_11';
+
   const sizes = payload.sizes || {};
-  const size7 = Math.max(0, Number(sizes['7'] || 0));
-  const size8 = Math.max(0, Number(sizes['8'] || 0));
-  const size9 = Math.max(0, Number(sizes['9'] || 0));
-  const size10 = Math.max(0, Number(sizes['10'] || 0));
-  const size11 = Math.max(0, Number(sizes['11'] || 0));
-  const totalQty = Math.max(0, Number(payload.totalQty ?? (size7 + size8 + size9 + size10 + size11)));
+  const parsedOrder = parseScaleSizes(sizes, scaleCodes, 'Order');
+  const size7 = isLegacy ? Number(parsedOrder.normalized['7'] || 0) : 0;
+  const size8 = isLegacy ? Number(parsedOrder.normalized['8'] || 0) : 0;
+  const size9 = isLegacy ? Number(parsedOrder.normalized['9'] || 0) : 0;
+  const size10 = isLegacy ? Number(parsedOrder.normalized['10'] || 0) : 0;
+  const size11 = isLegacy ? Number(parsedOrder.normalized['11'] || 0) : 0;
+  const totalQty = isLegacy
+    ? Math.max(0, Number(payload.totalQty ?? parsedOrder.sum))
+    : parsedOrder.sum;
+  const orderSizesJson = isLegacy ? '{}' : JSON.stringify(parsedOrder.normalized);
   const rawDueDate = String(payload.dueDate || payload.due_date || '').trim();
 
   let normalizedAllocations = [];
   if (Array.isArray(payload.allocations) && payload.allocations.length > 0) {
     const seenMakers = new Set();
-    const sumSizes = { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+    const sumSizes = Object.fromEntries(scaleCodes.map(c => [c, 0]));
     for (const rawAlloc of payload.allocations) {
       const allocMaker = String(rawAlloc?.maker || rawAlloc?.makerContractor || '').trim();
       if (!allocMaker) {
@@ -71,39 +141,27 @@ export function createPendingOrder(database, payload, {
         throw new Error(`Duplicate contractor "${allocMaker}" in order split allocations.`);
       }
       seenMakers.add(makerKey);
-      const aSizes = rawAlloc?.sizes || {};
-      const a7 = Math.max(0, Number(aSizes['7'] || 0));
-      const a8 = Math.max(0, Number(aSizes['8'] || 0));
-      const a9 = Math.max(0, Number(aSizes['9'] || 0));
-      const a10 = Math.max(0, Number(aSizes['10'] || 0));
-      const a11 = Math.max(0, Number(aSizes['11'] || 0));
-      const aTotal = a7 + a8 + a9 + a10 + a11;
-      if (totalQty > 0 && aTotal <= 0) {
+      const parsedAlloc = parseScaleSizes(rawAlloc?.sizes || {}, scaleCodes, `Contractor "${allocMaker}"`);
+      if (totalQty > 0 && parsedAlloc.sum <= 0) {
         throw new Error(`Contractor "${allocMaker}" must be assigned at least 1 pair.`);
       }
-      sumSizes['7'] += a7;
-      sumSizes['8'] += a8;
-      sumSizes['9'] += a9;
-      sumSizes['10'] += a10;
-      sumSizes['11'] += a11;
+      for (const code of scaleCodes) {
+        sumSizes[code] += parsedAlloc.normalized[code];
+      }
       normalizedAllocations.push({
         maker: allocMaker,
-        s7: a7,
-        s8: a8,
-        s9: a9,
-        s10: a10,
-        s11: a11,
-        total: aTotal,
+        sizesMap: parsedAlloc.normalized,
+        sizesJson: isLegacy ? '{}' : JSON.stringify(parsedAlloc.normalized),
+        s7: isLegacy ? Number(parsedAlloc.normalized['7'] || 0) : 0,
+        s8: isLegacy ? Number(parsedAlloc.normalized['8'] || 0) : 0,
+        s9: isLegacy ? Number(parsedAlloc.normalized['9'] || 0) : 0,
+        s10: isLegacy ? Number(parsedAlloc.normalized['10'] || 0) : 0,
+        s11: isLegacy ? Number(parsedAlloc.normalized['11'] || 0) : 0,
+        total: parsedAlloc.sum,
         dueDate: String(rawAlloc?.dueDate || rawAlloc?.due_date || rawDueDate || '').trim()
       });
     }
-    if (
-      sumSizes['7'] !== size7 ||
-      sumSizes['8'] !== size8 ||
-      sumSizes['9'] !== size9 ||
-      sumSizes['10'] !== size10 ||
-      sumSizes['11'] !== size11
-    ) {
+    if (scaleCodes.some(code => sumSizes[code] !== parsedOrder.normalized[code])) {
       throw new Error('Contractor size splits must add up exactly to the order size breakdown.');
     }
   }
@@ -121,6 +179,8 @@ export function createPendingOrder(database, payload, {
   if (normalizedAllocations.length === 0) {
     normalizedAllocations = [{
       maker,
+      sizesMap: parsedOrder.normalized,
+      sizesJson: orderSizesJson,
       s7: size7,
       s8: size8,
       s9: size9,
@@ -141,8 +201,6 @@ export function createPendingOrder(database, payload, {
     throw new Error('Order creation requires an audit logger');
   }
 
-  const schema = getOrderSchemaSupport(database);
-
   database.exec('BEGIN IMMEDIATE');
   try {
     const sequence = database.prepare(`SELECT last_n FROM order_seq WHERE year = ?`).get(year);
@@ -154,7 +212,35 @@ export function createPendingOrder(database, payload, {
       database.prepare(`INSERT INTO order_seq (year, last_n) VALUES (?, ?)`).run(year, nextNumber);
     }
 
-    if (schema.hasDueDateCol) {
+    if (schema.hasSizeFormatCol && schema.hasIdsCol && schema.hasDueDateCol) {
+      database.prepare(`
+        INSERT INTO pending_orders (
+          order_id, customer_id, buyer_name, maker_contractor, po_number, product_id,
+          article_name, color_shade, size_format, sizes_json,
+          size_7, size_8, size_9, size_10, size_11, total_qty, due_date, notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        orderId,
+        customerId,
+        buyer,
+        maker,
+        po,
+        productId,
+        article,
+        color,
+        sizeFormat,
+        orderSizesJson,
+        size7,
+        size8,
+        size9,
+        size10,
+        size11,
+        totalQty,
+        dueDate,
+        String(payload.notes || '')
+      );
+    } else if (schema.hasDueDateCol) {
       database.prepare(`
         INSERT INTO pending_orders (
           order_id, buyer_name, maker_contractor, po_number, article_name, color_shade,
@@ -202,14 +288,39 @@ export function createPendingOrder(database, payload, {
     }
 
     if (schema.hasAllocTable) {
-      const insertAlloc = database.prepare(`
-        INSERT INTO order_contractor_allocations (
-          order_id, maker_contractor, size_7, size_8, size_9, size_10, size_11, total_qty, due_date
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      for (const a of normalizedAllocations) {
-        insertAlloc.run(orderId, a.maker, a.s7, a.s8, a.s9, a.s10, a.s11, a.total, a.dueDate);
+      if (schema.hasAllocSizeFormatCol) {
+        const insertAlloc = database.prepare(`
+          INSERT INTO order_contractor_allocations (
+            order_id, maker_contractor, size_format, sizes_json,
+            size_7, size_8, size_9, size_10, size_11, total_qty, due_date
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const a of normalizedAllocations) {
+          insertAlloc.run(
+            orderId,
+            a.maker,
+            sizeFormat,
+            a.sizesJson,
+            a.s7,
+            a.s8,
+            a.s9,
+            a.s10,
+            a.s11,
+            a.total,
+            a.dueDate
+          );
+        }
+      } else {
+        const insertAlloc = database.prepare(`
+          INSERT INTO order_contractor_allocations (
+            order_id, maker_contractor, size_7, size_8, size_9, size_10, size_11, total_qty, due_date
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const a of normalizedAllocations) {
+          insertAlloc.run(orderId, a.maker, a.s7, a.s8, a.s9, a.s10, a.s11, a.total, a.dueDate);
+        }
       }
     }
 

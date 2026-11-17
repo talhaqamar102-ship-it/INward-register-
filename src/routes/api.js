@@ -83,7 +83,7 @@ function getAllowedRoles(req) {
   if (path === '/qc/aql-calc' || /^\/export\/manifest\/[^/]+$/.test(path)) {
     return ['SUPER_USER', 'PACKING_SUPERVISOR', 'QC_INSPECTOR'];
   }
-  if (path === '/inventory/gloves' || path === '/inventory/materials' || path === '/customers' || path === '/products') {
+  if (path === '/inventory/gloves' || path === '/inventory/materials' || path === '/customers' || path === '/products' || path === '/size-standards') {
     return ['SUPER_USER', 'INWARD_CLERK', 'PACKING_SUPERVISOR', 'QC_INSPECTOR', 'ALTERATION_LEAD'];
   }
   return [];
@@ -140,6 +140,7 @@ apiRouter.get('/inventory/gloves', handle(() => PackingService.getGloveInventory
 apiRouter.get('/inventory/materials', handle(() => PackingService.getMaterialInventory()));
 apiRouter.get('/customers', handle(() => PackingService.getCustomers()));
 apiRouter.get('/products', handle((req) => PackingService.getProducts(req.query.customerId)));
+apiRouter.get('/size-standards', handle(() => PackingService.getSizeStandards()));
 
 // --- GLOVE REQUISITIONS ---
 apiRouter.get('/requisitions', handle(() => PackingService.getRequisitions()));

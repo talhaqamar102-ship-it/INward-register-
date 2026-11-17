@@ -1,11 +1,86 @@
-export interface SizeBreakdown {
-  '6'?: number;
-  '7': number;
-  '8': number;
-  '9': number;
-  '10': number;
-  '11': number;
-  '12'?: number;
+export type SizeBreakdown = Record<string, number>;
+
+export interface SizeStandardOption {
+  code: string;
+  rawLabel: string;
+  sizes: string[];
+  isLegacy?: boolean;
+}
+
+export interface CatalogProductOption {
+  id: string;
+  name: string;
+  raw_name?: string;
+  article_code?: string;
+  raw_color?: string;
+  color_spec?: string;
+  size_format?: string;
+  customer_id: string;
+  customer_name?: string;
+  polybag_per_pair?: number;
+  silica_gel_per_pair?: number;
+  stickers_per_pair?: number;
+  pairs_per_carton?: number;
+}
+
+const LEGACY_SIZE_LABELS_MAP: Record<string, string> = {
+  '7': '7 / S',
+  '8': '8 / M',
+  '9': '9 / L',
+  '10': '10 / XL',
+  '11': '11 / XXL'
+};
+
+export function formatSizeColumnLabel(code: string, sizeFormat = 'LEGACY_7_11'): string {
+  if (!sizeFormat || sizeFormat === 'LEGACY_7_11') {
+    return LEGACY_SIZE_LABELS_MAP[code] || code;
+  }
+  return code;
+}
+
+export function getScaleSizeCodes(sizeStandards: SizeStandardOption[] | undefined, sizeFormat = 'LEGACY_7_11'): string[] {
+  const target = String(sizeFormat || 'LEGACY_7_11').trim() || 'LEGACY_7_11';
+  const matched = (sizeStandards || []).find(s => s.code === target);
+  if (matched && Array.isArray(matched.sizes) && matched.sizes.length > 0) {
+    return matched.sizes;
+  }
+  return ['7', '8', '9', '10', '11'];
+}
+
+export function resolveScaleKeysForBreakdown(
+  sizes?: Partial<SizeBreakdown> | null,
+  explicitCodes?: readonly string[]
+): string[] {
+  if (Array.isArray(explicitCodes) && explicitCodes.length > 0) {
+    return [...explicitCodes];
+  }
+  const keys = sizes ? Object.keys(sizes) : [];
+  if (keys.length > 0 && keys.some(k => !['7', '8', '9', '10', '11'].includes(k))) {
+    return keys;
+  }
+  return ['7', '8', '9', '10', '11'];
+}
+
+function inferSizeFormatFromCodes(codes: readonly string[], explicitFormat?: string): string {
+  if (explicitFormat && String(explicitFormat).trim()) return String(explicitFormat).trim();
+  return codes.every(c => ['7', '8', '9', '10', '11'].includes(c)) ? 'LEGACY_7_11' : 'CATALOG';
+}
+
+export function filterProductsByBuyer<T extends { customer_id?: string; customer_name?: string; name?: string }>(
+  products: T[],
+  customers: Array<{ id: string; name: string }>,
+  buyerValue: string
+): T[] {
+  const raw = String(buyerValue || '').trim();
+  if (!raw) return products;
+  const lowered = raw.toLowerCase();
+  const matchedCust = customers.find(
+    c => c.id.toLowerCase() === lowered || c.name.trim().toLowerCase() === lowered
+  );
+  return products.filter(p => {
+    if (matchedCust && p.customer_id === matchedCust.id) return true;
+    return String(p.customer_name || '').trim().toLowerCase() === lowered;
+  });
 }
 
 /**
@@ -157,11 +232,15 @@ export interface ContractorOrderAllocation {
 
 export interface PendingOrder {
   orderId: string;
+  customerId?: string;
   buyer?: string;
   maker: string;
   po?: string;
+  productId?: string;
   article: string;
   color?: string;
+  sizeFormat?: string;
+  sizeCodes?: string[];
   dueDate?: string;
   createdAt?: string;
   sizes?: SizeBreakdown;
@@ -185,28 +264,24 @@ export interface PendingOrder {
 
 export function validateContractorAllocations(
   orderSizes: SizeBreakdown,
-  allocations: Array<{ maker: string; sizes: SizeBreakdown; dueDate?: string }>
+  allocations: Array<{ maker: string; sizes: SizeBreakdown; dueDate?: string }>,
+  sizeCodes: readonly string[] = STANDARD_GLOVE_SIZES
 ): {
   valid: boolean;
   error?: string;
   unassignedBySize: SizeBreakdown;
   totalUnassigned: number;
 } {
-  const orderTotal = STANDARD_GLOVE_SIZES.reduce((sum, sz) => sum + Math.max(0, Number(orderSizes[sz] || 0)), 0);
-  const sumBySize = createEmptySizes();
+  const activeCodes = sizeCodes.length > 0 ? sizeCodes : STANDARD_GLOVE_SIZES;
+  const orderTotal = activeCodes.reduce((sum, sz) => sum + Math.max(0, Number(orderSizes[sz] || 0)), 0);
+  const sumBySize = createEmptySizes(activeCodes);
   const seenMakers = new Set<string>();
 
   if (!Array.isArray(allocations) || allocations.length === 0) {
     return {
       valid: false,
       error: 'Add at least one contractor allocation.',
-      unassignedBySize: {
-        '7': Number(orderSizes['7'] || 0),
-        '8': Number(orderSizes['8'] || 0),
-        '9': Number(orderSizes['9'] || 0),
-        '10': Number(orderSizes['10'] || 0),
-        '11': Number(orderSizes['11'] || 0)
-      },
+      unassignedBySize: Object.fromEntries(activeCodes.map(sz => [sz, Number(orderSizes[sz] || 0)])),
       totalUnassigned: orderTotal
     };
   }
@@ -225,7 +300,7 @@ export function validateContractorAllocations(
     if (maker) seenMakers.add(makerKey);
 
     let rowTotal = 0;
-    for (const sz of STANDARD_GLOVE_SIZES) {
+    for (const sz of activeCodes) {
       const val = Number(row?.sizes?.[sz] || 0);
       if ((!Number.isFinite(val) || val < 0) && !firstError) {
         firstError = `Contractor "${maker || `#${i + 1}`}": size ${sz} quantity cannot be negative.`;
@@ -239,15 +314,15 @@ export function validateContractorAllocations(
     }
   }
 
-  const unassignedBySize = createEmptySizes();
+  const unassignedBySize = createEmptySizes(activeCodes);
   let totalUnassigned = 0;
-  for (const sz of STANDARD_GLOVE_SIZES) {
+  for (const sz of activeCodes) {
     unassignedBySize[sz] = Math.max(0, Number(orderSizes[sz] || 0)) - sumBySize[sz];
     totalUnassigned += unassignedBySize[sz];
   }
 
   if (!firstError) {
-    const mismatchSize = STANDARD_GLOVE_SIZES.find(sz => unassignedBySize[sz] !== 0);
+    const mismatchSize = activeCodes.find(sz => unassignedBySize[sz] !== 0);
     if (mismatchSize) {
       const diff = unassignedBySize[mismatchSize];
       firstError = diff > 0
@@ -264,8 +339,8 @@ export function validateContractorAllocations(
   };
 }
 
-export function createEmptySizes(): SizeBreakdown {
-  return { '7': 0, '8': 0, '9': 0, '10': 0, '11': 0 };
+export function createEmptySizes(sizeCodes: readonly string[] = STANDARD_GLOVE_SIZES): SizeBreakdown {
+  return Object.fromEntries(sizeCodes.map(c => [c, 0]));
 }
 
 export function normalizeBaseReqNumber(reqNo: string): string {
@@ -283,38 +358,38 @@ export function getAlterationReqNumber(reqNo: string): string {
 
 export function calculateSizeTotal(sizes?: Partial<SizeBreakdown> | null): number {
   if (!sizes) return 0;
-  return EXTENDED_GLOVE_SIZES.reduce((sum, key) => {
-    const val = Number(sizes[key] || 0);
+  return Object.values(sizes).reduce<number>((sum, rawVal) => {
+    const val = Number(rawVal || 0);
     return sum + (Number.isFinite(val) && val > 0 ? val : 0);
   }, 0);
 }
 
 export function scaleSizeBreakdown(sizes: SizeBreakdown, targetTotal: number): SizeBreakdown {
+  const keys = resolveScaleKeysForBreakdown(sizes);
   const baseTotal = calculateSizeTotal(sizes);
-  if (targetTotal <= 0) return createEmptySizes();
+  if (targetTotal <= 0) return createEmptySizes(keys);
   if (baseTotal <= 0) {
-    const perSize = Math.floor(targetTotal / 5);
-    const rem = targetTotal - perSize * 5;
-    return {
-      '7': perSize,
-      '8': perSize,
-      '9': perSize + rem,
-      '10': perSize,
-      '11': perSize
-    };
+    const perSize = Math.floor(targetTotal / keys.length);
+    const rem = targetTotal - perSize * keys.length;
+    const remKey = keys.includes('9') ? '9' : keys[Math.floor(keys.length / 2)];
+    const even: SizeBreakdown = {};
+    for (const k of keys) {
+      even[k] = perSize + (k === remKey ? rem : 0);
+    }
+    return even;
   }
   const ratio = targetTotal / baseTotal;
-  const scaled: SizeBreakdown = {
-    '7': Math.floor(Number(sizes['7'] || 0) * ratio),
-    '8': Math.floor(Number(sizes['8'] || 0) * ratio),
-    '9': Math.floor(Number(sizes['9'] || 0) * ratio),
-    '10': Math.floor(Number(sizes['10'] || 0) * ratio),
-    '11': Math.floor(Number(sizes['11'] || 0) * ratio)
-  };
+  const scaled: SizeBreakdown = {};
+  for (const k of keys) {
+    scaled[k] = Math.floor(Math.max(0, Number(sizes[k] || 0)) * ratio);
+  }
   const currentSum = calculateSizeTotal(scaled);
   const diff = targetTotal - currentSum;
   if (diff !== 0) {
-    scaled['9'] = Math.max(0, scaled['9'] + diff);
+    const adjKey = keys.includes('9')
+      ? '9'
+      : keys.reduce((best, k) => (Number(sizes[k] || 0) >= Number(sizes[best] || 0) ? k : best), keys[0]);
+    scaled[adjKey] = Math.max(0, Number(scaled[adjKey] || 0) + diff);
   }
   return scaled;
 }
@@ -354,6 +429,8 @@ export interface OrderWipState {
   buyer?: string;
   plannedQty: number;
   issueStatus: 'Pending Inward Issue' | 'Issued by Inward Register';
+  sizeFormat?: string;
+  sizeCodes?: string[];
   sizes: SizeBreakdown;
   packedSizes?: SizeBreakdown;
   stage1In: number;
@@ -648,6 +725,8 @@ export interface OrderTraceabilityItem {
   po: string;
   article: string;
   color: string;
+  sizeFormat?: string;
+  sizeCodes?: string[];
   sizes: SizeBreakdown;
   packedSizes: SizeBreakdown;
   plannedQty: number;
@@ -1595,9 +1674,10 @@ export function buildSuperUserOrderRollups(params: {
     const packedStage5Cartons = reqBatches.reduce((s, b) => s + b.packedStage5Cartons, 0);
     const unpackedOrderBalanceQty = Math.max(0, effectivePlannedQty - packedStage5Qty - scrappedQty);
 
-    const orderPackedSizes = createEmptySizes();
+    const activeOrderSizes = ord.sizeCodes && ord.sizeCodes.length > 0 ? ord.sizeCodes : STANDARD_GLOVE_SIZES;
+    const orderPackedSizes = createEmptySizes(activeOrderSizes);
     for (const rb of reqBatches) {
-      for (const sz of STANDARD_GLOVE_SIZES) {
+      for (const sz of activeOrderSizes) {
         orderPackedSizes[sz] += Number(rb.packedSizes[sz] || 0);
       }
     }
@@ -1654,7 +1734,7 @@ export function buildSuperUserOrderRollups(params: {
           ];
     const contractorAllocations: ContractorOrderAllocation[] = rawAllocations.map(alloc => {
       const allocMaker = String(alloc.maker || '').trim();
-      const allocSizes = alloc.sizes || createEmptySizes();
+      const allocSizes = alloc.sizes || createEmptySizes(activeOrderSizes);
       const allocTotal = Math.max(Number(alloc.totalQty || 0), calculateSizeTotal(allocSizes));
       const makerGrns = rawGrnBatches.filter(
         g =>
@@ -1662,14 +1742,14 @@ export function buildSuperUserOrderRollups(params: {
           String(g.maker || '').trim().toLowerCase() === allocMaker.toLowerCase()
       );
       const allocRcvdPairs = makerGrns.reduce((sum, g) => sum + Number(g.rcvdPairs || 0), 0);
-      const allocRcvdSizes = createEmptySizes();
+      const allocRcvdSizes = createEmptySizes(activeOrderSizes);
       for (const mg of makerGrns) {
-        for (const sz of STANDARD_GLOVE_SIZES) {
+        for (const sz of activeOrderSizes) {
           allocRcvdSizes[sz] += Number(mg.sizes?.[sz] || 0);
         }
       }
-      const allocRemSizes = createEmptySizes();
-      for (const sz of STANDARD_GLOVE_SIZES) {
+      const allocRemSizes = createEmptySizes(activeOrderSizes);
+      for (const sz of activeOrderSizes) {
         allocRemSizes[sz] = ord.shortClosed ? 0 : Math.max(0, Number(allocSizes[sz] || 0) - allocRcvdSizes[sz]);
       }
       return {
@@ -1691,6 +1771,8 @@ export function buildSuperUserOrderRollups(params: {
       po: ord.po || '---',
       article: ord.article || '---',
       color: ord.color || 'Standard',
+      sizeFormat: ord.sizeFormat || 'LEGACY_7_11',
+      sizeCodes: [...activeOrderSizes],
       sizes: plannedSizes,
       packedSizes: orderPackedSizes,
       plannedQty,
@@ -2791,6 +2873,8 @@ export function applyPendingOrderSelection(
   po?: string;
   article: string;
   color?: string;
+  sizeFormat?: string;
+  sizeCodes?: string[];
   dueDate?: string;
   sizes?: SizeBreakdown;
   totalQty?: number;
@@ -2807,6 +2891,8 @@ export function applyPendingOrderSelection(
     po?: string;
     article: string;
     color?: string;
+    sizeFormat?: string;
+    sizeCodes?: string[];
     dueDate?: string;
     sizes?: SizeBreakdown;
     totalQty?: number;
@@ -2819,6 +2905,8 @@ export function applyPendingOrderSelection(
   if (found.buyer !== undefined) result.buyer = found.buyer;
   if (found.po !== undefined) result.po = found.po;
   if (found.color !== undefined) result.color = found.color;
+  if (found.sizeFormat !== undefined) result.sizeFormat = found.sizeFormat;
+  if (found.sizeCodes !== undefined) result.sizeCodes = found.sizeCodes;
   if (found.dueDate !== undefined) result.dueDate = found.dueDate;
   if (found.sizes !== undefined) result.sizes = found.sizes;
   if (found.totalQty !== undefined) result.totalQty = found.totalQty;
@@ -2860,6 +2948,8 @@ export interface PackingRequisitionSlipParams {
   sizes: SizeBreakdown;
   totalPairs?: number;
   issueStatus?: 'Pending Inward Issue' | 'Issued by Inward Register';
+  sizeFormat?: string;
+  sizeCodes?: string[];
 }
 
 export function buildPackingRequisitionSlipHtml(params: PackingRequisitionSlipParams): string {
@@ -2871,6 +2961,8 @@ export function buildPackingRequisitionSlipHtml(params: PackingRequisitionSlipPa
   const article = params.article || '---';
   const dateStr = params.date || '31-10-2026';
   const issueStatus = params.issueStatus || 'Pending Inward Issue';
+  const activeCodes = resolveScaleKeysForBreakdown(params.sizes, params.sizeCodes);
+  const activeFormat = inferSizeFormatFromCodes(activeCodes, params.sizeFormat);
 
   return `
     <div class="printable-slip-box">
@@ -2885,35 +2977,27 @@ export function buildPackingRequisitionSlipHtml(params: PackingRequisitionSlipPa
         <div><span>Date:</span> <strong>${dateStr}</strong></div>
         <div><span>Material Req # (M):</span> <strong>${mReq}</strong></div>
         <div><span>Alteration Bay # (A):</span> <strong>${aReq}</strong></div>
-        <div><span>Article:</span> <strong>${article}</strong></div>
+        <div><span>Article:</span> <strong>${escapeHtml(article)}</strong></div>
         <div><span>Asking Quantity:</span> <strong>${pairs.toLocaleString()} Pairs</strong></div>
         <div><span>Dock Store Status:</span> <strong>${issueStatus}</strong></div>
         <div><span>Origin Station:</span> <strong>Packing Hall #1</strong></div>
       </div>
 
       <div style="font-weight: 700; color: var(--ink-950); margin: 8px 0 4px; font-size: 11.5px; text-transform: uppercase;">
-        Article &amp; Size Breakdown Allocation (Pairs)
+        Article &amp; Size Breakdown Allocation (Pairs &bull; Scale: ${escapeHtml(activeFormat)})
       </div>
       <table class="size-matrix-table" style="margin-bottom: 12px;">
         <thead>
           <tr>
             <th>Article</th>
-            <th>7 / S</th>
-            <th>8 / M</th>
-            <th>9 / L</th>
-            <th>10 / XL</th>
-            <th>11 / XXL</th>
+            ${activeCodes.map(sz => `<th>${escapeHtml(formatSizeColumnLabel(sz, activeFormat))}</th>`).join('')}
             <th style="background: var(--ink-200); color: var(--ink-950);">Total Pairs</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><strong>${article}</strong></td>
-            <td>${Number(params.sizes['7'] || 0).toLocaleString()} Prs</td>
-            <td>${Number(params.sizes['8'] || 0).toLocaleString()} Prs</td>
-            <td>${Number(params.sizes['9'] || 0).toLocaleString()} Prs</td>
-            <td>${Number(params.sizes['10'] || 0).toLocaleString()} Prs</td>
-            <td>${Number(params.sizes['11'] || 0).toLocaleString()} Prs</td>
+            <td><strong>${escapeHtml(article)}</strong></td>
+            ${activeCodes.map(sz => `<td>${Number(params.sizes?.[sz] || 0).toLocaleString()} Prs</td>`).join('')}
             <td style="font-weight: 800; color: var(--ink-950);">${pairs.toLocaleString()} Pairs</td>
           </tr>
         </tbody>
@@ -3124,6 +3208,8 @@ export interface GrnSlipParams {
   receivedFrom?: string;
   rcvdPairs: number;
   sizes: SizeBreakdown;
+  sizeFormat?: string;
+  sizeCodes?: string[];
 }
 
 export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
@@ -3136,6 +3222,8 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
   const grnRef = params.grnRef || 'GRN-2026-0001';
   const sizeTotal = calculateSizeTotal(params.sizes);
   const rcvd = params.rcvdPairs > 0 ? params.rcvdPairs : sizeTotal;
+  const activeCodes = resolveScaleKeysForBreakdown(params.sizes, params.sizeCodes);
+  const activeFormat = inferSizeFormatFromCodes(activeCodes, params.sizeFormat);
 
   return `
     <div class="printable-slip-box">
@@ -3157,28 +3245,20 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
       </div>
 
       <div style="font-weight: 700; color: var(--ink-950); margin: 8px 0 4px; font-size: 11.5px; text-transform: uppercase;">
-        Article &amp; Received Size Breakdown Allocation (Pairs)
+        Article &amp; Received Size Breakdown Allocation (Pairs &bull; Scale: ${escapeHtml(activeFormat)})
       </div>
       <table class="size-matrix-table" style="width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 12px;">
         <thead>
           <tr style="background: var(--ink-100); color: var(--ink-950);">
             <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: left;">Article / Colour</th>
-            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">7 / S</th>
-            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">8 / M</th>
-            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">9 / L</th>
-            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">10 / XL</th>
-            <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">11 / XXL</th>
+            ${activeCodes.map(sz => `<th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${escapeHtml(formatSizeColumnLabel(sz, activeFormat))}</th>`).join('')}
             <th style="border: 1px solid var(--border-strong); padding: 6px; text-align: center; background: var(--ink-200); font-weight: 800;">Total Received</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: left; font-weight: 700;">${escapeHtml(article)} (${escapeHtml(color)})</td>
-            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['7'] || 0).toLocaleString()} Prs</td>
-            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['8'] || 0).toLocaleString()} Prs</td>
-            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['9'] || 0).toLocaleString()} Prs</td>
-            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['10'] || 0).toLocaleString()} Prs</td>
-            <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes['11'] || 0).toLocaleString()} Prs</td>
+            ${activeCodes.map(sz => `<td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center;">${Number(params.sizes?.[sz] || 0).toLocaleString()} Prs</td>`).join('')}
             <td style="border: 1px solid var(--border-strong); padding: 6px; text-align: center; font-weight: 800; color: var(--ink-950); font-size: 13px;">${rcvd.toLocaleString()} Pairs</td>
           </tr>
         </tbody>
@@ -3361,6 +3441,8 @@ export function getSuperUserStatusBadgeClass(status: string): string {
 export function renderRequisitionWipAnalyticsChart(params: {
   series: RequisitionAnalyticsPoint[];
   activeWipSizes?: SizeBreakdown;
+  activeSizeFormat?: string;
+  activeSizeCodes?: string[];
   activeReqNumber?: string;
   activePlannedQty?: number;
   activeStage4Packed?: number;
@@ -3370,6 +3452,8 @@ export function renderRequisitionWipAnalyticsChart(params: {
   const {
     series,
     activeWipSizes,
+    activeSizeFormat,
+    activeSizeCodes,
     activeReqNumber,
     activePlannedQty = 0,
     activeStage4Packed = 0,
@@ -3427,14 +3511,8 @@ export function renderRequisitionWipAnalyticsChart(params: {
   const tick50 = Math.round(maxChartVal * 0.5);
   const tick25 = Math.round(maxChartVal * 0.25);
 
-  const sizeKeys: Array<'7' | '8' | '9' | '10' | '11'> = ['7', '8', '9', '10', '11'];
-  const sizeLabels: Record<'7' | '8' | '9' | '10' | '11', string> = {
-    '7': 'Size 7 / S',
-    '8': 'Size 8 / M',
-    '9': 'Size 9 / L',
-    '10': 'Size 10 / XL',
-    '11': 'Size 11 / XXL'
-  };
+  const sizeKeys = resolveScaleKeysForBreakdown(activeWipSizes, activeSizeCodes);
+  const sizeChartFormat = inferSizeFormatFromCodes(sizeKeys, activeSizeFormat);
 
   const sizeTotal = activeWipSizes ? calculateSizeTotal(activeWipSizes) : 0;
   const effectiveDemand = Math.max(activePlannedQty, sizeTotal);
@@ -3672,7 +3750,7 @@ export function renderRequisitionWipAnalyticsChart(params: {
                   return `
                   <div style="margin-bottom: 9px;">
                     <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px;">
-                      <strong style="color: var(--ink-900);">${sizeLabels[sz]}</strong>
+                      <strong style="color: var(--ink-900);">Size ${escapeHtml(formatSizeColumnLabel(sz, sizeChartFormat))}</strong>
                       <span style="font-family: var(--font-mono); color: var(--ink-700);">
                         Demand: <strong>${szDemand}</strong> | 1st Pkg: <strong>${estS4}</strong> | Packed S5: <strong>${estS5}</strong>
                       </span>
