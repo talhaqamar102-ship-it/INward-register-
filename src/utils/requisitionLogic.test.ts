@@ -747,16 +747,20 @@ test('R2 & 12.3: zero raw hex colors exist in superUserView.ts and requisitionLo
   assert.ok(mixedScaleChart.includes('role="img"'), 'bars must declare role="img"');
   assert.ok(mixedScaleChart.includes('<table class="sr-only">'), 'chart must expose a screen-reader data table');
 
-  // Verify zero raw hex color codes in superUserView.ts (+ src/components/superUser/*.ts), requisitionLogic.ts, and packingHallView.ts
+  // Verify zero raw hex color codes in superUserView.ts (+ src/components/superUser/*.ts), requisitionLogic.ts (+ src/utils/requisition/*.ts), and packingHallView.ts
   const suViewPath = path.resolve(process.cwd(), 'src/components/superUserView.ts');
   const suDirPath = path.resolve(process.cwd(), 'src/components/superUser');
   const reqLogicPath = path.resolve(process.cwd(), 'src/utils/requisitionLogic.ts');
+  const reqDirPath = path.resolve(process.cwd(), 'src/utils/requisition');
   const packingViewPath = path.resolve(process.cwd(), 'src/components/packingHallView.ts');
   const suModuleFiles = fs.existsSync(suDirPath)
     ? fs.readdirSync(suDirPath).filter(f => f.endsWith('.ts')).map(f => fs.readFileSync(path.join(suDirPath, f), 'utf8'))
     : [];
+  const reqModuleFiles = fs.existsSync(reqDirPath)
+    ? fs.readdirSync(reqDirPath).filter(f => f.endsWith('.ts')).map(f => fs.readFileSync(path.join(reqDirPath, f), 'utf8'))
+    : [];
   const suViewSrc = [fs.readFileSync(suViewPath, 'utf8'), ...suModuleFiles].join('\n');
-  const reqLogicSrc = fs.readFileSync(reqLogicPath, 'utf8');
+  const reqLogicSrc = [fs.readFileSync(reqLogicPath, 'utf8'), ...reqModuleFiles].join('\n');
   const packingViewSrc = fs.readFileSync(packingViewPath, 'utf8');
 
   const hexRegex = /(?<!&)#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})\b/g;

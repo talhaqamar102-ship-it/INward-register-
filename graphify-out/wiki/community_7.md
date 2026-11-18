@@ -1,16 +1,17 @@
 # C7: AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)
 
-Cohesion Score: `0.76` • Total Nodes: 377
+Cohesion Score: `0.75` • Total Nodes: 378
 
 ## Nodes in Community
 
 - **.agents/skills/ck/commands/shared.mjs** (`file:.agents/skills/ck/commands/shared.mjs`) — `.agents/skills/ck/commands/shared.mjs:L1` (degree: 29)
-- **scripts/graphify.ts** (`file:scripts/graphify.ts`) — `scripts/graphify.ts:L1` (degree: 20)
+- **scripts/graphify.ts** (`file:scripts/graphify.ts`) — `scripts/graphify.ts:L1` (degree: 21)
 - **buildProjectGraph()** (`fn:scripts/graphify.ts:buildProjectGraph`) — `scripts/graphify.ts:L133-L1008` (degree: 18)
 - **extractBraceBlock()** (`fn:scripts/graphify.ts:extractBraceBlock`) — `scripts/graphify.ts:L118-L1008` (degree: 17)
 - **docs/catalog-integration-plan.md** (`file:docs/catalog-integration-plan.md`) — `docs/catalog-integration-plan.md:L1` (degree: 15)
 - **.claude/CLAUDE.md** (`file:.claude/CLAUDE.md`) — `.claude/CLAUDE.md:L1` (degree: 12)
 - **.agents/skills/council-multi-model/scripts/review-with-codex.js** (`file:.agents/skills/council-multi-model/scripts/review-with-codex.js`) — `.agents/skills/council-multi-model/scripts/review-with-codex.js:L1` (degree: 11)
+- **.agents/traces/2026-11-18-split-superuser-view.md** (`file:.agents/traces/2026-11-18-split-superuser-view.md`) — `.agents/traces/2026-11-18-split-superuser-view.md:L1` (degree: 11)
 - **.agents/traces/2026-11-17-slice1-catalog-backend.md** (`file:.agents/traces/2026-11-17-slice1-catalog-backend.md`) — `.agents/traces/2026-11-17-slice1-catalog-backend.md:L1` (degree: 10)
 - **.agents/skills/unslop/scripts/story.mjs** (`file:.agents/skills/unslop/scripts/story.mjs`) — `.agents/skills/unslop/scripts/story.mjs:L1` (degree: 9)
 - **.agents/traces/2026-11-17-archive-unused.md** (`file:.agents/traces/2026-11-17-archive-unused.md`) — `.agents/traces/2026-11-17-archive-unused.md:L1` (degree: 9)

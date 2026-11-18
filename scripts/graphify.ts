@@ -229,8 +229,8 @@ export function buildProjectGraph(rootDir: string) {
     const full = path.join(rootDir, rel);
     const content = fs.readFileSync(full, 'utf8');
 
-    // 3a. Imports
-    const importRegex = /import\s+(?:[\s\S]*?from\s+)?['"]([^'"]+)['"]/g;
+    // 3a. Imports & Re-exports
+    const importRegex = /(?:import|export)\s+(?:[\s\S]*?from\s+)?['"]([^'"]+)['"]/g;
     let im: RegExpExecArray | null;
     while ((im = importRegex.exec(content)) !== null) {
       const spec = im[1];
