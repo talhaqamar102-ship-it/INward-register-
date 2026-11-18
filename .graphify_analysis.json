@@ -57,6 +57,7 @@
       "fn:src/main.ts:attachEventHandlers",
       "fn:src/main.ts:attachGRNHandlers",
       "fn:src/main.ts:syncSizesAndReceived",
+      "fn:src/main.ts:persistAndRecordGrnBatch",
       "fn:src/main.ts:attachRepairHandlers",
       "fn:src/main.ts:attachQCHandlers",
       "fn:src/main.ts:isPersistedRequisition",
@@ -130,8 +131,9 @@
       "dom:#grn-color",
       "dom:#grn-received-from",
       "dom:#grn-rcvd-pairs",
-      "dom:#grn-size-total-display",
+      "dom:#grn-split-entry-table",
       "dom:#grn-size-caps",
+      "dom:#grn-size-total-display",
       "dom:#grn-delivery-timeline",
       "dom:#btn-print-grn-slip",
       "dom:#btn-clear-grn",
@@ -162,8 +164,8 @@
       "dom:#modal-title",
       "dom:#modal-close-x",
       "dom:#modal-body",
-      "dom:#modal-btn-close",
       "dom:#modal-btn-print",
+      "dom:#modal-btn-close",
       "dom:#step1-good-input",
       "dom:#step1-defect-input",
       "dom:#step1-defect-reason",
@@ -233,6 +235,8 @@
       "fn:src/utils/requisitionLogic.ts:getScaleSizeCodes",
       "fn:src/utils/requisitionLogic.ts:resolveScaleKeysForBreakdown",
       "fn:src/utils/requisitionLogic.ts:inferSizeFormatFromCodes",
+      "fn:src/utils/requisitionLogic.ts:formatCurrentDateDDMMYYYY",
+      "fn:src/utils/requisitionLogic.ts:formatSplitAllocationSummary",
       "fn:src/utils/requisitionLogic.ts:getActiveGloveSizes",
       "fn:src/utils/requisitionLogic.ts:escapeHtml",
       "fn:src/utils/requisitionLogic.ts:parseUtcDateMidnightMs",
@@ -279,6 +283,7 @@
       "fn:src/utils/requisitionLogic.ts:buildMaterialRequisitionSlipHtml",
       "fn:src/utils/requisitionLogic.ts:buildAlterationRouteSlipHtml",
       "fn:src/utils/requisitionLogic.ts:buildGrnReceivingSlipHtml",
+      "fn:src/utils/requisitionLogic.ts:buildGrnReceiveConfirmationHtml",
       "fn:src/utils/requisitionLogic.ts:buildRequisitionAnalyticsSeries",
       "fn:src/utils/requisitionLogic.ts:getSuperUserStatusBadgeClass",
       "fn:src/utils/requisitionLogic.ts:renderRequisitionWipAnalyticsChart",
@@ -720,6 +725,7 @@
       "file:.agents/traces/2026-11-17-rule-tiers.md",
       "file:.agents/traces/2026-11-17-slice1-catalog-backend.md",
       "file:.agents/traces/2026-11-17-slice2-cascading-ui.md",
+      "file:.agents/traces/2026-11-17-slice3-downstream.md",
       "file:.agents/workflows/aside.md",
       "file:.agents/workflows/auto-update.md",
       "file:.agents/workflows/build-fix.md",
@@ -1038,7 +1044,7 @@
     ]
   },
   "cohesion": {
-    "0": 0.77,
+    "0": 0.76,
     "1": 0.64,
     "2": 0.6,
     "3": 0.61,
@@ -1057,7 +1063,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 333
+      "degree": 336
     },
     {
       "id": "file:src/utils/requisitionLogic.ts",
@@ -1068,7 +1074,7 @@
       "source_location": "L1",
       "community": 1,
       "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
-      "degree": 98
+      "degree": 103
     },
     {
       "id": "file:src/components/superUserView.ts",
@@ -1079,7 +1085,7 @@
       "source_location": "L1",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 86
+      "degree": 87
     },
     {
       "id": "file:src/routes/api.js",
@@ -1098,7 +1104,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L4267-L5038",
+      "source_location": "L4573-L5344",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 55
@@ -1120,7 +1126,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L599-L621",
+      "source_location": "L604-L626",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 49
@@ -1145,7 +1151,7 @@
       "source_location": "L1",
       "community": 7,
       "community_label": "AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)",
-      "degree": 42
+      "degree": 43
     },
     {
       "id": "table:cartons",
@@ -1159,26 +1165,26 @@
       "degree": 35
     },
     {
-      "id": "fn:src/main.ts:attachPackingHandlers",
-      "label": "attachPackingHandlers()",
+      "id": "fn:src/main.ts:attachGRNHandlers",
+      "label": "attachGRNHandlers()",
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3068-L3670",
+      "source_location": "L2157-L2889",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 35
     },
     {
-      "id": "fn:src/main.ts:renderApp",
-      "label": "renderApp()",
+      "id": "fn:src/main.ts:attachPackingHandlers",
+      "label": "attachPackingHandlers()",
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L1833-L1833",
+      "source_location": "L3370-L3972",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 34
+      "degree": 35
     }
   ],
   "surprises": [

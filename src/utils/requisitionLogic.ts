@@ -66,6 +66,23 @@ function inferSizeFormatFromCodes(codes: readonly string[], explicitFormat?: str
   return codes.every(c => ['7', '8', '9', '10', '11'].includes(c)) ? 'LEGACY_7_11' : 'CATALOG';
 }
 
+export function formatCurrentDateDDMMYYYY(now: Date = new Date()): string {
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+export function formatSplitAllocationSummary(
+  allocations?: Array<{ maker: string; totalQty: number; sizes?: SizeBreakdown }> | null
+): string {
+  if (!Array.isArray(allocations) || allocations.length <= 1) return '';
+  return allocations
+    .map(a => `${String(a.maker || '').trim()} (${Number(a.totalQty || 0).toLocaleString()} Prs)`)
+    .filter(Boolean)
+    .join(', ');
+}
+
 export function filterProductsByBuyer<T extends { customer_id?: string; customer_name?: string; name?: string }>(
   products: T[],
   customers: Array<{ id: string; name: string }>,
@@ -1292,7 +1309,7 @@ export function migrateLegacyRecordsToRelationalHierarchy(params: {
     return {
       sr: g.sr || idx + 1,
       grnCode,
-      date: g.date || '31-10-2026',
+      date: g.date || formatCurrentDateDDMMYYYY(),
       pendingOrderId: targetOrderId,
       maker: g.maker || '---',
       article: g.article || '---',
@@ -1464,7 +1481,7 @@ export function buildSuperUserOrderRollups(params: {
       grnCode: g.grnCode || formatBatchSequence('GRN', g.sr || idx + 1),
       orderBatchSeq: idx + 1,
       sr: g.sr || idx + 1,
-      date: g.date || '31-10-2026',
+      date: g.date || formatCurrentDateDDMMYYYY(),
       orderId: ord.orderId,
       pendingOrderId: ord.orderId,
       maker: g.maker || ord.maker,
@@ -2959,7 +2976,7 @@ export function buildPackingRequisitionSlipHtml(params: PackingRequisitionSlipPa
   const sizeSum = calculateSizeTotal(params.sizes);
   const pairs = params.totalPairs !== undefined && params.totalPairs > 0 ? params.totalPairs : sizeSum;
   const article = params.article || '---';
-  const dateStr = params.date || '31-10-2026';
+  const dateStr = params.date || formatCurrentDateDDMMYYYY();
   const issueStatus = params.issueStatus || 'Pending Inward Issue';
   const activeCodes = resolveScaleKeysForBreakdown(params.sizes, params.sizeCodes);
   const activeFormat = inferSizeFormatFromCodes(activeCodes, params.sizeFormat);
@@ -3068,7 +3085,7 @@ export function buildMaterialRequisitionSlipHtml(params: {
   const mReq = getMaterialReqNumber(baseReq);
   const pairs = Math.max(0, Number(params.pairs || 0));
   const cartons = Math.max(1, Math.ceil(pairs / 60));
-  const dateStr = params.date || '04-11-2026';
+  const dateStr = params.date || formatCurrentDateDDMMYYYY();
 
   return `
     <div class="printable-slip-box">
@@ -3149,7 +3166,7 @@ export function buildAlterationRouteSlipHtml(params: {
 }): string {
   const baseReq = normalizeBaseReqNumber(params.reqNo || params.altReqNo);
   const aReq = getAlterationReqNumber(baseReq);
-  const dateStr = params.date || '04-11-2026';
+  const dateStr = params.date || formatCurrentDateDDMMYYYY();
 
   return `
     <div class="printable-slip-box">
@@ -3206,6 +3223,7 @@ export interface GrnSlipParams {
   article: string;
   color?: string;
   receivedFrom?: string;
+  splitSummary?: string;
   rcvdPairs: number;
   sizes: SizeBreakdown;
   sizeFormat?: string;
@@ -3218,7 +3236,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
   const color = params.color || 'Standard';
   const maker = params.maker || '---';
   const receivedFrom = params.receivedFrom || maker || '---';
-  const dateStr = params.date || '31-10-2026';
+  const dateStr = params.date || formatCurrentDateDDMMYYYY();
   const grnRef = params.grnRef || 'GRN-2026-0001';
   const sizeTotal = calculateSizeTotal(params.sizes);
   const rcvd = params.rcvdPairs > 0 ? params.rcvdPairs : sizeTotal;
@@ -3238,6 +3256,7 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
         <div><span>Receiving Date:</span> <strong>${escapeHtml(dateStr)}</strong></div>
         <div><span>Pending Order #:</span> <strong>${escapeHtml(pendingOrderId)}</strong></div>
         <div><span>Maker / Contractor:</span> <strong>${escapeHtml(maker)}</strong></div>
+        ${params.splitSummary ? `<div><span>Order Split:</span> <strong>${escapeHtml(params.splitSummary)}</strong></div>` : ''}
         <div><span>Article / Model:</span> <strong>${escapeHtml(article)}</strong></div>
         <div><span>Colour / Shade:</span> <strong>${escapeHtml(color)}</strong></div>
         <div><span>Received From:</span> <strong>${escapeHtml(receivedFrom)}</strong></div>
@@ -3269,6 +3288,46 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
         <span>Dock Receiver: _____________</span>
         <span>Store Head Sign: _____________</span>
       </div>
+    </div>
+  `;
+}
+
+export function buildGrnReceiveConfirmationHtml(params: {
+  pendingOrderId: string;
+  date: string;
+  splitSummary?: string;
+  batches: GrnSlipParams[];
+}): string {
+  const totalPairs = params.batches.reduce((sum, b) => sum + Number(b.rcvdPairs || calculateSizeTotal(b.sizes) || 0), 0);
+  const dateStr = params.date || formatCurrentDateDDMMYYYY();
+  const splitLabel = params.splitSummary || '';
+  const grnRefs = params.batches.map(b => b.grnRef || 'GRN').join(', ');
+  const senderSummary = params.batches
+    .map(b => {
+      const who = String(b.receivedFrom || b.maker || '---').trim();
+      const makerName = String(b.maker || '').trim();
+      return params.batches.length > 1 && makerName
+        ? `${who} (${makerName}: ${Number(b.rcvdPairs || 0).toLocaleString()} Prs)`
+        : `${who} (${makerName || 'Direct'})`;
+    })
+    .join(' • ');
+  const slipsHtml = params.batches
+    .map(b => buildGrnReceivingSlipHtml({ ...b, splitSummary: b.splitSummary || splitLabel || undefined }))
+    .join('<div style="margin-top: 14px; border-top: 1px dashed var(--border-strong); padding-top: 14px;"></div>');
+
+  return `
+    <div class="grn-confirm-banner" data-testid="grn-receive-confirmation" style="background: var(--ink-50); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px 12px; margin-bottom: 12px; font-size: 12.5px; color: var(--ink-950);">
+      <div style="font-weight: 800; margin-bottom: 4px;">
+        Receiving Confirmed &mdash; ${escapeHtml(grnRefs)} (${escapeHtml(dateStr)})
+      </div>
+      <div>
+        Received <strong>${totalPairs.toLocaleString()} Pairs</strong> from <strong>${escapeHtml(senderSummary)}</strong>
+        for Order <strong>${escapeHtml(params.pendingOrderId || '---')}</strong>.
+      </div>
+      ${splitLabel ? `<div style="margin-top: 4px; font-size: 11.5px; color: var(--ink-700);">Order Split Among: <strong>${escapeHtml(splitLabel)}</strong></div>` : ''}
+    </div>
+    <div id="doc-preview-container">
+      ${slipsHtml}
     </div>
   `;
 }

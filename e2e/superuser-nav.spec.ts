@@ -1217,4 +1217,124 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
 
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('Receiving Hall: Receive button, Option B multi-contractor split, confirmation popup with Print first, and live DD-MM-YYYY date', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    let printPopupOpened = false;
+    page.on('popup', () => {
+      printPopupOpened = true;
+    });
+
+    await authenticateAsSuperUser(page);
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+
+    // Create a split Master Order across 2 contractors (60 + 40 = 100 Prs)
+    await page.selectOption('#admin-pending-order-article', 'Model A1');
+    await page.fill('#admin-pending-order-po', 'PO-SPLIT-OPTION-B');
+    await page.fill('.admin-order-size-val[data-size="7"]', '60');
+    await page.fill('.admin-order-size-val[data-size="8"]', '40');
+    await page.click('#btn-admin-toggle-split');
+
+    const m1Val = await page.locator('.admin-split-maker[data-split-index="0"]').inputValue();
+    const m2Val = await page.locator('.admin-split-maker[data-split-index="1"]').inputValue();
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="7"]', '60');
+    await page.fill('.admin-split-size-val[data-split-index="0"][data-size="8"]', '0');
+    await page.fill('.admin-split-size-val[data-split-index="1"][data-size="8"]', '40');
+    await page.click('#btn-admin-add-pending-order');
+
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    // Compute today's expected DD-MM-YYYY date in browser context
+    const expectedTodayDate = await page.evaluate(() => {
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      return `${dd}-${mm}-${now.getFullYear()}`;
+    });
+
+    // Jump to Receiving Hall via + Receive GRN Batch
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+
+    // Verify 1) Receive button label, 3) Live DD-MM-YYYY date in header, and 2) Option B split table renders all contractors together
+    await expect(page.locator('#btn-print-grn-slip')).toHaveText('Receive');
+    await expect(page.locator('.system-date-label')).toHaveText(`Date: ${expectedTodayDate}`);
+    await expect(page.locator('#grn-split-entry-table')).toBeVisible();
+    await expect(page.locator('#grn-split-entry-table')).toContainText(m1Val);
+    await expect(page.locator('#grn-split-entry-table')).toContainText(m2Val);
+
+    // Validation requires Received From when entering qty for a split contractor
+    await page.fill(`.grn-split-size-val[data-split-idx="0"][data-size="7"]`, '30');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('.grn-split-received-from[data-split-idx="0"]')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+
+    // Enter both split contractors together in Option B (30 + 20 = 50 Pairs)
+    await page.fill('.grn-split-received-from[data-split-idx="0"]', 'Tariq Carrier');
+    await page.fill('.grn-split-received-from[data-split-idx="1"]', 'Imran Carrier');
+    await page.fill('.grn-split-size-val[data-split-idx="1"][data-size="8"]', '20');
+    await expect(page.locator('#grn-rcvd-pairs')).toHaveValue('50');
+
+    // Click Receive -> confirmation popup opens WITHOUT auto-printing, with Print button FIRST at the bottom
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    expect(printPopupOpened).toBe(false);
+
+    const confirmBox = page.locator('[data-testid="grn-receive-confirmation"]');
+    await expect(confirmBox).toBeVisible();
+    await expect(confirmBox).toContainText('50 Pairs');
+    await expect(confirmBox).toContainText('Tariq Carrier');
+    await expect(confirmBox).toContainText('Imran Carrier');
+    await expect(confirmBox).toContainText(expectedTodayDate);
+    await expect(confirmBox).toContainText(`Order Split Among: ${m1Val} (60 Prs), ${m2Val} (40 Prs)`);
+
+    const footerButtonIds = await page.locator('#global-modal .modal-footer button').evaluateAll(btns => btns.map(b => b.id));
+    expect(footerButtonIds[0]).toBe('modal-btn-print');
+    await expect(page.locator('#modal-btn-print')).toHaveText('Print');
+
+    // Clicking Print inside confirmation popup prints the slips
+    const [printPopup] = await Promise.all([
+      page.waitForEvent('popup'),
+      page.click('#modal-btn-print')
+    ]);
+    await expect(printPopup.locator('.printable-slip-box')).toHaveCount(2);
+    await printPopup.close();
+    await page.click('#modal-btn-close');
+
+    // Store Register table displays live date and order split context for both saved rows
+    const storeTable = page.locator('table.data-table');
+    await expect(storeTable).toContainText(expectedTodayDate);
+    await expect(storeTable).toContainText(`Split: ${m1Val} (60 Prs), ${m2Val} (40 Prs)`);
+
+    // Viewport overflow checks at 1440px and 375px on Option B split table
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await page.setViewportSize({ width: 375, height: 812 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    // Reload persistence verifies live date persisted into SQLite
+    await page.reload();
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    const reloadedFirstRow = page.locator('table.data-table tbody tr').first();
+    await expect(reloadedFirstRow).toContainText(expectedTodayDate);
+    await expect(reloadedFirstRow).not.toContainText('31-10-2026');
+
+    expect(runtimeErrors).toEqual([]);
+  });
 });

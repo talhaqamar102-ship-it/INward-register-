@@ -69,6 +69,9 @@ import {
   getDefaultStationForRole,
   createEmptySizes,
   getStartupRequisitionNumber,
+  formatCurrentDateDDMMYYYY,
+  formatSplitAllocationSummary,
+  buildGrnReceiveConfirmationHtml,
   PendingOrder,
   OrderWipState
 } from './requisitionLogic';
@@ -2049,4 +2052,53 @@ test('Slice 3: Dynamic multi-scale rollups, monochrome GRN/REQ slips, and WIP an
   });
   assert.ok(suTrackingHtml.includes('2XS:10'), 'Live tracking displays dynamic Planned Sizes for IXS MEN');
   assert.ok(!suTrackingHtml.includes('7:0 | 8:0 | 9:0 | 10:0 | 11:0'), 'Live tracking hides legacy 7..11 for IXS MEN');
+});
+
+test('Receiving Hall fixes: live DD-MM-YYYY date, Option B split confirmation popup & slip split summary', () => {
+  const fixedNow = new Date(2026, 10, 18, 9, 30, 0); // 18-11-2026 local
+  assert.equal(formatCurrentDateDDMMYYYY(fixedNow), '18-11-2026');
+
+  const splitSummary = formatSplitAllocationSummary([
+    { maker: 'Hall A', sizes: { '7': 60 }, totalQty: 60 },
+    { maker: 'Hall B', sizes: { '8': 40 }, totalQty: 40 }
+  ]);
+  assert.equal(splitSummary, 'Hall A (60 Prs), Hall B (40 Prs)');
+  assert.equal(formatSplitAllocationSummary([{ maker: 'Hall A', sizes: { '7': 60 }, totalQty: 60 }]), '');
+
+  const confirmHtml = buildGrnReceiveConfirmationHtml({
+    pendingOrderId: 'ORD-2026-105',
+    date: '18-11-2026',
+    splitSummary,
+    batches: [
+      {
+        grnRef: 'GRN-2026-0010',
+        date: '18-11-2026',
+        pendingOrderId: 'ORD-2026-105',
+        maker: 'Hall A',
+        article: 'Model A1',
+        color: 'Black',
+        receivedFrom: 'Tariq Carrier',
+        rcvdPairs: 30,
+        sizes: { '7': 30, '8': 0, '9': 0, '10': 0, '11': 0 }
+      },
+      {
+        grnRef: 'GRN-2026-0011',
+        date: '18-11-2026',
+        pendingOrderId: 'ORD-2026-105',
+        maker: 'Hall B',
+        article: 'Model A1',
+        color: 'Black',
+        receivedFrom: 'Imran Carrier',
+        rcvdPairs: 20,
+        sizes: { '7': 0, '8': 20, '9': 0, '10': 0, '11': 0 }
+      }
+    ]
+  });
+  assert.ok(confirmHtml.includes('data-testid="grn-receive-confirmation"'), 'Renders receive confirmation summary card');
+  assert.ok(confirmHtml.includes('50 Pairs'), 'Shows combined total pairs received');
+  assert.ok(confirmHtml.includes('Tariq Carrier'), 'Shows first received-from carrier');
+  assert.ok(confirmHtml.includes('Imran Carrier'), 'Shows second received-from carrier');
+  assert.ok(confirmHtml.includes('Hall A (60 Prs), Hall B (40 Prs)'), 'Displays all contractors order is split among');
+  assert.ok(confirmHtml.includes('18-11-2026'), 'Shows saved date instead of hardcoded 31-10-2026');
+  assert.ok(confirmHtml.includes('id="doc-preview-container"'), 'Wraps printable slip(s) inside #doc-preview-container for modal Print button');
 });

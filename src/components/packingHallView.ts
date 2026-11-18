@@ -9,7 +9,8 @@ import {
   isStage3ClearedForMaterialReq,
   isStage5ReadyForCartons,
   normalizeBaseReqNumber,
-  renderRequisitionWipAnalyticsChart
+  renderRequisitionWipAnalyticsChart,
+  formatCurrentDateDDMMYYYY
 } from '../utils/requisitionLogic';
 
 export type RollupSummaryParam = Parameters<typeof buildRequisitionAnalyticsSeries>[0];
@@ -94,7 +95,7 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
         Packing Hall Floor &mdash; 5-Stage WIP Flow &amp; Requisition Slip Generator
       </h1>
       <div class="sub-header-right">
-        <span class="system-date-label">Date: 31-10-2026</span>
+        <span class="system-date-label">Date: ${formatCurrentDateDDMMYYYY()}</span>
       </div>
     </div>
 

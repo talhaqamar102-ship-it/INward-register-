@@ -1,6 +1,6 @@
 {
-  "total_files": 328,
-  "total_words": 376354,
+  "total_files": 329,
+  "total_words": 378819,
   "files": {
     "code": [
       ".agents/skills/ck/commands/forget.mjs",
@@ -216,6 +216,7 @@
       ".agents/traces/2026-11-17-rule-tiers.md",
       ".agents/traces/2026-11-17-slice1-catalog-backend.md",
       ".agents/traces/2026-11-17-slice2-cascading-ui.md",
+      ".agents/traces/2026-11-17-slice3-downstream.md",
       ".agents/workflows/aside.md",
       ".agents/workflows/auto-update.md",
       ".agents/workflows/build-fix.md",
