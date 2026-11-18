@@ -7,7 +7,7 @@ Cohesion Score: `0.71` • Total Nodes: 60
 - **public/app-packing.js** (`file:public/app-packing.js`) — `public/app-packing.js:L1` (degree: 32)
 - **public/app-store.js** (`file:public/app-store.js`) — `public/app-store.js:L1` (degree: 19)
 - **loadActiveBatchDetails()** (`fn:public/app-packing.js:loadActiveBatchDetails`) — `public/app-packing.js:L78-L162` (degree: 19)
-- **public/index.html** (`file:public/index.html`) — `public/index.html:L1` (degree: 9)
+- **public/index.html** (`file:public/index.html`) — `public/index.html:L1` (degree: 10)
 - **public/style.css** (`file:public/style.css`) — `public/style.css:L1` (degree: 9)
 - **loadStoreData()** (`fn:public/app-store.js:loadStoreData`) — `public/app-store.js:L43-L52` (degree: 9)
 - **loadRequisitionsDropdown()** (`fn:public/app-packing.js:loadRequisitionsDropdown`) — `public/app-packing.js:L33-L61` (degree: 8)

@@ -81,6 +81,7 @@ export function renderModuleSwitcher(state: any): string {
   if (!state.currentUser) return '';
   const hasData = state.grnList.length > 0 || state.defectList.length > 0 || state.cartons.length > 0 || state.packingWip.plannedQty > 0;
   const isSuperUser = state.currentUser.role === 'SUPER_USER';
+  const isInwardClerk = state.currentUser.role === 'INWARD_CLERK';
   const viewingOtherScreen = isSuperUser && state.activeScreen !== 'screen-admin';
   const screenRoles: Record<string, SystemUserRecord['role']> = {
     'screen-grn': 'INWARD_CLERK',
@@ -89,6 +90,12 @@ export function renderModuleSwitcher(state: any): string {
     'screen-qc': 'QC_INSPECTOR',
     'screen-admin': 'SUPER_USER'
   };
+  const pendingAltCount = (state.defectList || []).filter(
+    (d: any) => d.rawStatus === 'SENT_FOR_ALTERATION' || d.status === 'In Rework'
+  ).length;
+  const displayedStationRole = (viewingOtherScreen || (isInwardClerk && state.activeScreen === 'screen-repair'))
+    ? (screenRoles[state.activeScreen] || state.currentUser.role)
+    : state.currentUser.role;
 
   return `
     <header class="module-switcher-bar">
@@ -98,10 +105,14 @@ export function renderModuleSwitcher(state: any): string {
         <span class="brand-title">HAMMAD INDUSTRIES</span>
       </div>
       <div class="module-switcher-left">
-        <span class="station-label">${escapeHtml(stationName(viewingOtherScreen
-          ? (screenRoles[state.activeScreen] || state.currentUser.role)
-          : state.currentUser.role))}</span>
+        <span class="station-label">${escapeHtml(stationName(displayedStationRole))}</span>
         ${viewingOtherScreen ? '<button class="btn-outline" id="btn-return-admin">Return to Super User</button>' : ''}
+        ${isInwardClerk ? `
+          <div style="display: inline-flex; gap: 6px; margin-left: 8px; flex-wrap: wrap;">
+            <button type="button" class="${state.activeScreen === 'screen-grn' ? 'btn-primary' : 'btn-outline'}" id="btn-inward-nav-grn" style="padding: 4px 10px; font-size: 11.5px;">Inward Register</button>
+            <button type="button" class="${state.activeScreen === 'screen-repair' ? 'btn-primary' : 'btn-outline'}" id="btn-inward-nav-repair" style="padding: 4px 10px; font-size: 11.5px;">Alteration Bay${pendingAltCount > 0 ? ` (${pendingAltCount})` : ''}</button>
+          </div>
+        ` : ''}
       </div>
       <div class="module-switcher-right">
         ${isSuperUser || state.currentUser.role === 'INWARD_CLERK' ? `

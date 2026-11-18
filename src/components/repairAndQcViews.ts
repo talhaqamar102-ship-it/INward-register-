@@ -21,9 +21,10 @@ export interface RepairAndQcStateShape {
   cartons: Array<Record<string, any>>;
 }
 
-export function renderRepairScreen(state: RepairAndQcStateShape): string {
+export function renderRepairScreen(state: RepairAndQcStateShape & { ordersWipMap?: Record<string, any> }): string {
   const aReq = getAlterationReqNumber(state.packingWip.selectedBatch);
-  const batchOptions = Array.from(new Set([aReq, ...state.dropdownOptions.defectBatchIds]));
+  const wipAltBatches = Object.keys(state.ordersWipMap || {}).map(req => getAlterationReqNumber(req));
+  const batchOptions = Array.from(new Set([aReq, ...wipAltBatches, ...state.dropdownOptions.defectBatchIds]));
   const savedTailorSelected = state.savedTailors.some(
     tailor => tailor.toLocaleLowerCase() === state.repairForm.tailor.toLocaleLowerCase()
   );
@@ -143,9 +144,12 @@ export function renderRepairScreen(state: RepairAndQcStateShape): string {
                     </td>
                     <td>${defect.route}</td>
                     <td class="text-center" style="white-space: nowrap;">
-                      <button class="table-btn" onclick="window.handleDefectAction('${defect.id}', '${defect.actionText}')">
-                        ${defect.actionText}
-                      </button>
+                      ${
+                        defect.altId && (defect.rawStatus === 'SENT_FOR_ALTERATION' || defect.status === 'In Rework')
+                          ? `<button type="button" class="table-btn" data-alt-return-id="${defect.altId}">Return Stage 1</button>
+                             <button type="button" class="table-btn" data-alt-scrap-id="${defect.altId}">Scrap</button>`
+                          : `<button type="button" class="table-btn" onclick="window.handleDefectAction('${escapeHtml(defect.id)}', '${escapeHtml(defect.actionText)}')">${escapeHtml(defect.actionText)}</button>`
+                      }
                     </td>
                   </tr>
                 `).join('')}

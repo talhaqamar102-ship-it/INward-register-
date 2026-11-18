@@ -1,10 +1,10 @@
 # C5: Automated Verification & DBRE Test Suites (test/)
 
-Cohesion Score: `0.51` • Total Nodes: 9
+Cohesion Score: `0.5` • Total Nodes: 9
 
 ## Nodes in Community
 
-- **test/http.test.js** (`file:test/http.test.js`) — `test/http.test.js:L1` (degree: 8)
+- **test/http.test.js** (`file:test/http.test.js`) — `test/http.test.js:L1` (degree: 10)
 - **createTestDatabase()** (`fn:test/order-integrity.test.js:createTestDatabase`) — `test/order-integrity.test.js:L10-L38` (degree: 6)
 - **test/order-integrity.test.js** (`file:test/order-integrity.test.js`) — `test/order-integrity.test.js:L1` (degree: 5)
 - **test/enterprise-gaps.test.js** (`file:test/enterprise-gaps.test.js`) — `test/enterprise-gaps.test.js:L1` (degree: 4)

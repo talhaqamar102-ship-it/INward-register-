@@ -30,13 +30,19 @@ function readSessionToken(req) {
   }
 }
 
-function setSessionCookie(res, token) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+function isHttpsRequest(req) {
+  if (req?.secure) return true;
+  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  return forwardedProto === 'https';
+}
+
+function setSessionCookie(req, res, token) {
+  const secure = isHttpsRequest(req) ? '; Secure' : '';
   res.append('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MAX_AGE_SECONDS}${secure}`);
 }
 
-function clearSessionCookie(res) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+function clearSessionCookie(req, res) {
+  const secure = isHttpsRequest(req) ? '; Secure' : '';
   res.append('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`);
 }
 
@@ -75,7 +81,7 @@ function getAllowedRoles(req) {
     return ['SUPER_USER', 'PACKING_SUPERVISOR'];
   }
   if (path === '/alterations' || /^\/alterations\/[^/]+\/(return|repair)$/.test(path)) {
-    return ['SUPER_USER', 'ALTERATION_LEAD'];
+    return ['SUPER_USER', 'ALTERATION_LEAD', 'INWARD_CLERK'];
   }
   if (path === '/materials/return' || /^\/bom\/[^/]+$/.test(path)) {
     return ['SUPER_USER', 'PACKING_SUPERVISOR'];
@@ -102,7 +108,7 @@ apiRouter.get('/auth/status', handle(req => ({
 apiRouter.post('/auth/bootstrap', handle((req, res) => {
   const user = AuthService.createInitialSuperUser(req.body || {});
   const session = AuthService.createSession(user.userId);
-  setSessionCookie(res, session.token);
+  setSessionCookie(req, res, session.token);
   return { user };
 }));
 
@@ -110,13 +116,13 @@ apiRouter.post('/auth/login', handle((req, res) => {
   const user = AuthService.verifyCredentials(req.body?.username, req.body?.password);
   if (!user) throw authError('Username or password is incorrect.', 401);
   const session = AuthService.createSession(user.userId);
-  setSessionCookie(res, session.token);
+  setSessionCookie(req, res, session.token);
   return { user };
 }));
 
 apiRouter.post('/auth/logout', handle((req, res) => {
   AuthService.destroySession(readSessionToken(req));
-  clearSessionCookie(res);
+  clearSessionCookie(req, res);
   return { loggedOut: true };
 }));
 
@@ -301,8 +307,14 @@ apiRouter.post('/materials/return', handle((req) => {
 
 // --- ALTERATION REWORK ATTRIBUTION (TAILOR & MAX 2-REWORK SCRAP) ---
 apiRouter.post('/alterations/:id/repair', handle((req) => {
-  const { tailorName, isScrap, deductionRate } = req.body;
-  return PackingService.completeAlterationRepair(Number(req.params.id), tailorName, Boolean(isScrap), deductionRate);
+  const { tailorName, isScrap, deductionRate, pairsCount } = req.body || {};
+  return PackingService.completeAlterationRepair(
+    Number(req.params.id),
+    tailorName,
+    Boolean(isScrap),
+    deductionRate,
+    pairsCount != null ? Number(pairsCount) : null
+  );
 }));
 
 // --- AQL 1.5 AUDIT & EXPORT MANIFEST ---
@@ -323,8 +335,11 @@ apiRouter.get('/export/manifest/:reqNo', handle((req) => {
 }));
 
 // --- SUPER USER ADMIN ENDPOINTS ---
-apiRouter.get('/admin/overview', handle(() => {
-  return PackingService.getAdminOverview();
+apiRouter.get('/admin/overview', handle((req) => {
+  return PackingService.getAdminOverview({
+    includeCatalog: req.query?.includeCatalog !== '0',
+    fullIntegrityCheck: req.query?.fullIntegrity === '1'
+  });
 }));
 
 apiRouter.get('/admin/users', handle(() => AuthService.listUsers()));

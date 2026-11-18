@@ -1,6 +1,6 @@
 {
-  "total_files": 354,
-  "total_words": 380989,
+  "total_files": 359,
+  "total_words": 386921,
   "files": {
     "code": [
       ".agents/skills/ck/commands/forget.mjs",
@@ -54,6 +54,9 @@
       "src/style.css",
       "src/styles/print.css",
       "src/styles/shopFloor.css",
+      "src/styles/su-dashboard.css",
+      "src/styles/su-live-tracking.css",
+      "src/styles/su-shared.css",
       "src/styles/superUser.css",
       "src/styles/tokensAndBase.css",
       "src/utils/domModalsAndPrint.ts",
@@ -238,10 +241,12 @@
       ".agents/traces/2026-11-17-slice1-catalog-backend.md",
       ".agents/traces/2026-11-17-slice2-cascading-ui.md",
       ".agents/traces/2026-11-17-slice3-downstream.md",
+      ".agents/traces/2026-11-18-inward-alteration-role.md",
       ".agents/traces/2026-11-18-phase1-split-requisition-logic.md",
       ".agents/traces/2026-11-18-phase2-and-3-modular-views-and-styles.md",
       ".agents/traces/2026-11-18-receiving-hall-option-b.md",
       ".agents/traces/2026-11-18-split-superuser-view.md",
+      ".agents/traces/2026-11-18-tunnel-and-sync-performance.md",
       ".agents/workflows/aside.md",
       ".agents/workflows/auto-update.md",
       ".agents/workflows/build-fix.md",

@@ -1337,4 +1337,258 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
 
     expect(runtimeErrors).toEqual([]);
   });
+
+  test('Inward Clerk can open Alteration Bay and return defective pairs back to Stage 1 in SQLite', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page);
+
+    // 1. Create an Inward Clerk account
+    await page.click('.admin-tab-btn[data-admin-tab="users"]');
+    const inwardUser = 'e2e.inward.alt';
+    const inwardPass = 'Inward-Alt-Password-2026!';
+    await page.fill('#admin-user-name', 'Inward Alteration Clerk');
+    await page.fill('#admin-user-username', inwardUser);
+    await page.fill('#admin-user-password', inwardPass);
+    await page.selectOption('#admin-user-role', 'INWARD_CLERK');
+    await page.click('#btn-admin-add-system-user');
+    await expect(page.locator('.su-user-table')).toContainText(inwardUser);
+
+    // 2. Create 100-pair Order, receive GRN, draw & issue REQ, and send 10 defects at Stage 1
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+    await page.selectOption('#admin-pending-order-maker', 'Hall A');
+    await page.selectOption('#admin-pending-order-article', 'Model A1');
+    await page.fill('#admin-pending-order-po', 'PO-E2E-ALT-01');
+    await page.fill('.admin-order-size-val[data-size="7"]', '100');
+    await page.click('#btn-admin-add-pending-order');
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await page.fill('#grn-received-from', 'Alteration Driver');
+    await page.fill('.grn-size-val >> nth=0', '100');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-create-req"][data-order-id="${orderId}"]`);
+    await expect(page.locator('#btn-confirm-lot-draw')).toBeVisible();
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes(`/api/orders/${encodeURIComponent(orderId)}/requisitions`) && res.status() === 200),
+      page.click('#btn-confirm-lot-draw')
+    ]);
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+    await page.click('#btn-issue-req-to-packing');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.locator(`#tracking-order-card-${orderId} button[data-su-action="open-req-screen"][data-target-screen="screen-packing"]`).first().click();
+    await expect(page.locator('#wip-stg1-in')).toHaveText('100');
+
+    // Stage 1: Pass 90, send 10 to Alteration Bay
+    await page.click('#btn-wip-step1');
+    await page.fill('#step1-defect-input', '10');
+    await page.click('#btn-submit-step1-action');
+    await expect(page.locator('#wip-stg2-in')).toHaveText('90');
+    await expect(page.locator('#wip-stg1-in')).toHaveText('0');
+    await expect(page.locator('#btn-wip-step1')).toBeDisabled();
+
+    // 3. Sign out of Super User and sign in as Inward Clerk
+    await page.click('#btn-session-lock');
+    await expect(page.locator('h1#auth-title')).toContainText('Sign in');
+    await page.fill('#auth-username', inwardUser);
+    await page.fill('#auth-password', inwardPass);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+
+    // Inward Clerk sees Alteration Bay toggle with 1 pending batch and can switch cleanly
+    const altNavBtn = page.locator('#btn-inward-nav-repair');
+    await expect(altNavBtn).toBeVisible();
+    await expect(altNavBtn).toContainText('Alteration Bay (1)');
+    await altNavBtn.click();
+    await expect(page.locator('.sub-header-title')).toContainText('Alteration & Repair Bay #2');
+    await expect(page.locator('table.data-table')).toContainText('10 Prs');
+
+    // Return the 10 pairs back to Stage 1 Checking and confirm persistence across reload
+    await page.fill('#defect-tailor', 'Master Tailor Khalid');
+    const returnBtn = page.locator('[data-alt-return-id]').first();
+    await expect(returnBtn).toBeVisible();
+    await returnBtn.click();
+    await expect(page.locator('table.data-table')).toContainText('Completed');
+    await expect(page.locator('#btn-inward-nav-repair')).toHaveText('Alteration Bay');
+
+    await page.reload();
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await page.click('#btn-inward-nav-repair');
+    await expect(page.locator('table.data-table')).toContainText('Completed');
+
+    // 4. Sign back in as Super User and verify Stage 1 input in Packing Hall increased to 110 (100 + 10 returned)
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', TEST_ADMIN.username);
+    await page.fill('#auth-password', TEST_ADMIN.password);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('[data-testid="superuser-command-center"]')).toBeVisible();
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.locator(`#tracking-order-card-${orderId} button[data-su-action="open-req-screen"][data-target-screen="screen-packing"]`).first().click();
+    await expect(page.locator('#wip-stg1-in')).toHaveText('10');
+    await expect(page.locator('#btn-wip-step1')).toBeEnabled();
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('Dashboard (.su-db) and Live Tracking (.su-lt) responsive layout, slip tags, and multi-viewport zero-overflow geometry', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await authenticateAsSuperUser(page, '?demo=1');
+    await page.click('#btn-load-demo-600-inprogress');
+    await expect(page.locator('#btn-remove-demo-600')).toBeVisible();
+
+    // Verify new .su-db Dashboard styles, Row 4 .su-vg layout, negative color cascade, slip modal, and 1440/768/375px zero-overflow geometry
+    await expect(page.locator('.su-db [data-testid="su-pulse-cards-grid"]')).toBeVisible();
+    await expect(page.locator('.su-db [data-testid="su-exceptions-strip"]')).toBeVisible();
+    await expect(page.locator('.su-db #su-active-orders-pulse-section')).toBeVisible();
+    await expect(page.locator('.su-vg .su-vg-bar').first()).toBeVisible();
+    const vgCheck = await page.evaluate(() => {
+      const bar = document.querySelector<HTMLElement>('.su-vg .su-vg-bar');
+      const arrow = document.querySelector<SVGElement>('.su-vg .su-vg-arrow');
+      return {
+        barHeight: bar ? bar.getBoundingClientRect().height : 0,
+        arrowWidth: arrow ? arrow.getBoundingClientRect().width : 0
+      };
+    });
+    expect(vgCheck.barHeight).toBeGreaterThan(10);
+    expect(vgCheck.arrowWidth).toBeLessThanOrEqual(20);
+    const negColor = await page.locator('.su-db td.su-db-neg').first().evaluate(el => getComputedStyle(el).color);
+    expect(negColor).toBe('rgb(220, 38, 38)');
+    await page.locator('.su-db button.su-db-ref[data-su-action="open-slip"]').first().click();
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    for (const vp of [
+      { width: 1440, height: 900, expectVgCols: 2 },
+      { width: 768, height: 1024, expectVgCols: 1 },
+      { width: 375, height: 812, expectVgCols: 1 }
+    ]) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      const dbGeom = await page.evaluate(() => {
+        const cw = document.documentElement.clientWidth;
+        const sw = document.documentElement.scrollWidth;
+        const vg = document.querySelector<HTMLElement>('.su-vg');
+        const vgCols = vg ? getComputedStyle(vg).gridTemplateColumns.trim().split(/\s+/).length : 0;
+        const offenders =
+          sw > cw
+            ? Array.from(document.querySelectorAll<HTMLElement>('.su-db *'))
+                .map(el => ({ tag: el.tagName, cls: String(el.className), right: Math.round(el.getBoundingClientRect().right) }))
+                .filter(x => x.right > cw + 1)
+                .slice(0, 8)
+            : [];
+        return { cw, sw, vgCols, offenders };
+      });
+      expect(dbGeom.vgCols).toBe(vp.expectVgCols);
+      expect(dbGeom.sw <= dbGeom.cw, `Dashboard overflow at ${vp.width}px (${dbGeom.sw} > ${dbGeom.cw}): ${JSON.stringify(dbGeom.offenders)}`).toBe(true);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await expect(page.locator('.su-lt .su-lt-toolbar')).toBeVisible();
+    await expect(page.locator('.su-lt .su-order-card.su-lt-card').first()).toBeVisible();
+    await expect(page.locator('.su-lt .su-lt-sizes').first()).toBeVisible();
+
+    // Countdown chip sits on its own row below .su-lt-title without overlapping
+    const headerGeom = await page.evaluate(() => {
+      const title = document.querySelector<HTMLElement>('.su-lt .su-lt-title');
+      const countdown = document.querySelector<HTMLElement>('.su-lt .su-lt-countdown');
+      if (!title || !countdown) throw new Error('Missing .su-lt-title or .su-lt-countdown');
+      const tr = title.getBoundingClientRect();
+      const cr = countdown.getBoundingClientRect();
+      return { titleBottom: tr.bottom, countdownTop: cr.top, countdownWidth: cr.width };
+    });
+    expect(headerGeom.countdownTop).toBeGreaterThanOrEqual(headerGeom.titleBottom - 1);
+    expect(headerGeom.countdownWidth).toBeGreaterThan(120);
+
+    // Clicking a REQ slip tag opens #global-modal cleanly
+    await page.locator('.su-lt button.su-lt-ref[data-su-action="open-slip"][data-slip-type="REQ"]').first().click();
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    // Verify 4-col -> 2-col stats, 2-col -> 1-col streams, and zero document horizontal overflow at 1440px, 768px, 375px
+    for (const vp of [
+      { width: 1440, height: 900, expectStatCols: 4, expectBodyCols: 2 },
+      { width: 768, height: 1024, expectStatCols: 2, expectBodyCols: 1 },
+      { width: 375, height: 812, expectStatCols: 2, expectBodyCols: 1 }
+    ]) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      const geom = await page.evaluate(() => {
+        const docOverflow = document.documentElement.scrollWidth > document.documentElement.clientWidth;
+        const card = document.querySelector<HTMLElement>('.su-lt .su-order-card.su-lt-card');
+        const stats = document.querySelector<HTMLElement>('.su-lt .su-lt-stats');
+        const body = document.querySelector<HTMLElement>('.su-lt .su-lt-body');
+        if (!card || !stats || !body) throw new Error('Missing .su-lt layout elements');
+        const statCols = getComputedStyle(stats).gridTemplateColumns.trim().split(/\s+/).length;
+        const bodyCols = getComputedStyle(body).gridTemplateColumns.trim().split(/\s+/).length;
+        const cw = document.documentElement.clientWidth;
+        const sw = document.documentElement.scrollWidth;
+        const offenders = docOverflow
+          ? Array.from(document.querySelectorAll<HTMLElement>('*'))
+              .map(el => ({
+                tag: el.tagName,
+                cls: el.className,
+                right: Math.round(el.getBoundingClientRect().right)
+              }))
+              .filter(x => x.right > cw + 1)
+              .slice(0, 8)
+          : [];
+        return {
+          vp: cw,
+          sw,
+          offenders,
+          docOverflow,
+          cardRight: card.getBoundingClientRect().right,
+          clientWidth: cw,
+          statCols,
+          bodyCols
+        };
+      });
+      expect(geom.docOverflow, `Overflow at ${vp.width}px (scrollWidth=${geom.sw}): ${JSON.stringify(geom.offenders)}`).toBe(false);
+      expect(geom.cardRight).toBeLessThanOrEqual(geom.clientWidth + 1);
+      expect(geom.statCols).toBe(vp.expectStatCols);
+      expect(geom.bodyCols).toBe(vp.expectBodyCols);
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.click('.admin-tab-btn[data-admin-tab="dashboard"]');
+    await page.click('#btn-remove-demo-600');
+    expect(runtimeErrors).toEqual([]);
+  });
 });

@@ -645,6 +645,8 @@ test('4.1, 3.8, 5.4, 10.2, 10.3, 10.4: lifecycle transitions, over-receipt polic
   // 10.4 RBAC
   assert.equal(canRolePerformAction('SUPER_USER', 'ORDER_CREATE'), true);
   assert.equal(canRolePerformAction('INWARD_CLERK', 'ORDER_CREATE'), false);
+  assert.equal(canRolePerformAction('INWARD_CLERK', 'ALTERATION_CYCLE_UPDATE'), true);
+  assert.equal(canRolePerformAction('INWARD_CLERK', 'SCRAP_CONDEMN'), true);
   assert.equal(canRolePerformAction('QC_INSPECTOR', 'FINAL_QC_APPROVE'), true);
 
   // 10.3 Audit entry

@@ -1,0 +1,137 @@
+/* Live Tracking, aligned to Super User.
+   Uses the app's own --su-* / --ink-* tokens and its btn-primary / btn-outline / panel-card components.
+   No --lt-* token layer, no dark block (the app has no data-theme toggle).
+   Load AFTER superUser.css. Selectors are prefixed with .su-lt (and .su-lt-card for the order card)
+   so they beat `.superuser-command-center .su-order-*` (0,2,0).
+   Based on unslop by Damir Sokolovsky (@heydamir), CC BY 4.0, https://github.com/heydamir/unslop */
+
+.su-lt { --lt-ease: cubic-bezier(0.22, 1, 0.36, 1); color: var(--su-text-primary); font-size: 14px; line-height: 20px; }
+.su-lt .num  { font-variant-numeric: tabular-nums; }
+.su-lt .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.su-lt .muted { color: var(--ink-600, #52525B); }          /* 7.0:1 on #f4f4f5 */
+.su-lt .sr-only { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+
+.su-lt button, .su-lt select, .su-lt input {
+  transition: color 160ms var(--lt-ease), background-color 160ms var(--lt-ease), border-color 160ms var(--lt-ease);
+}
+.su-lt button:focus-visible, .su-lt select:focus-visible, .su-lt input:focus-visible { outline: 2px solid var(--su-req-primary); outline-offset: 2px; }
+.su-lt button:active:not(:disabled) { transform: scale(0.98); }
+
+/* ---------- toolbar (uses .panel-card for border/radius, so it matches the WIP chart) ---------- */
+.su-lt .su-lt-toolbar { display: grid; gap: 12px; padding: 16px; margin-bottom: 16px; }
+.su-lt .su-lt-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.su-lt .su-lt-toolbar .form-input, .su-lt .su-lt-toolbar .form-select { height: 36px; font-size: 14px; }
+.su-lt .su-lt-toolbar .su-tracking-search-input { flex: 1 1 280px; min-width: 240px; }
+.su-lt .su-lt-toolbar .form-select { max-width: 200px; }
+.su-lt .su-lt-tabs { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.su-lt .su-lt-tabs .count { margin-left: 6px; font-family: var(--font-mono); font-size: 12px; opacity: .8; }
+.su-lt .su-lt-spacer { flex: 1; }
+.su-lt .su-lt-hint { font-size: 12px; color: var(--ink-600, #52525B); }
+.su-lt .su-lt-pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--su-border); font-size: 13px; color: var(--su-text-secondary); }
+
+/* ---------- buttons: colors come from btn-primary / btn-outline; this only sets size ---------- */
+.su-lt .su-lt-btn { height: 32px; padding: 0 12px; font-size: 13px; line-height: 1; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.su-lt .su-lt-btn:disabled { opacity: .45; cursor: not-allowed; }
+.su-lt .su-lt-btn--ghost { background: transparent; border: 1px solid transparent; color: var(--su-text-secondary); border-radius: var(--radius-sm); }
+.su-lt .su-lt-btn--ghost:hover:not(:disabled) { background: var(--su-bg-tertiary); color: var(--su-text-primary); }
+.su-lt .su-lt-btn--icon { width: 32px; padding: 0; justify-content: center; }
+.su-lt .su-lt-ico { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.su-lt .su-lt-chevron { transition: transform 160ms var(--lt-ease); }
+.su-lt [aria-expanded="false"] > .su-lt-chevron { transform: rotate(-90deg); }
+
+/* ---------- order card ---------- */
+.su-lt .su-order-card.su-lt-card { background: var(--su-white); border: 1px solid var(--su-border); border-radius: 6px; margin-bottom: 16px; overflow: hidden; box-shadow: none; }
+.su-lt .su-lt-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px 16px; align-items: start; padding: 16px; }
+.su-lt .su-lt-title { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; font-size: 16px; line-height: 24px; font-weight: 600; }
+.su-lt .su-lt-title .order-id { font-family: var(--font-mono); font-size: 14px; color: var(--su-req-primary); }
+.su-lt .su-lt-meta { margin-top: 4px; font-size: 13px; color: var(--su-text-secondary); display: flex; gap: 4px 8px; flex-wrap: wrap; }
+.su-lt .su-lt-meta .sep { color: var(--ink-600, #52525B); }
+.su-lt .su-lt-meta strong { font-weight: 600; color: var(--su-text-primary); }
+.su-lt .su-lt-countdown { display: block; max-width: 360px; margin-top: 8px; }   /* chip + its timeline bar get their own row */
+.su-lt .su-lt-splits { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.su-lt .su-lt-split { font-size: 12px; padding: 4px 8px; border-radius: 4px; background: var(--su-bg-tertiary); border: 1px solid var(--su-border); color: var(--su-text-secondary); font-variant-numeric: tabular-nums; }
+.su-lt .su-lt-split strong { font-weight: 600; color: var(--su-text-primary); }
+
+.su-lt .su-lt-side { display: grid; gap: 12px; justify-items: end; }
+.su-lt .su-lt-progress { width: 240px; display: grid; gap: 4px; }
+.su-lt .su-lt-progress-label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink-600, #52525B); font-variant-numeric: tabular-nums; }
+.su-lt .su-lt-progress-label strong { font-weight: 600; color: var(--su-complete-dark); }
+.su-lt .su-lt-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--su-border-subtle); border: 1px solid var(--su-border); }
+/* same four stage colors the rest of Super User uses */
+.su-lt .su-lt-seg-s5  { background: var(--su-complete-primary); }
+.su-lt .su-lt-seg-s4  { background: var(--su-mreq-primary); }
+.su-lt .su-lt-seg-wip { background: var(--su-req-accent); }
+.su-lt .su-lt-seg-alt { background: var(--su-areq-primary); }
+.su-lt .su-lt-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------- stats: 4 lead + 4 supporting ---------- */
+.su-lt .su-lt-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 24px; margin: 0; padding: 16px; border-top: 1px solid var(--su-border); background: var(--su-bg-tertiary); }
+.su-lt .su-lt-stats > div { display: grid; gap: 2px; }
+.su-lt .su-lt-stats dt { font-size: 12px; color: var(--ink-600, #52525B); }
+.su-lt .su-lt-stats dd { margin: 0; font-size: 14px; color: var(--su-text-primary); font-variant-numeric: tabular-nums; }
+.su-lt .su-lt-stats .lead dd { font-size: 24px; line-height: 28px; font-weight: 600; }
+.su-lt .su-lt-stats .lead.packed dd { color: var(--su-complete-dark); }
+.su-lt .su-lt-stats dd small { font-size: 12px; font-weight: 400; color: var(--ink-600, #52525B); margin-left: 4px; }
+
+/* ---------- size table ---------- */
+.su-lt .su-lt-sizes { padding: 16px 16px 0; overflow-x: auto; }
+.su-lt .su-lt-sizes table { border-collapse: collapse; font-size: 13px; }
+.su-lt .su-lt-sizes th, .su-lt .su-lt-sizes td { padding: 4px 12px; text-align: right; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--su-border-subtle); }
+.su-lt .su-lt-sizes th { color: var(--ink-600, #52525B); font-weight: 400; }
+.su-lt .su-lt-sizes th:first-child, .su-lt .su-lt-sizes td:first-child { text-align: left; padding-left: 0; color: var(--su-text-secondary); }
+
+/* ---------- two streams ---------- */
+.su-lt .su-lt-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; padding: 16px; }
+@media (max-width: 1280px) { .su-lt .su-lt-body { grid-template-columns: minmax(0, 1fr); } .su-lt .su-lt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.su-lt .su-lt-panel { border: 1px solid var(--su-border); border-radius: 6px; overflow: hidden; background: var(--su-white); }
+.su-lt .su-lt-panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 12px; background: var(--su-bg-tertiary); border-bottom: 1px solid var(--su-border); }
+.su-lt .su-lt-panel-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--su-text-primary); }
+.su-lt .su-lt-panel-head span { font-size: 12px; color: var(--ink-600, #52525B); font-variant-numeric: tabular-nums; }
+.su-lt .su-lt-panel .data-table { width: 100%; margin: 0; border-collapse: collapse; }
+.su-lt .su-lt-panel .data-table th { height: 36px; padding: 0 12px; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--ink-600, #52525B); text-align: left; background: transparent; border-bottom: 1px solid var(--su-border); white-space: nowrap; }
+.su-lt .su-lt-panel .data-table td { padding: 12px; font-size: 13px; vertical-align: top; border-bottom: 1px solid var(--su-border-subtle); font-variant-numeric: tabular-nums; }
+.su-lt .su-lt-panel .data-table th.text-right, .su-lt .su-lt-panel .data-table td.text-right { text-align: right; }
+.su-lt .su-lt-panel .data-table th.text-center, .su-lt .su-lt-panel .data-table td.text-center { text-align: center; }
+.su-lt .su-lt-panel .data-table tbody tr:last-child td { border-bottom: 0; }
+.su-lt .su-lt-panel .data-table tbody tr:hover { background: var(--su-bg-tertiary); }
+.su-lt .su-lt-panel .data-table tbody tr.is-highlighted { background: var(--su-req-bg); box-shadow: inset 2px 0 0 var(--su-req-primary); }
+.su-lt .su-lt-panel .data-table td.su-lt-empty-row { padding: 24px 16px; text-align: center; color: var(--ink-600, #52525B); }
+.su-lt .su-lt-sub { margin-top: 4px; font-size: 12px; color: var(--ink-600, #52525B); font-family: var(--font-mono); }
+.su-lt .su-lt-figs { display: flex; gap: 4px 12px; flex-wrap: wrap; font-size: 12px; color: var(--ink-600, #52525B); }
+.su-lt .su-lt-figs b { font-weight: 600; color: var(--su-text-primary); margin-left: 4px; }
+.su-lt .su-lt-figs .s5 b  { color: var(--su-complete-dark); }
+.su-lt .su-lt-figs .neg b { color: var(--su-areq-primary); }
+
+/* signature: reference codes as slip tags with a type dot */
+.su-lt .su-lt-ref { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--su-text-primary); background: var(--su-bg-tertiary); border: 1px solid var(--su-border); }
+.su-lt button.su-lt-ref { cursor: pointer; }
+.su-lt button.su-lt-ref:hover { background: var(--su-white); border-color: var(--su-text-secondary); }
+.su-lt .su-lt-ref i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-600, #52525B); flex: none; }
+.su-lt .su-lt-ref--grn i  { background: var(--su-grn-dark); }
+.su-lt .su-lt-ref--req i  { background: var(--su-req-primary); }
+.su-lt .su-lt-ref--areq i { background: var(--su-areq-primary); }
+
+.su-lt .su-lt-link { border: 0; background: transparent; padding: 4px 8px; border-radius: 4px; font-size: 13px; color: var(--su-text-secondary); cursor: pointer; }
+.su-lt .su-lt-link:hover { background: var(--su-bg-tertiary); color: var(--su-text-primary); }
+.su-lt .su-lt-link--danger:hover { color: var(--su-areq-primary); }
+
+/* ---------- empty + chart spacing ---------- */
+.su-lt .su-lt-empty { padding: 48px 24px; text-align: center; }
+.su-lt .su-lt-empty h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.su-lt .su-lt-empty p { margin: 0 auto 16px; max-width: 36rem; color: var(--su-text-secondary); }
+.su-lt .su-lt-chart { margin-bottom: 16px; }
+
+/* ---------- touch (factory tablets) ---------- */
+@media (pointer: coarse) {
+  .su-lt .su-lt-btn, .su-lt .su-lt-toolbar .form-input, .su-lt .su-lt-toolbar .form-select { min-height: 44px; height: 44px; }
+  .su-lt .su-lt-btn--icon { width: 44px; }
+  .su-lt .su-lt-link { min-height: 44px; padding: 0 12px; }
+  .su-lt button.su-lt-ref { min-height: 32px; height: 32px; }
+}
+@media (max-width: 900px) {
+  .su-lt .su-lt-head { grid-template-columns: auto minmax(0, 1fr); }
+  .su-lt .su-lt-side { grid-column: 1 / -1; justify-items: start; }
+  .su-lt .su-lt-progress { width: 100%; }
+  .su-lt .su-lt-actions { justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { .su-lt * { transition: none !important; } }

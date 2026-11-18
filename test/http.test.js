@@ -1074,4 +1074,176 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
       }
     }
   });
+
+  test('API: /api/admin/overview supports ?includeCatalog=0 fast incremental refresh without resending catalog SKUs', async () => {
+    const fullRes = await apiFetch(`${baseUrl}/api/admin/overview`);
+    assert.equal(fullRes.status, 200);
+    const fullJson = await fullRes.json();
+    assert.equal(fullJson.success, true);
+    assert.equal(fullJson.data.dbHealth.integrity, 'ok');
+    assert.ok(Array.isArray(fullJson.data.products) && fullJson.data.products.length > 0);
+    assert.ok(Array.isArray(fullJson.data.customers) && fullJson.data.customers.length > 0);
+    assert.ok(Array.isArray(fullJson.data.sizeStandards) && fullJson.data.sizeStandards.length > 0);
+
+    const slimRes = await apiFetch(`${baseUrl}/api/admin/overview?includeCatalog=0`);
+    assert.equal(slimRes.status, 200);
+    const slimJson = await slimRes.json();
+    assert.equal(slimJson.success, true);
+    assert.equal(slimJson.data.dbHealth.integrity, 'ok');
+    assert.equal(slimJson.data.products, undefined);
+    assert.equal(slimJson.data.customers, undefined);
+    assert.equal(slimJson.data.sizeStandards, undefined);
+    assert.ok(Array.isArray(slimJson.data.pendingOrders));
+  });
+
+  test('API authentication: session cookie omits Secure on plain HTTP LAN requests even in production and adds Secure for HTTPS proxies', async () => {
+    const prevNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const httpLogin = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: adminUsername, password: adminPassword })
+      });
+      assert.equal(httpLogin.status, 200);
+      const httpCookie = httpLogin.headers.get('set-cookie') || '';
+      assert.match(httpCookie, /HttpOnly/);
+      assert.equal(/;\s*Secure\b/i.test(httpCookie), false);
+      const httpTok = decodeURIComponent(httpCookie.split(';')[0].split('=')[1] || '');
+      if (httpTok) AuthService.destroySession(httpTok);
+
+      const httpsLogin = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Forwarded-Proto': 'https' },
+        body: JSON.stringify({ username: adminUsername, password: adminPassword })
+      });
+      assert.equal(httpsLogin.status, 200);
+      const httpsCookie = httpsLogin.headers.get('set-cookie') || '';
+      assert.match(httpsCookie, /;\s*Secure\b/i);
+      const httpsTok = decodeURIComponent(httpsCookie.split(';')[0].split('=')[1] || '');
+      if (httpsTok) AuthService.destroySession(httpsTok);
+    } finally {
+      process.env.NODE_ENV = prevNodeEnv;
+    }
+  });
+
+  test('API RBAC: INWARD_CLERK can inspect alterations and return repaired/partial pairs back to Stage 1', async () => {
+    const master = db.prepare(`
+      SELECT c.name AS buyer, p.name AS article
+      FROM customers c JOIN products p ON p.customer_id = c.id
+      WHERE p.name = 'Model A9'
+      LIMIT 1
+    `).get();
+    assert.ok(master);
+
+    let orderId;
+    let rcvNumber;
+    let reqNumber;
+
+    try {
+      const orderResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyer: master.buyer,
+          maker: 'Alteration Maker',
+          po: `PO-ALT-${randomUUID()}`,
+          article: master.article,
+          sizes: { '7': 10, '8': 10, '9': 10, '10': 10, '11': 10 },
+          totalQty: 50
+        })
+      });
+      assert.equal(orderResp.status, 200);
+      orderId = (await orderResp.json()).data.orderId;
+
+      const grnResp = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          makerContractor: 'Alteration Maker',
+          receivedFrom: 'Driver Alt',
+          strictInwardEntry: true,
+          sizes: { '7': 10, '8': 10, '9': 10, '10': 10, '11': 10 },
+          rcvdPairs: 50
+        })
+      }, inwardCookie);
+      assert.equal(grnResp.status, 200);
+      rcvNumber = (await grnResp.json()).data.rcv_number;
+
+      const reqResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: { '7': 10, '8': 10, '9': 10, '10': 10, '11': 10 } })
+      }, packingCookie);
+      assert.equal(reqResp.status, 200);
+      reqNumber = (await reqResp.json()).data.reqNumber;
+
+      const issueResp = await apiFetch(`${baseUrl}/api/orders/${orderId}/issue-req`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reqNumber, requestedPairs: 50 })
+      }, inwardCookie);
+      assert.equal(issueResp.status, 200);
+
+      // Packing supervisor logs 40 good and 10 defective pairs in Stage 1
+      const s1Resp = await apiFetch(`${baseUrl}/api/wip/${reqNumber}/step1-checking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goodPairs: 40, defectPairs: 10, defectReason: 'Stitching Skip' })
+      }, packingCookie);
+      assert.equal(s1Resp.status, 200);
+
+      // Inward Clerk reads /api/alterations (200) and sees the 10-pair pending ticket
+      const altListResp = await apiFetch(`${baseUrl}/api/alterations?reqNo=${encodeURIComponent(reqNumber)}`, {}, inwardCookie);
+      assert.equal(altListResp.status, 200);
+      const altList = (await altListResp.json()).data;
+      const openAlt = altList.find(a => a.req_number === reqNumber && a.status === 'SENT_FOR_ALTERATION');
+      assert.ok(openAlt);
+      assert.equal(openAlt.pairs_count, 10);
+
+      // Inward Clerk returns 4 pairs first (partial repair back to Stage 1)
+      const partialResp = await apiFetch(`${baseUrl}/api/alterations/${openAlt.id}/repair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tailorName: 'Tailor Rashid', isScrap: false, pairsCount: 4 })
+      }, inwardCookie);
+      assert.equal(partialResp.status, 200);
+      assert.equal((await partialResp.json()).data.pairsCount, 4);
+
+      let reqAfter = (await (await apiFetch(`${baseUrl}/api/requisitions/${encodeURIComponent(reqNumber)}`)).json()).data;
+      assert.equal(reqAfter.wip.step1_checking_in, 54);
+      const remainingOpen = reqAfter.alterations.find(a => a.id === openAlt.id);
+      assert.equal(remainingOpen.status, 'SENT_FOR_ALTERATION');
+      assert.equal(remainingOpen.pairs_count, 6);
+
+      // Inward Clerk returns the remaining 6 pairs to Stage 1
+      const finalResp = await apiFetch(`${baseUrl}/api/alterations/${openAlt.id}/repair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tailorName: 'Tailor Rashid', isScrap: false })
+      }, inwardCookie);
+      assert.equal(finalResp.status, 200);
+      assert.equal((await finalResp.json()).data.pairsCount, 6);
+
+      reqAfter = (await (await apiFetch(`${baseUrl}/api/requisitions/${encodeURIComponent(reqNumber)}`)).json()).data;
+      assert.equal(reqAfter.wip.step1_checking_in, 60);
+      assert.equal(reqAfter.alterations.filter(a => a.status === 'SENT_FOR_ALTERATION').length, 0);
+    } finally {
+      if (reqNumber) {
+        db.prepare('DELETE FROM scrap_ledger WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM alterations WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM packing_wip WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM grn_req_allocations WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM glove_requisitions WHERE req_number = ?').run(reqNumber);
+      }
+      if (rcvNumber) {
+        db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
+      }
+      if (orderId) {
+        db.prepare('DELETE FROM order_contractor_allocations WHERE order_id = ?').run(orderId);
+        db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(orderId);
+      }
+    }
+  });
 });

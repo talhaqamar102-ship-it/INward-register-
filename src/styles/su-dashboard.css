@@ -1,0 +1,76 @@
+/* Super User dashboard, aligned to Live Tracking.
+   Built on the app's own --su-* / --ink-* tokens and its btn-primary / btn-outline / panel-card /
+   admin-kpi-* components. No new token layer, no dark block (the app has no data-theme toggle).
+   Load AFTER superUser.css. Every selector starts with .su-db, and KPI rules go one level deeper,
+   so they beat `.superuser-command-center .admin-kpi-*` (0,2,0 to 0,3,0).
+   Based on unslop by Damir Sokolovsky (@heydamir), CC BY 4.0, https://github.com/heydamir/unslop */
+
+.su-db { --db-ease: cubic-bezier(0.22, 1, 0.36, 1); display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; color: var(--su-text-primary); font-size: 14px; line-height: 20px; }
+.su-db .num   { font-variant-numeric: tabular-nums; }
+.su-db .mono  { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.su-db .sr-only { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+/* one rhythm: the container gap replaces the old 10px / 12px margins */
+.su-db .admin-kpi-grid, .su-db .two-column-grid, .su-db .panel-card { margin: 0; }
+.su-db .admin-kpi-grid, .su-db .two-column-grid { gap: 16px; }
+
+.su-db button, .su-db summary { transition: color 160ms var(--db-ease), background-color 160ms var(--db-ease), border-color 160ms var(--db-ease); }
+.su-db button:focus-visible, .su-db summary:focus-visible, .su-db .su-db-scroll:focus-visible { outline: 2px solid var(--su-req-primary); outline-offset: 2px; }
+.su-db button:active:not(:disabled) { transform: scale(0.98); }
+
+/* ---------- demo drawer + reconciliation health ---------- */
+.su-db .su-db-health { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.su-db .su-db-health strong { font-weight: 600; color: var(--su-text-primary); }
+.su-db .su-demo-drawer-actions { gap: 8px; flex-wrap: wrap; }
+.su-db .su-db-btn { height: 32px; padding: 0 12px; font-size: 13px; line-height: 1; white-space: nowrap; display: inline-flex; align-items: center; }
+.su-db .su-db-btn--danger.btn-outline,
+.su-db .su-db-btn--danger.btn-outline:hover:not(:disabled) { color: var(--su-areq-dark); border-color: var(--su-areq-border); }
+.su-db .su-db-btn--danger.btn-outline:hover:not(:disabled) { background: var(--su-bg-tertiary); }
+.su-db .su-db-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- KPI cards: neutral figures, color only when something is wrong ---------- */
+.su-db .admin-kpi-grid .admin-kpi-card { padding: 16px; display: grid; gap: 4px; align-content: start; }
+.su-db .admin-kpi-grid .admin-kpi-card .admin-kpi-label { font-size: 13px; line-height: 20px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--su-text-secondary); }
+.su-db .admin-kpi-grid .admin-kpi-card .admin-kpi-value { font-size: 28px; line-height: 32px; font-weight: 600; color: var(--su-text-primary); font-variant-numeric: tabular-nums; }
+.su-db .admin-kpi-grid .admin-kpi-card .admin-kpi-value small { margin-left: 8px; font-size: 13px; line-height: 20px; font-weight: 400; color: var(--ink-600, #52525B); }
+.su-db .admin-kpi-grid .admin-kpi-card .admin-kpi-value.su-db-neg { color: var(--su-areq-primary); }
+.su-db .admin-kpi-grid .admin-kpi-card .admin-kpi-sub { display: grid; gap: 2px; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--ink-600, #52525B); font-variant-numeric: tabular-nums; }
+.su-db .admin-kpi-grid .admin-kpi-card .admin-kpi-sub strong { font-weight: 600; color: var(--su-text-primary); }
+
+/* ---------- panels + tables ---------- */
+.su-db .panel-card-title { font-weight: 600; font-size: 14px; }
+.su-db .su-db-scroll { overflow: auto; }
+.su-db .su-db-scroll--short { max-height: 220px; }
+.su-db .su-db-scroll--tall  { max-height: 400px; }
+.su-db .su-db-scroll .data-table { width: 100%; margin: 0; border-collapse: collapse; }
+.su-db .su-db-scroll .data-table th { position: sticky; top: 0; z-index: 1; height: 36px; padding: 0 12px; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--ink-600, #52525B); text-align: left; background: var(--su-bg-tertiary); border-bottom: 1px solid var(--su-border); white-space: nowrap; }
+.su-db .su-db-scroll .data-table td { padding: 12px; font-size: 13px; vertical-align: top; border-bottom: 1px solid var(--su-border-subtle); }
+.su-db .su-db-scroll .data-table th.text-right, .su-db .su-db-scroll .data-table td.text-right { text-align: right; }
+.su-db .su-db-scroll .data-table th.text-center, .su-db .su-db-scroll .data-table td.text-center { text-align: center; }
+.su-db .su-db-scroll .data-table tbody tr:last-child td { border-bottom: 0; }
+.su-db .su-db-scroll .data-table tbody tr:hover { background: var(--su-bg-tertiary); }
+.su-db .su-db-scroll .data-table td.su-db-empty { padding: 24px 16px; text-align: center; color: var(--ink-600, #52525B); }
+.su-db .su-db-scroll .data-table td.su-db-empty--tall { padding: 32px 16px; }
+.su-db .su-db-empty--tall > div { margin-bottom: 12px; }
+.su-db .su-db-sub { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--ink-600, #52525B); font-variant-numeric: tabular-nums; }
+.su-db .su-db-stack { margin-top: 4px; }
+.su-db .su-db-scroll .data-table td.su-db-neg { color: var(--su-areq-primary); }
+.su-db .su-db-scroll .data-table td.su-db-ok  { color: var(--su-complete-dark); font-weight: 600; }
+
+/* slip tags: same component as Live Tracking */
+.su-db .su-db-ref { display: inline-flex; align-items: center; gap: 6px; height: 24px; min-height: 24px; white-space: nowrap; padding: 0 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--su-text-primary); background: var(--su-bg-tertiary); border: 1px solid var(--su-border); cursor: pointer; }
+.su-db .su-db-ref:hover { background: var(--su-white); border-color: var(--su-text-secondary); }
+.su-db .su-db-ref i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-600, #52525B); flex: none; }
+.su-db .su-db-ref--grn i  { background: var(--su-grn-dark); }
+.su-db .su-db-ref--req i  { background: var(--su-req-primary); }
+.su-db .su-db-ref--areq i { background: var(--su-areq-primary); }
+
+.su-db .su-db-link { border: 0; background: transparent; padding: 4px 8px; border-radius: 4px; font-size: 13px; color: var(--su-text-secondary); cursor: pointer; white-space: nowrap; }
+.su-db .su-db-link:hover { background: var(--su-bg-tertiary); color: var(--su-text-primary); }
+
+/* ---------- touch (factory tablets) ---------- */
+@media (pointer: coarse) {
+  .su-db .su-db-btn { min-height: 44px; height: 44px; }
+  .su-db .su-db-link { min-height: 44px; padding: 0 12px; }
+  .su-db .su-db-ref { height: 32px; min-height: 32px; }
+}
+@media (prefers-reduced-motion: reduce) { .su-db * { transition: none !important; } }

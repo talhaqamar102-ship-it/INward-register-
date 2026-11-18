@@ -18,6 +18,9 @@
       "file:src/style.css",
       "file:src/styles/print.css",
       "file:src/styles/shopFloor.css",
+      "file:src/styles/su-dashboard.css",
+      "file:src/styles/su-live-tracking.css",
+      "file:src/styles/su-shared.css",
       "file:src/styles/superUser.css",
       "file:src/styles/tokensAndBase.css",
       "fn:src/components/authView.ts:screenForRole",
@@ -33,6 +36,8 @@
       "dom:#auth-password",
       "dom:#auth-password-confirm",
       "dom:#btn-return-admin",
+      "dom:#btn-inward-nav-grn",
+      "dom:#btn-inward-nav-repair",
       "dom:#btn-open-doc-center",
       "dom:#btn-clear-all-data",
       "dom:#btn-session-lock",
@@ -181,6 +186,7 @@
       "fn:src/components/superUser/shared.ts:renderReconciliationBadge",
       "fn:src/components/superUser/shared.ts:renderDeliveryCountdownChip",
       "fn:src/components/superUser/shared.ts:renderStageMiniTrack",
+      "fn:src/components/superUser/shared.ts:renderRefTag",
       "fn:src/components/superUser/shared.ts:renderDashboardVisualGraphs",
       "fn:src/components/superUser/shared.ts:renderOrderGrnChipsWithOverflow",
       "fn:src/components/superUser/shared.ts:renderOrderReqChipsWithOverflow",
@@ -258,6 +264,9 @@
       "fn:src/main.ts:syncAdminOrderDraftFromDom",
       "fn:src/main.ts:updateAdminSplitBalanceDom",
       "fn:src/main.ts:recalcAdminOrderSizes",
+      "fn:src/main.ts:applyDropdownsPayload",
+      "fn:src/main.ts:applyReceivingsPayload",
+      "fn:src/main.ts:applyAlterationsPayload",
       "fn:src/main.ts:syncBackendData",
       "fn:src/main.ts:window.adminToggleOrderExpand",
       "fn:src/main.ts:window.adminSetAllOrdersExpanded",
@@ -448,8 +457,14 @@
       "file:server.ts",
       "file:src/routes/api.js",
       "file:src/server.js",
+      "iface:server.ts:PrecompressedAsset",
+      "fn:server.ts:pickEncoding",
+      "fn:server.ts:sendCompressedBuffer",
+      "fn:server.ts:buildStaticAssetCache",
+      "fn:server.ts:walk",
       "fn:server.ts:startServer",
       "fn:src/routes/api.js:readSessionToken",
+      "fn:src/routes/api.js:isHttpsRequest",
       "fn:src/routes/api.js:setSessionCookie",
       "fn:src/routes/api.js:clearSessionCookie",
       "fn:src/routes/api.js:authError",
@@ -871,10 +886,12 @@
       "file:.agents/traces/2026-11-17-slice1-catalog-backend.md",
       "file:.agents/traces/2026-11-17-slice2-cascading-ui.md",
       "file:.agents/traces/2026-11-17-slice3-downstream.md",
+      "file:.agents/traces/2026-11-18-inward-alteration-role.md",
       "file:.agents/traces/2026-11-18-phase1-split-requisition-logic.md",
       "file:.agents/traces/2026-11-18-phase2-and-3-modular-views-and-styles.md",
       "file:.agents/traces/2026-11-18-receiving-hall-option-b.md",
       "file:.agents/traces/2026-11-18-split-superuser-view.md",
+      "file:.agents/traces/2026-11-18-tunnel-and-sync-performance.md",
       "file:.agents/workflows/aside.md",
       "file:.agents/workflows/auto-update.md",
       "file:.agents/workflows/build-fix.md",
@@ -1079,12 +1096,12 @@
   "cohesion": {
     "0": 0.76,
     "1": 0.63,
-    "2": 0.6,
+    "2": 0.61,
     "3": 0.61,
-    "4": 0.59,
-    "5": 0.51,
+    "4": 0.6,
+    "5": 0.5,
     "6": 0.71,
-    "7": 0.73
+    "7": 0.72
   },
   "gods": [
     {
@@ -1096,7 +1113,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 267
+      "degree": 274
     },
     {
       "id": "file:src/routes/api.js",
@@ -1107,7 +1124,7 @@
       "source_location": "L1",
       "community": 2,
       "community_label": "Express API & HTTP Server Layer (server.ts, api.js)",
-      "degree": 69
+      "degree": 72
     },
     {
       "id": "fn:src/main.ts:attachAdminHandlers",
@@ -1115,7 +1132,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L3405-L4176",
+      "source_location": "L3464-L4241",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 55
@@ -1126,7 +1143,7 @@
       "kind": "class",
       "file_type": "code",
       "source_file": "src/services/packingService.js",
-      "source_location": "L52-L2055",
+      "source_location": "L52-L2099",
       "community": 3,
       "community_label": "Packing Hall 5-Stage & AQL Domain Services (src/services)",
       "degree": 50
@@ -1173,7 +1190,7 @@
       "source_location": "L1",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
-      "degree": 42
+      "degree": 43
     },
     {
       "id": "table:cartons",
@@ -1192,7 +1209,7 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L987-L1719",
+      "source_location": "L1003-L1735",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 35
@@ -1203,20 +1220,20 @@
       "kind": "function",
       "file_type": "code",
       "source_file": "src/main.ts",
-      "source_location": "L2202-L2804",
+      "source_location": "L2261-L2863",
       "community": 0,
       "community_label": "Frontend MES Screens & UI State (src/main.ts)",
       "degree": 35
     },
     {
-      "id": "fn:src/main.ts:renderApp",
-      "label": "renderApp()",
-      "kind": "function",
+      "id": "file:src/utils/requisitionLogic.test.ts",
+      "label": "src/utils/requisitionLogic.test.ts",
+      "kind": "file",
       "file_type": "code",
-      "source_file": "src/main.ts",
-      "source_location": "L729-L729",
-      "community": 0,
-      "community_label": "Frontend MES Screens & UI State (src/main.ts)",
+      "source_file": "src/utils/requisitionLogic.test.ts",
+      "source_location": "L1",
+      "community": 1,
+      "community_label": "Requisition & Multi-Order Pure Logic (src/utils)",
       "degree": 34
     }
   ],

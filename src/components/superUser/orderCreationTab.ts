@@ -456,9 +456,15 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                 <tr><th>Product ID</th><th>Article</th><th>Buyer</th><th class="text-right">Polybag</th><th class="text-right">Silica</th><th class="text-right">Stickers</th><th class="text-right">Prs/Ctn</th></tr>
               </thead>
               <tbody>
-                ${ov.products
-                  .map(
-                    (p: any) => `
+                ${(() => {
+                  const filteredProducts = draft.customerId || draft.buyer
+                    ? filterProductsByBuyer(ov.products, allCustomers, draft.customerId || draft.buyer)
+                    : ov.products;
+                  const MAX_ARTICLE_ROWS = 80;
+                  const visibleProducts = filteredProducts.slice(0, MAX_ARTICLE_ROWS);
+                  const rowsHtml = visibleProducts
+                    .map(
+                      (p: any) => `
                   <tr>
                     <td class="font-bold">${escapeHtml(p.id)}</td>
                     <td class="font-bold">${escapeHtml(p.name)}</td>
@@ -469,8 +475,13 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                     <td class="text-right font-bold">${p.pairs_per_carton}</td>
                   </tr>
                 `
-                  )
-                  .join('')}
+                    )
+                    .join('');
+                  const moreNotice = filteredProducts.length > MAX_ARTICLE_ROWS
+                    ? `<tr><td colspan="7" class="text-center" style="font-size: 11px; color: var(--su-text-muted); padding: 8px;">Showing first ${MAX_ARTICLE_ROWS} of ${filteredProducts.length} catalog articles${draft.buyer ? ` for ${escapeHtml(draft.buyer)}` : ' — select a Buyer in Section 1 to view its full SKU list'}.</td></tr>`
+                    : '';
+                  return rowsHtml + moreNotice;
+                })()}
               </tbody>
             </table>
           </div>

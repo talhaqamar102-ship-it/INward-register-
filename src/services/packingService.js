@@ -1054,67 +1054,109 @@ export class PackingService {
   }
 
   // --- CLOSED LOOP ALTERATION REWORK (Max 2-Rework Scrap Rule) ---
-  static completeAlterationRepair(alterationId, tailorName = 'Supervisor A', isScrap = false, deductionRate = 150) {
-    const alt = db.prepare(`SELECT * FROM alterations WHERE id = ?`).get(alterationId);
-    if (!alt) throw new Error(`Alteration #${alterationId} not found`);
+  static completeAlterationRepair(alterationId, tailorName = 'Supervisor A', isScrap = false, deductionRate = 150, pairsToProcess = null) {
+    return runAtomicWipStep(() => {
+      const alt = db.prepare(`SELECT * FROM alterations WHERE id = ?`).get(alterationId);
+      if (!alt) throw new Error(`Alteration #${alterationId} not found`);
 
-    if (alt.status === 'RETURNED_TO_CHECKING') {
-      throw new Error(`Alteration #${alterationId} has already been repaired and returned`);
-    }
+      if (alt.status === 'RETURNED_TO_CHECKING') {
+        throw new Error(`Alteration #${alterationId} has already been repaired and returned`);
+      }
 
-    const currentReworks = Number(alt.rework_count || 1);
+      const totalAltPairs = Number(alt.pairs_count || 0);
+      const requestedPairs = pairsToProcess == null ? totalAltPairs : Number(pairsToProcess);
+      if (!Number.isInteger(requestedPairs) || requestedPairs <= 0 || requestedPairs > totalAltPairs) {
+        throw new Error(`Invalid repair quantity ${requestedPairs}: only ${totalAltPairs} pairs pending in Alteration #${alterationId}.`);
+      }
+      const processedPairs = requestedPairs;
+      const isPartial = processedPairs < totalAltPairs;
+      const currentReworks = Number(alt.rework_count || 1);
+      const effectiveTailor = tailorName || 'Supervisor A';
 
-    // If marked scrap or exceeded 2 rework attempts -> Auto condemn to scrap
-    if (isScrap || currentReworks >= 2) {
+      // If marked scrap or exceeded 2 rework attempts -> Auto condemn to scrap
+      if (isScrap || currentReworks >= 2) {
+        if (isPartial) {
+          db.prepare(`UPDATE alterations SET pairs_count = pairs_count - ? WHERE id = ?`).run(processedPairs, alterationId);
+          db.prepare(`
+            INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, fault_party, tailor_name, rework_count, is_scrapped, status, returned_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'RETURNED_TO_CHECKING', CURRENT_TIMESTAMP)
+          `).run(
+            alt.req_number,
+            alt.source_stage,
+            processedPairs,
+            alt.defect_reason,
+            alt.fault_party || 'CONTRACTOR',
+            effectiveTailor,
+            currentReworks
+          );
+        } else {
+          db.prepare(`
+            UPDATE alterations
+            SET status = 'RETURNED_TO_CHECKING', tailor_name = ?, is_scrapped = 1, returned_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(effectiveTailor, alterationId);
+        }
+
+        const req = db.prepare(`SELECT p.name as article_name FROM glove_requisitions r JOIN products p ON r.product_id = p.id WHERE r.req_number = ?`).get(alt.req_number);
+        const articleName = req ? req.article_name : 'Gloves';
+        const totalDeduction = processedPairs * Number(deductionRate);
+
+        db.prepare(`
+          INSERT INTO scrap_ledger (req_number, article_name, scrapped_pairs, fault_party, defect_reason, financial_deduction_amount)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(alt.req_number, articleName, processedPairs, alt.fault_party || 'CONTRACTOR', alt.defect_reason || 'Unrepairable Defect', totalDeduction);
+
+        return {
+          alterationId,
+          status: 'CONDEMNED_TO_SCRAP',
+          pairsCount: processedPairs,
+          tailorName: effectiveTailor,
+          faultParty: alt.fault_party || 'CONTRACTOR',
+          financialDeduction: totalDeduction,
+          route: 'Scrap Condemned / Bin'
+        };
+      }
+
+      // Otherwise repaired -> MANDATORY FACTORY RULE: Must return to Step 1 Checking
+      if (isPartial) {
+        db.prepare(`UPDATE alterations SET pairs_count = pairs_count - ? WHERE id = ?`).run(processedPairs, alterationId);
+        db.prepare(`
+          INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, fault_party, tailor_name, rework_count, is_scrapped, status, returned_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'RETURNED_TO_CHECKING', CURRENT_TIMESTAMP)
+        `).run(
+          alt.req_number,
+          alt.source_stage,
+          processedPairs,
+          alt.defect_reason,
+          alt.fault_party || 'CONTRACTOR',
+          effectiveTailor,
+          currentReworks + 1
+        );
+      } else {
+        db.prepare(`
+          UPDATE alterations
+          SET status = 'RETURNED_TO_CHECKING', tailor_name = ?, rework_count = rework_count + 1, returned_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(effectiveTailor, alterationId);
+      }
+
+      // Advance pairs back to Step 1 Checking in WIP
       db.prepare(`
-        UPDATE alterations
-        SET status = 'RETURNED_TO_CHECKING', tailor_name = ?, is_scrapped = 1, returned_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(tailorName, alterationId);
-
-      const req = db.prepare(`SELECT p.name as article_name FROM glove_requisitions r JOIN products p ON r.product_id = p.id WHERE r.req_number = ?`).get(alt.req_number);
-      const articleName = req ? req.article_name : 'Gloves';
-      const totalDeduction = Number(alt.pairs_count) * Number(deductionRate);
-
-      db.prepare(`
-        INSERT INTO scrap_ledger (req_number, article_name, scrapped_pairs, fault_party, defect_reason, financial_deduction_amount)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(alt.req_number, articleName, alt.pairs_count, alt.fault_party || 'CONTRACTOR', alt.defect_reason || 'Unrepairable Defect', totalDeduction);
+        UPDATE packing_wip
+        SET step1_checking_in = step1_checking_in + ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE req_number = ?
+      `).run(processedPairs, alt.req_number);
 
       return {
         alterationId,
-        status: 'CONDEMNED_TO_SCRAP',
-        pairsCount: alt.pairs_count,
-        tailorName,
-        faultParty: alt.fault_party || 'CONTRACTOR',
-        financialDeduction: totalDeduction,
-        route: 'Scrap Condemned / Bin'
+        status: 'REPAIRED_RETURNED',
+        pairsCount: processedPairs,
+        tailorName: effectiveTailor,
+        route: 'RETURNED_TO_STAGE_1_CHECKING',
+        message: `${processedPairs} pairs repaired by ${effectiveTailor} and auto-routed back to Stage 1 Checking.`
       };
-    }
-
-    // Otherwise repaired -> MANDATORY FACTORY RULE: Must return to Step 1 Checking
-    db.prepare(`
-      UPDATE alterations
-      SET status = 'RETURNED_TO_CHECKING', tailor_name = ?, rework_count = rework_count + 1, returned_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(tailorName, alterationId);
-
-    // Advance pairs back to Step 1 Checking in WIP
-    db.prepare(`
-      UPDATE packing_wip
-      SET step1_checking_in = step1_checking_in + ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE req_number = ?
-    `).run(alt.pairs_count, alt.req_number);
-
-    return {
-      alterationId,
-      status: 'REPAIRED_RETURNED',
-      pairsCount: alt.pairs_count,
-      tailorName,
-      route: 'RETURNED_TO_STAGE_1_CHECKING',
-      message: `${alt.pairs_count} pairs repaired by ${tailorName} and auto-routed back to Stage 1 Checking.`
-    };
+    });
   }
 
   // --- AQL 1.5 SAMPLING INSPECTION & QUARANTINE ---
@@ -1192,9 +1234,11 @@ export class PackingService {
   // ============================================================================
   // SUPER USER ADMIN MANAGEMENT METHODS
   // ============================================================================
-  static getAdminOverview() {
+  static getAdminOverview(options = {}) {
+    const { includeCatalog = true, fullIntegrityCheck = false } = options || {};
     const journalMode = db.prepare('PRAGMA journal_mode').get()?.journal_mode || 'wal';
-    const integrity = db.prepare('PRAGMA integrity_check').get()?.integrity_check || 'ok';
+    const integrityRow = db.prepare(fullIntegrityCheck ? 'PRAGMA integrity_check' : 'PRAGMA quick_check').get();
+    const integrity = integrityRow?.quick_check || integrityRow?.integrity_check || 'ok';
 
     const tables = [
       'customers',
@@ -1243,9 +1287,9 @@ export class PackingService {
     const alterations = this.getAlterations();
     const scrapLedger = db.prepare(`SELECT * FROM scrap_ledger ORDER BY id DESC`).all();
     const mrvList = db.prepare(`SELECT * FROM material_return_vouchers ORDER BY created_at DESC`).all();
-    const customers = this.getCustomers();
-    const products = this.getProducts();
-    const sizeStandards = this.getSizeStandards();
+    const customers = includeCatalog ? this.getCustomers() : undefined;
+    const products = includeCatalog ? this.getProducts() : undefined;
+    const sizeStandards = includeCatalog ? this.getSizeStandards() : undefined;
     const gloveInventory = this.getGloveInventory();
     const materialInventory = this.getMaterialInventory();
     const materialReqs = this.getMaterialRequisitions();
@@ -1712,7 +1756,7 @@ export class PackingService {
       'ALTERATION_CYCLE_UPDATE',
       'SCRAP_CONDEMN'
     ],
-    INWARD_CLERK: ['GRN_RECEIVE', 'REQ_ISSUE'],
+    INWARD_CLERK: ['GRN_RECEIVE', 'REQ_ISSUE', 'ALTERATION_CYCLE_UPDATE', 'SCRAP_CONDEMN'],
     PACKING_SUPERVISOR: ['REQ_CREATE', 'WIP_STAGE_ADVANCE', 'STAGE_5_CARTON_SEAL'],
     QC_INSPECTOR: ['FINAL_QC_APPROVE', 'FINAL_QC_REJECT', 'WIP_STAGE_ADVANCE'],
     ALTERATION_LEAD: ['ALTERATION_CYCLE_UPDATE', 'SCRAP_CONDEMN']

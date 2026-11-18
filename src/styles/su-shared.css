@@ -1,0 +1,88 @@
+/* Shared Super User graphs, flow cards, and slip/ref tags.
+   Uses the app's own --su-* / --ink-* tokens and panel-card / table-btn components.
+   Load AFTER superUser.css. Selectors sit under .su-vg or .superuser-command-center so they beat
+   older .superuser-command-center .table-btn / .su-chip-btn rules cleanly.
+   Based on unslop by Damir Sokolovsky (@heydamir), CC BY 4.0, https://github.com/heydamir/unslop */
+
+/* ---------- slip & reference tags (shared across Dashboard rows, Order flow & chips) ---------- */
+.superuser-command-center .su-ref { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 24px; min-height: 24px; padding: 0 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; font-weight: 500; line-height: 1; color: var(--su-text-primary); background: var(--su-bg-tertiary); border: 1px solid var(--su-border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.superuser-command-center button.su-ref { cursor: pointer; transition: color 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.superuser-command-center button.su-ref:hover { background: var(--su-white); border-color: var(--su-text-secondary); }
+.superuser-command-center .su-ref i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-600, #52525B); flex: none; }
+.superuser-command-center .su-ref--grn i  { background: var(--su-grn-dark); }
+.superuser-command-center .su-ref--req i  { background: var(--su-req-primary); }
+.superuser-command-center .su-ref--mreq i { background: var(--su-mreq-dark); }
+.superuser-command-center .su-ref--areq i { background: var(--su-areq-primary); }
+.superuser-command-center .su-ref--more { background: var(--su-white); color: var(--su-text-secondary); }
+.superuser-command-center .su-ref > span:not(.su-ref-meta) { flex: none; }
+.superuser-command-center .su-ref-meta { color: var(--ink-600, #52525B); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.superuser-command-center .su-ref-none { font-family: var(--font-mono); font-size: 12px; color: var(--ink-600, #52525B); }
+
+.superuser-command-center .su-chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; align-items: center; margin-top: 4px; }
+.superuser-command-center .su-chip-pair { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
+.superuser-command-center .su-ref-slip { display: inline-flex; align-items: center; height: 24px; min-height: 24px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--su-border); background: var(--su-white); color: var(--su-text-secondary); font-size: 11px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.superuser-command-center .su-ref-slip:hover { background: var(--su-bg-tertiary); color: var(--su-text-primary); border-color: var(--su-text-secondary); }
+
+/* ---------- Row 4 visual graphs (Pipeline volume + Order flow) ---------- */
+.su-vg { --vg-ease: cubic-bezier(0.22, 1, 0.36, 1); display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; font-variant-numeric: tabular-nums; }
+.su-vg .panel-card { margin: 0; }
+.su-vg .panel-card-title { font-weight: 600; font-size: 14px; }
+@media (max-width: 1024px) { .su-vg { grid-template-columns: minmax(0, 1fr); } }
+
+.su-vg .su-vg-chart { padding: 16px; }
+.su-vg .su-vg-scroll { overflow-x: auto; padding-bottom: 4px; }
+.su-vg .su-vg-scroll:focus-visible, .su-vg .su-vg-flow:focus-visible { outline: 2px solid var(--su-req-primary); outline-offset: 2px; }
+.su-vg .su-vg-cols { display: grid; grid-template-columns: repeat(7, minmax(64px, 1fr)); gap: 8px; align-items: end; height: 180px; padding-top: 20px; border-bottom: 1px solid var(--su-border); }
+.su-vg .su-stage-bar-btn { justify-content: flex-end; padding: 4px 2px 0; }
+.su-vg .su-vg-val { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--su-text-primary); line-height: 16px; white-space: nowrap; }
+.su-vg .su-vg-pct { font-size: 11px; color: var(--ink-600, #52525B); margin-bottom: 4px; }
+.su-vg .su-vg-bar { display: block; width: 68%; border-radius: 4px 4px 0 0; transition: height 160ms var(--vg-ease), opacity 160ms var(--vg-ease); }
+.su-vg .su-vg-bar--orders   { background: var(--su-req-deep); }
+.su-vg .su-vg-bar--received { background: var(--su-grn-primary); }
+.su-vg .su-vg-bar--dock     { background: var(--su-grn-accent); }
+.su-vg .su-vg-bar--wip      { background: var(--su-req-accent); }
+.su-vg .su-vg-bar--hold     { background: var(--su-mreq-primary); }
+.su-vg .su-vg-bar--alt      { background: var(--su-areq-primary); }
+.su-vg .su-vg-bar--packed   { background: var(--su-complete-primary); }
+
+.su-vg .su-vg-labels { display: grid; grid-template-columns: repeat(7, minmax(64px, 1fr)); gap: 8px; padding-top: 8px; text-align: center; }
+.su-vg .su-vg-step  { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--ink-600, #52525B); }
+.su-vg .su-vg-label { font-size: 12px; font-weight: 600; color: var(--su-text-primary); line-height: 1.25; margin-top: 2px; }
+.su-vg .su-vg-sub   { font-size: 11px; color: var(--ink-600, #52525B); line-height: 1.25; margin-top: 2px; }
+
+.su-vg .su-vg-empty-title { font-size: 14px; font-weight: 600; color: var(--su-text-primary); }
+.su-vg .su-vg-empty-text  { font-size: 13px; color: var(--su-text-secondary); max-width: 36rem; line-height: 20px; }
+
+/* ---------- Order flow cards ---------- */
+.su-vg .su-vg-flow { padding: 16px; display: grid; gap: 12px; max-height: 300px; overflow-y: auto; }
+.su-vg .su-vg-blueprint { padding: 16px; border: 1px dashed var(--su-border); border-radius: 6px; background: var(--su-bg-primary); text-align: center; display: grid; gap: 10px; justify-items: center; }
+.su-vg .su-vg-order { border: 1px solid var(--su-border); border-radius: 6px; padding: 12px; background: var(--su-white); display: grid; gap: 8px; min-width: 0; }
+.su-vg .su-vg-order-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.su-vg .su-vg-order-id   { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--su-req-primary); margin-right: 8px; }
+.su-vg .su-vg-order-meta { font-size: 12px; color: var(--ink-600, #52525B); }
+.su-vg .su-vg-order-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.su-vg .su-vg-link { border: 0; background: transparent; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--su-text-secondary); cursor: pointer; white-space: nowrap; }
+.su-vg .su-vg-link:hover { background: var(--su-bg-tertiary); color: var(--su-text-primary); }
+
+.su-vg .su-vg-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 48px; align-items: center; gap: 8px; font-size: 12px; }
+.su-vg .su-vg-row-label { color: var(--su-text-secondary); font-weight: 500; white-space: nowrap; }
+.su-vg .su-vg-track { height: 8px; border-radius: 4px; background: var(--su-bg-tertiary); border: 1px solid var(--su-border); overflow: hidden; display: flex; }
+.su-vg .su-vg-seg { height: 100%; }
+.su-vg .su-vg-seg--grn { background: var(--su-grn-primary); }
+.su-vg .su-vg-seg--s5  { background: var(--su-complete-primary); }
+.su-vg .su-vg-seg--s4  { background: var(--su-mreq-primary); }
+.su-vg .su-vg-seg--wip { background: var(--su-req-accent); }
+.su-vg .su-vg-seg--alt { background: var(--su-areq-primary); }
+.su-vg .su-vg-row-pct { text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--su-text-secondary); white-space: nowrap; }
+
+.su-vg .su-vg-chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px; border-radius: 4px; background: var(--su-bg-primary); border: 1px solid var(--su-border-subtle); min-width: 0; }
+.su-vg .su-vg-chain--center { justify-content: center; border: 0; background: transparent; padding: 0; }
+.su-vg .su-vg-arrow { width: 14px; height: 14px; stroke: var(--ink-600, #52525B); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ---------- touch (factory tablets) ---------- */
+@media (pointer: coarse) {
+  .superuser-command-center .su-vg-link { min-height: 44px; padding: 0 12px; }
+  .superuser-command-center button.su-ref,
+  .superuser-command-center .su-ref-slip { min-height: 32px; height: 32px; }
+}
+@media (prefers-reduced-motion: reduce) { .su-vg * { transition: none !important; } }

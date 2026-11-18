@@ -1,6 +1,6 @@
 # C7: AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)
 
-Cohesion Score: `0.73` • Total Nodes: 380
+Cohesion Score: `0.72` • Total Nodes: 382
 
 ## Nodes in Community
 
@@ -17,10 +17,12 @@ Cohesion Score: `0.73` • Total Nodes: 380
 - **.agents/traces/2026-11-18-phase1-split-requisition-logic.md** (`file:.agents/traces/2026-11-18-phase1-split-requisition-logic.md`) — `.agents/traces/2026-11-18-phase1-split-requisition-logic.md:L1` (degree: 10)
 - **.agents/skills/unslop/scripts/story.mjs** (`file:.agents/skills/unslop/scripts/story.mjs`) — `.agents/skills/unslop/scripts/story.mjs:L1` (degree: 9)
 - **.agents/traces/2026-11-17-archive-unused.md** (`file:.agents/traces/2026-11-17-archive-unused.md`) — `.agents/traces/2026-11-17-archive-unused.md:L1` (degree: 9)
+- **.agents/traces/2026-11-18-inward-alteration-role.md** (`file:.agents/traces/2026-11-18-inward-alteration-role.md`) — `.agents/traces/2026-11-18-inward-alteration-role.md:L1` (degree: 9)
 - **CLAUDE.md** (`file:CLAUDE.md`) — `CLAUDE.md:L1` (degree: 9)
 - **scripts/build-catalog-seed.mjs** (`file:scripts/build-catalog-seed.mjs`) — `scripts/build-catalog-seed.mjs:L1` (degree: 9)
 - **.agents/skills/ck/SKILL.md** (`file:.agents/skills/ck/SKILL.md`) — `.agents/skills/ck/SKILL.md:L1` (degree: 8)
 - **.agents/skills/ck/hooks/session-start.mjs** (`file:.agents/skills/ck/hooks/session-start.mjs`) — `.agents/skills/ck/hooks/session-start.mjs:L1` (degree: 8)
+- **.agents/traces/2026-11-18-tunnel-and-sync-performance.md** (`file:.agents/traces/2026-11-18-tunnel-and-sync-performance.md`) — `.agents/traces/2026-11-18-tunnel-and-sync-performance.md:L1` (degree: 8)
 - **GEMINI.md** (`file:GEMINI.md`) — `GEMINI.md:L1` (degree: 8)
 - **docs/last-5-turns-senior-audit.md** (`file:docs/last-5-turns-senior-audit.md`) — `docs/last-5-turns-senior-audit.md:L1` (degree: 8)
 - **main()** (`fn:.agents/skills/ck/hooks/session-start.mjs:main`) — `.agents/skills/ck/hooks/session-start.mjs:L83-L219` (degree: 8)
@@ -30,8 +32,8 @@ Cohesion Score: `0.73` • Total Nodes: 380
 - **.agents/skills/ck/commands/migrate.mjs** (`file:.agents/skills/ck/commands/migrate.mjs`) — `.agents/skills/ck/commands/migrate.mjs:L1` (degree: 6)
 - **.agents/traces/2026-11-17-slice3-downstream.md** (`file:.agents/traces/2026-11-17-slice3-downstream.md`) — `.agents/traces/2026-11-17-slice3-downstream.md:L1` (degree: 6)
 - **docs/ui-remediation-plan.md** (`file:docs/ui-remediation-plan.md`) — `docs/ui-remediation-plan.md:L1` (degree: 6)
+- **e2e/superuser-nav.spec.ts** (`file:e2e/superuser-nav.spec.ts`) — `e2e/superuser-nav.spec.ts:L1` (degree: 6)
 - **.agents/traces/2026-11-18-receiving-hall-option-b.md** (`file:.agents/traces/2026-11-18-receiving-hall-option-b.md`) — `.agents/traces/2026-11-18-receiving-hall-option-b.md:L1` (degree: 5)
-- **e2e/superuser-nav.spec.ts** (`file:e2e/superuser-nav.spec.ts`) — `e2e/superuser-nav.spec.ts:L1` (degree: 5)
 - **playwright.config.ts** (`file:playwright.config.ts`) — `playwright.config.ts:L1` (degree: 5)
 - **saveContext()** (`fn:.agents/skills/ck/commands/shared.mjs:saveContext`) — `.agents/skills/ck/commands/shared.mjs:L61-L66` (degree: 5)
 - **readJson()** (`fn:.agents/skills/ck/hooks/session-start.mjs:readJson`) — `.agents/skills/ck/hooks/session-start.mjs:L29-L31` (degree: 5)
@@ -97,6 +99,7 @@ Cohesion Score: `0.73` • Total Nodes: 380
 - **runStdinReview()** (`fn:.agents/skills/council-multi-model/scripts/review-with-codex.js:runStdinReview`) — `.agents/skills/council-multi-model/scripts/review-with-codex.js:L235-L235` (degree: 2)
 - **browserKit()** (`fn:.agents/skills/unslop/scripts/snapshot.mjs:browserKit`) — `.agents/skills/unslop/scripts/snapshot.mjs:L44-L55` (degree: 2)
 - **browserKit()** (`fn:.agents/skills/unslop/scripts/story.mjs:browserKit`) — `.agents/skills/unslop/scripts/story.mjs:L18-L29` (degree: 2)
+- **letters()** (`fn:.agents/skills/unslop/scripts/story.mjs:letters`) — `.agents/skills/unslop/scripts/story.mjs:L169-L197` (degree: 2)
 - **layer()** (`fn:.agents/skills/unslop/scripts/story.mjs:layer`) — `.agents/skills/unslop/scripts/story.mjs:L200-L202` (degree: 2)
 - **put()** (`fn:.agents/skills/unslop/scripts/story.mjs:put`) — `.agents/skills/unslop/scripts/story.mjs:L207-L214` (degree: 2)
 - **readZipEntries()** (`fn:scripts/build-catalog-seed.mjs:readZipEntries`) — `scripts/build-catalog-seed.mjs:L22-L60` (degree: 2)
@@ -123,7 +126,6 @@ Cohesion Score: `0.73` • Total Nodes: 380
 - **buildEnvironment()** (`fn:.agents/skills/council-multi-model/scripts/review-with-codex.js:buildEnvironment`) — `.agents/skills/council-multi-model/scripts/review-with-codex.js:L171-L179` (degree: 1)
 - **runReview()** (`fn:.agents/skills/council-multi-model/scripts/review-with-codex.js:runReview`) — `.agents/skills/council-multi-model/scripts/review-with-codex.js:L181-L181` (degree: 1)
 - **resolveStoryFile()** (`fn:.agents/skills/unslop/scripts/story-path.mjs:resolveStoryFile`) — `.agents/skills/unslop/scripts/story-path.mjs:L13-L27` (degree: 1)
-- **letters()** (`fn:.agents/skills/unslop/scripts/story.mjs:letters`) — `.agents/skills/unslop/scripts/story.mjs:L169-L197` (degree: 1)
 - **audit()** (`fn:.agents/skills/unslop/scripts/story.mjs:audit`) — `.agents/skills/unslop/scripts/story.mjs:L217-L227` (degree: 1)
 - **spacing()** (`fn:.agents/skills/unslop/scripts/story.mjs:spacing`) — `.agents/skills/unslop/scripts/story.mjs:L229-L279` (degree: 1)
 - **details()** (`fn:.agents/skills/unslop/scripts/story.mjs:details`) — `.agents/skills/unslop/scripts/story.mjs:L281-L298` (degree: 1)
