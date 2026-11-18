@@ -1,0 +1,189 @@
+/* Printable Document Slips */
+.printable-slip-box {
+  background: #ffffff;
+  border: 1.5px solid #000000;
+  padding: 18px 22px;
+  border-radius: 4px;
+  font-family: var(--font-family);
+  color: #000000;
+}
+
+.printable-slip-header {
+  text-align: center;
+  border-bottom: 1.5px solid var(--ink-950);
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.printable-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+
+.printable-meta-grid div {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dotted var(--border-strong);
+  padding-bottom: 2px;
+}
+
+/* Enforce 100% Monochrome Black-and-White on Printable Slips even inside Super User */
+.superuser-command-center .printable-slip-box,
+.superuser-command-center .printable-slip-box * {
+  color: #000000;
+}
+
+.superuser-command-center .printable-slip-box {
+  background: #ffffff !important;
+  border: 1.5px solid #000000 !important;
+}
+
+/* ========================================================================= */
+/* PRINT MEDIA STYLES - FACTORY SLIPS, VOUCHERS, AND LABELS                  */
+/* ========================================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+
+  *, *:before, *:after {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .table-responsive {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .data-table thead th {
+    position: static !important;
+  }
+
+  body.printing-slip #root {
+    display: none !important;
+  }
+
+  body.printing-slip #direct-print-stage {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .module-switcher-bar,
+  .action-ribbon,
+  .toolbar-container,
+  .footer-actions,
+  .footer-actions-right,
+  .btn-primary,
+  .btn-outline,
+  .btn-secondary,
+  .btn-success,
+  .search-input-wrap,
+  .modal-footer,
+  .modal-close-btn,
+  .admin-subnav,
+  .admin-sidebar,
+  .admin-workspace-caption,
+  .su-demo-drawer,
+  .toast-container,
+  .secret-auth-overlay {
+    display: none !important;
+  }
+
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .modal-overlay.open {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    z-index: 1 !important;
+  }
+
+  .modal-overlay.open .modal-box {
+    position: static !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  .modal-overlay.open .modal-header {
+    background: transparent !important;
+    color: #000000 !important;
+    border-bottom: 1.5px solid #000000 !important;
+    margin-bottom: 12px !important;
+    padding: 0 0 8px 0 !important;
+  }
+
+  .modal-overlay.open .modal-title {
+    font-size: 15pt !important;
+    font-weight: 800 !important;
+    color: #000000 !important;
+  }
+
+  .modal-overlay.open .modal-body {
+    padding: 0 !important;
+    overflow: visible !important;
+    max-height: none !important;
+    font-size: 11pt !important;
+  }
+
+  .printable-slip-box {
+    border: 1.5px solid #000000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .printable-slip-header {
+    border-bottom: 1.5px solid #000000 !important;
+  }
+
+  .size-matrix-table,
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: avoid;
+  }
+
+  table th, table td {
+    border: 1px solid #000000 !important;
+    padding: 6px 8px !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  table th {
+    background: #ffffff !important;
+    font-weight: 700 !important;
+  }
+}
+

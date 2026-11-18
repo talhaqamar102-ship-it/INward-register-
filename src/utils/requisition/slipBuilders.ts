@@ -130,6 +130,7 @@ export function buildMaterialRequisitionSlipHtml(params: {
   mreqNo: string;
   reqNo: string;
   orderId: string;
+  po?: string;
   article: string;
   pairs: number;
   status: string;
@@ -150,12 +151,13 @@ export function buildMaterialRequisitionSlipHtml(params: {
         </p>
       </div>
       <div class="printable-meta-grid">
-        <div><span>Material Req #:</span> <strong>${mReq}</strong></div>
-        <div><span>Parent Requisition #:</span> <strong>${baseReq}</strong></div>
-        <div><span>Master Order #:</span> <strong>${params.orderId || '---'}</strong></div>
-        <div><span>Article:</span> <strong>${params.article || '---'}</strong></div>
+        <div><span>Material Req #:</span> <strong>${escapeHtml(mReq)}</strong></div>
+        <div><span>Parent Requisition #:</span> <strong>${escapeHtml(baseReq)}</strong></div>
+        <div><span>Master Order #:</span> <strong>${escapeHtml(params.orderId || '---')}</strong></div>
+        <div><span>PO Number:</span> <strong>${escapeHtml(params.po || '---')}</strong></div>
+        <div><span>Article:</span> <strong>${escapeHtml(params.article || '---')}</strong></div>
         <div><span>Target Batch Pairs:</span> <strong>${pairs.toLocaleString()} Pairs</strong></div>
-        <div><span>Trim Store Status:</span> <strong>${params.status || 'Issued'} (${dateStr})</strong></div>
+        <div><span>Trim Store Status:</span> <strong>${escapeHtml(params.status || 'Issued')} (${escapeHtml(dateStr)})</strong></div>
       </div>
 
       <table class="size-matrix-table" style="margin-bottom: 14px;">

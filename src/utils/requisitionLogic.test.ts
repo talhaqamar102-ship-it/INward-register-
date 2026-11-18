@@ -254,11 +254,14 @@ test('1.4 & 9.3: printable slips (GRN, REQ, M-REQ, A-REQ) render 100% monochrome
     mreqNo: 'M-REQ-0001',
     reqNo: 'REQ-0001',
     orderId: 'ORD-2026-001',
+    po: 'PO-27351',
     article: 'Model A9',
     pairs: 300,
     status: 'Issued'
   });
   assert.ok(mreqHtml.includes('M-REQ-0001'));
+  assert.ok(mreqHtml.includes('PO Number:'));
+  assert.ok(mreqHtml.includes('PO-27351'));
   assert.ok(mreqHtml.includes('300'));
 
   const areqHtml = buildAlterationRouteSlipHtml({
@@ -1050,8 +1053,12 @@ test('5.1-8.5, 6.6, 9.6, 12.2: Super User 5-view DOM rendering, <150ms Tier-1->T
     assert.ok(!repHtml.includes('Acceptance Criteria'), `${activeReport} removes legacy Acceptance Criteria label`);
   }
 
-  // 9.6 WCAG AA contrast check (>= 4.5:1) for all Super User semantic badge pairs in src/style.css
-  const styleSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/style.css'), 'utf8');
+  // 9.6 WCAG AA contrast check (>= 4.5:1) for all Super User semantic badge pairs in src/style.css (+ src/styles/*.css)
+  const stylesDir = path.resolve(process.cwd(), 'src/styles');
+  const stylePartialFiles = fs.existsSync(stylesDir)
+    ? fs.readdirSync(stylesDir).filter(f => f.endsWith('.css')).map(f => fs.readFileSync(path.join(stylesDir, f), 'utf8'))
+    : [];
+  const styleSrc = [fs.readFileSync(path.resolve(process.cwd(), 'src/style.css'), 'utf8'), ...stylePartialFiles].join('\n');
   assert.ok(styleSrc.includes('BlinkMacSystemFont, "Segoe UI", "Helvetica Neue"'), '9.5 offline system font fallback stack present');
   assert.ok(styleSrc.includes('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'), '9.5 offline mono font fallback stack present');
 
@@ -1130,7 +1137,16 @@ test('5.1-8.5, 6.6, 9.6, 12.2: Super User 5-view DOM rendering, <150ms Tier-1->T
   assert.match(styleSrc, /\.status-pill-amber\s*\{[^}]*border-style:\s*dashed/s, 'Amber status is distinguishable by shape');
   assert.match(styleSrc, /\.status-pill-red\s*\{[^}]*border:\s*2px solid/s, 'Red status is distinguishable by border weight');
 
-  const mainSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/main.ts'), 'utf8');
+  const mainSrc = [
+    'src/main.ts',
+    'src/utils/domModalsAndPrint.ts',
+    'src/components/authView.ts',
+    'src/components/inwardRegisterView.ts',
+    'src/components/repairAndQcViews.ts'
+  ]
+    .filter(rel => fs.existsSync(path.resolve(process.cwd(), rel)))
+    .map(rel => fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8'))
+    .join('\n');
   assert.match(mainSrc, /setAttribute\('role', 'status'\)/, 'Toast content is exposed as a status message');
   assert.match(mainSrc, /role="dialog" aria-modal="true"/, 'Modal declares dialog semantics');
   assert.match(mainSrc, /event\.key === 'Escape'/, 'Modal closes from the Escape key');
@@ -1317,7 +1333,11 @@ test('Final QC readiness & Rolled Throughput Yield helpers handle all edge cases
 
 test('Monochrome Print Guard: @media print and .printable-slip-box contain zero --su-* tokens or non-monochrome hex colors', () => {
   const cssPath = path.resolve(process.cwd(), 'src/style.css');
-  const css = fs.readFileSync(cssPath, 'utf8');
+  const stylesDir = path.resolve(process.cwd(), 'src/styles');
+  const cssPartials = fs.existsSync(stylesDir)
+    ? fs.readdirSync(stylesDir).filter(f => f.endsWith('.css')).map(f => fs.readFileSync(path.join(stylesDir, f), 'utf8'))
+    : [];
+  const css = [fs.readFileSync(cssPath, 'utf8'), ...cssPartials].join('\n');
 
   function extractBlocks(input: string, header: RegExp): string[] {
     const out: string[] = [];
@@ -1694,7 +1714,11 @@ test('Phase 4.3: buildFocusRestoreSelector derives stable escaped selectors for 
 });
 
 test('Phase 4.4: Customer Master and Article/BOM Master forms use responsive CSS grid classes instead of hardcoded inline column ratios', () => {
-  const styleCss = fs.readFileSync(path.join(process.cwd(), 'src', 'style.css'), 'utf8');
+  const stylesDir = path.join(process.cwd(), 'src', 'styles');
+  const stylePartials = fs.existsSync(stylesDir)
+    ? fs.readdirSync(stylesDir).filter(f => f.endsWith('.css')).map(f => fs.readFileSync(path.join(stylesDir, f), 'utf8'))
+    : [];
+  const styleCss = [fs.readFileSync(path.join(process.cwd(), 'src', 'style.css'), 'utf8'), ...stylePartials].join('\n');
   assert.match(styleCss, /\.su-customer-form-grid[\s\S]*grid-template-columns:/);
   assert.match(styleCss, /\.su-article-form-grid[\s\S]*grid-template-columns:/);
 
