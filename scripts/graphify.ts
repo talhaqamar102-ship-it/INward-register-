@@ -78,7 +78,7 @@ function sha256File(filePath: string): string {
 function assignCommunity(relPath: string, kind: GraphNode['kind']): number {
   if (kind === 'table' || relPath === 'src/db.js') return 4;
   if (relPath.startsWith('src/utils/')) return 1;
-  if (relPath === 'src/main.ts' || relPath === 'src/App.tsx' || relPath === 'src/main.tsx' || relPath === 'index.html' || relPath === 'src/style.css') return 0;
+  if (relPath === 'src/main.ts' || relPath === 'src/App.tsx' || relPath === 'src/main.tsx' || relPath === 'index.html' || relPath === 'src/style.css' || relPath.startsWith('src/components/')) return 0;
   if (relPath === 'server.ts' || relPath === 'src/server.js' || relPath.startsWith('src/routes/') || kind === 'route') return 2;
   if (relPath.startsWith('src/services/')) return 3;
   if (relPath.startsWith('test/')) return 5;

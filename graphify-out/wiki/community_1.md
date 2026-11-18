@@ -4,9 +4,9 @@ Cohesion Score: `0.64` • Total Nodes: 93
 
 ## Nodes in Community
 
-- **src/utils/requisitionLogic.ts** (`file:src/utils/requisitionLogic.ts`) — `src/utils/requisitionLogic.ts:L1` (degree: 103)
-- **extractBlocks()** (`fn:src/utils/requisitionLogic.test.ts:extractBlocks`) — `src/utils/requisitionLogic.test.ts:L1314-L2105` (degree: 32)
-- **src/utils/requisitionLogic.test.ts** (`file:src/utils/requisitionLogic.test.ts`) — `src/utils/requisitionLogic.test.ts:L1` (degree: 29)
+- **src/utils/requisitionLogic.ts** (`file:src/utils/requisitionLogic.ts`) — `src/utils/requisitionLogic.ts:L1` (degree: 110)
+- **extractBlocks()** (`fn:src/utils/requisitionLogic.test.ts:extractBlocks`) — `src/utils/requisitionLogic.test.ts:L1318-L2109` (degree: 32)
+- **src/utils/requisitionLogic.test.ts** (`file:src/utils/requisitionLogic.test.ts`) — `src/utils/requisitionLogic.test.ts:L1` (degree: 30)
 - **escapeHtml()** (`fn:src/utils/requisitionLogic.ts:escapeHtml`) — `src/utils/requisitionLogic.ts:L118-L126` (degree: 27)
 - **normalizeBaseReqNumber()** (`fn:src/utils/requisitionLogic.ts:normalizeBaseReqNumber`) — `src/utils/requisitionLogic.ts:L363-L366` (degree: 25)
 - **calculateSizeTotal()** (`fn:src/utils/requisitionLogic.ts:calculateSizeTotal`) — `src/utils/requisitionLogic.ts:L376-L382` (degree: 19)
@@ -49,7 +49,7 @@ Cohesion Score: `0.64` • Total Nodes: 93
 - **validateSystemUserInputs()** (`fn:src/utils/requisitionLogic.ts:validateSystemUserInputs`) — `src/utils/requisitionLogic.ts:L3937-L3941` (degree: 3)
 - **validatePasswordResetInput()** (`fn:src/utils/requisitionLogic.ts:validatePasswordResetInput`) — `src/utils/requisitionLogic.ts:L3956-L3958` (degree: 3)
 - **getDefaultStationForRole()** (`fn:src/utils/requisitionLogic.ts:getDefaultStationForRole`) — `src/utils/requisitionLogic.ts:L4049-L4064` (degree: 3)
-- **#confirm-dialog-cancel** (`dom:#confirm-dialog-cancel`) — `src/utils/requisitionLogic.test.ts:L1579` (degree: 2)
+- **#confirm-dialog-cancel** (`dom:#confirm-dialog-cancel`) — `src/utils/requisitionLogic.test.ts:L1583` (degree: 2)
 - **canExecuteStage5CartonPacking()** (`fn:src/utils/requisitionLogic.ts:canExecuteStage5CartonPacking`) — `src/utils/requisitionLogic.ts:L513-L517` (degree: 2)
 - **isStage5ReadyForCartons()** (`fn:src/utils/requisitionLogic.ts:isStage5ReadyForCartons`) — `src/utils/requisitionLogic.ts:L575-L579` (degree: 2)
 - **evaluateOrderReconciliation()** (`fn:src/utils/requisitionLogic.ts:evaluateOrderReconciliation`) — `src/utils/requisitionLogic.ts:L992-L1004` (degree: 2)
@@ -61,7 +61,7 @@ Cohesion Score: `0.64` • Total Nodes: 93
 - **buildAlterationRouteSlipHtml()** (`fn:src/utils/requisitionLogic.ts:buildAlterationRouteSlipHtml`) — `src/utils/requisitionLogic.ts:L3156-L3166` (degree: 2)
 - **escapeCssAttrValue()** (`fn:src/utils/requisitionLogic.ts:escapeCssAttrValue`) — `src/utils/requisitionLogic.ts:L3981-L3987` (degree: 2)
 - **escapeCssIdSelector()** (`fn:src/utils/requisitionLogic.ts:escapeCssIdSelector`) — `src/utils/requisitionLogic.ts:L3989-L3994` (degree: 2)
-- **#btn-admin-lock** (`dom:#btn-admin-lock`) — `src/utils/requisitionLogic.test.ts:L909` (degree: 1)
+- **#btn-admin-lock** (`dom:#btn-admin-lock`) — `src/utils/requisitionLogic.test.ts:L913` (degree: 1)
 - **interface SizeStandardOption** (`iface:src/utils/requisitionLogic.ts:SizeStandardOption`) — `src/utils/requisitionLogic.ts:L3` (degree: 1)
 - **interface CatalogProductOption** (`iface:src/utils/requisitionLogic.ts:CatalogProductOption`) — `src/utils/requisitionLogic.ts:L10` (degree: 1)
 - **interface DeliveryCountdownInfo** (`iface:src/utils/requisitionLogic.ts:DeliveryCountdownInfo`) — `src/utils/requisitionLogic.ts:L136` (degree: 1)

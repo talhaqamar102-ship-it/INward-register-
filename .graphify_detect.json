@@ -1,6 +1,6 @@
 {
-  "total_files": 329,
-  "total_words": 378819,
+  "total_files": 337,
+  "total_words": 379362,
   "files": {
     "code": [
       ".agents/skills/ck/commands/forget.mjs",
@@ -32,6 +32,13 @@
       "scripts/rollback-catalog-migration.mjs",
       "server.ts",
       "src/components/packingHallView.ts",
+      "src/components/superUser/dashboardTab.ts",
+      "src/components/superUser/liveTrackingTab.ts",
+      "src/components/superUser/orderCreationTab.ts",
+      "src/components/superUser/reportsTab.ts",
+      "src/components/superUser/shared.ts",
+      "src/components/superUser/types.ts",
+      "src/components/superUser/usersTab.ts",
       "src/components/superUserView.ts",
       "src/db.js",
       "src/main.ts",
@@ -217,6 +224,7 @@
       ".agents/traces/2026-11-17-slice1-catalog-backend.md",
       ".agents/traces/2026-11-17-slice2-cascading-ui.md",
       ".agents/traces/2026-11-17-slice3-downstream.md",
+      ".agents/traces/2026-11-18-receiving-hall-option-b.md",
       ".agents/workflows/aside.md",
       ".agents/workflows/auto-update.md",
       ".agents/workflows/build-fix.md",
