@@ -7,8 +7,6 @@ import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 import { initDatabase } from './src/db.js';
 import { apiRouter } from './src/routes/api.js';
-import { createOrchestratorRouter } from './src/routes/orchestrator.js';
-import { OrchestratorService } from './src/services/orchestratorService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,7 +72,6 @@ app.use('/api', (req, res, next) => {
 
 // API Routes
 app.use('/api', apiRouter);
-app.use(OrchestratorService.getRoutePath(), createOrchestratorRouter());
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
