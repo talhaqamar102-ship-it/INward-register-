@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { db, backupDatabase, initDatabase } from '../db.js';
 import { AQLService } from './aqlService.js';
-import { createPendingOrder, deletePendingOrder } from './orderService.js';
+import { createPendingOrder, createPendingOrderBatch, deletePendingOrder } from './orderService.js';
 
 const REQUISITION_SIZES = ['7', '8', '9', '10', '11'];
 
@@ -125,7 +125,7 @@ export class PackingService {
 
     db.exec('BEGIN IMMEDIATE');
     try {
-      const order = db.prepare(`SELECT * FROM pending_orders WHERE order_id = ?`).get(normalizedOrderId);
+      const order = db.prepare(`SELECT * FROM active_orders WHERE order_id = ?`).get(normalizedOrderId);
       if (!order) {
         const error = new Error(`Parent order ${normalizedOrderId} was not found.`);
         error.statusCode = 404;
@@ -746,9 +746,9 @@ export class PackingService {
       params.push(filters.maker);
     }
     if (filters.search) {
-      query += ` AND (po_number LIKE ? OR article_name LIKE ? OR rcv_number LIKE ? OR maker_contractor LIKE ?)`;
+      query += ` AND (po_number LIKE ? OR article_name LIKE ? OR rcv_number LIKE ? OR maker_contractor LIKE ? OR hall_name LIKE ? OR stitcher_name LIKE ? OR received_from LIKE ? OR receiving_note LIKE ?)`;
       const s = `%${filters.search}%`;
-      params.push(s, s, s, s);
+      params.push(s, s, s, s, s, s, s, s);
     }
     query += ` ORDER BY id ASC`;
     const rows = db.prepare(query).all(...params);
@@ -771,6 +771,12 @@ export class PackingService {
       color,
       receivedFrom,
       received_from,
+      hallName,
+      hall_name,
+      stitcherName,
+      stitcher_name,
+      receivingNote,
+      receiving_note,
       strictInwardEntry,
       orderQty,
       rcvdPairs,
@@ -783,7 +789,7 @@ export class PackingService {
 
     const orderIdVal = String(data.orderId || data.order_id || data.pendingOrderId || '').trim();
     const linkedOrder = orderIdVal
-      ? db.prepare(`SELECT * FROM pending_orders WHERE order_id = ?`).get(orderIdVal)
+      ? db.prepare(`SELECT * FROM active_orders WHERE order_id = ?`).get(orderIdVal)
       : null;
 
     // When tied to an order, article, model, colour, PO, and buyer are locked server-side from the order.
@@ -794,14 +800,58 @@ export class PackingService {
     const effectiveCustomer = (linkedOrder ? linkedOrder.buyer_name : customerName) || customerName || 'Standard';
     const effectivePo = (linkedOrder ? linkedOrder.po_number : poNumber) || data.pendingOrderId || 'ORD-INWARD';
 
-    if (!makerContractor || !effectiveArticle) {
+    const hallNameVal = String(hallName ?? hall_name ?? '').trim();
+    const stitcherNameVal = String(stitcherName ?? stitcher_name ?? '').trim();
+    const receivingNoteVal = String(receivingNote ?? receiving_note ?? '').trim();
+
+    if (!hallNameVal && stitcherNameVal) {
+      const err = new Error('Hall is required when specifying a Stitcher.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    let canonicalHall = '';
+    let canonicalStitcher = '';
+    if (hallNameVal) {
+      const hallRow = db.prepare(
+        `SELECT id, name FROM halls WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1`
+      ).get(hallNameVal);
+      if (!hallRow) {
+        const err = new Error(`Hall "${hallNameVal}" does not exist in Super User Master Data.`);
+        err.statusCode = 400;
+        throw err;
+      }
+      if (!stitcherNameVal) {
+        const err = new Error(`Stitcher is required when receiving from ${hallRow.name}.`);
+        err.statusCode = 400;
+        throw err;
+      }
+      const hallStitchers = db.prepare(`SELECT id, name FROM stitchers WHERE hall_id = ?`).all(hallRow.id);
+      const matchedStitcher = hallStitchers.find(
+        s => String(s.name || '').trim().toLowerCase() === stitcherNameVal.toLowerCase()
+      );
+      if (!matchedStitcher) {
+        const err = new Error(`Stitcher "${stitcherNameVal}" is not assigned to ${hallRow.name}.`);
+        err.statusCode = 400;
+        throw err;
+      }
+      canonicalHall = hallRow.name;
+      canonicalStitcher = matchedStitcher.name;
+    }
+
+    const effectiveMakerContractor = String(makerContractor || canonicalHall || '').trim();
+    if (!effectiveMakerContractor || !effectiveArticle) {
       throw new Error('Maker/Contractor and Article are required');
     }
 
-    const hasExplicitReceivedFrom = receivedFrom !== undefined || received_from !== undefined || Boolean(strictInwardEntry);
-    const receivedFromVal = String(
-      receivedFrom ?? received_from ?? (hasExplicitReceivedFrom ? '' : makerContractor || 'Contractor Carrier')
-    ).trim();
+    const rawReceivedFrom = receivedFrom ?? received_from;
+    const explicitPersonOrNote = String(rawReceivedFrom ?? '').trim() || receivingNoteVal;
+    const hasExplicitReceivedFrom = rawReceivedFrom !== undefined || Boolean(strictInwardEntry);
+    const receivedFromVal = canonicalHall && canonicalStitcher
+      ? (explicitPersonOrNote || `${canonicalStitcher} (${canonicalHall})`)
+      : String(
+          rawReceivedFrom ?? (hasExplicitReceivedFrom ? '' : effectiveMakerContractor || 'Contractor Carrier')
+        ).trim();
     if (!receivedFromVal) {
       throw new Error('Received From (person name) is required');
     }
@@ -818,10 +868,10 @@ export class PackingService {
       `).all(orderIdVal);
       if (allocRows.length > 0) {
         const matchedAlloc = allocRows.find(
-          a => String(a.maker_contractor || '').trim().toLowerCase() === String(makerContractor).trim().toLowerCase()
+          a => String(a.maker_contractor || '').trim().toLowerCase() === effectiveMakerContractor.toLowerCase()
         );
         if (!matchedAlloc) {
-          throw new Error(`Contractor "${makerContractor}" is not allocated to Order ${orderIdVal}`);
+          throw new Error(`Contractor "${effectiveMakerContractor}" is not allocated to Order ${orderIdVal}`);
         }
         const allocCap = Number(matchedAlloc.total_qty || 0);
         if (allocCap > 0 && (allocRows.length > 1 || Boolean(strictInwardEntry))) {
@@ -869,18 +919,21 @@ export class PackingService {
 
     db.prepare(`
       INSERT INTO store_receivings 
-      (rcv_number, rcv_date, order_id, maker_contractor, customer_name, po_number, article_name, color_shade, received_from, order_qty, rcvd_pairs, allocated_pairs, unallocated_pairs, allocation_status, balance_qty, status, challan_no, gate_pass_no, vehicle_no, overage_allowed_pct)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'UNALLOCATED', ?, ?, ?, ?, ?, ?)
+      (rcv_number, rcv_date, order_id, maker_contractor, customer_name, po_number, article_name, color_shade, received_from, hall_name, stitcher_name, receiving_note, order_qty, rcvd_pairs, allocated_pairs, unallocated_pairs, allocation_status, balance_qty, status, challan_no, gate_pass_no, vehicle_no, overage_allowed_pct)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'UNALLOCATED', ?, ?, ?, ?, ?, ?)
     `).run(
       rcvNumber,
       dateVal,
       orderIdVal,
-      makerContractor,
+      effectiveMakerContractor,
       effectiveCustomer,
       effectivePo,
       effectiveArticle,
       effectiveColor,
       receivedFromVal,
+      canonicalHall,
+      canonicalStitcher,
+      receivingNoteVal,
       orderNum,
       rcvdNum,
       rcvdNum,
@@ -967,6 +1020,36 @@ export class PackingService {
     return { ...row, sizes: sizeRows };
   }
 
+  static getHallsWithStitchers() {
+    try {
+      const hallRows = db.prepare(`SELECT id, name, created_at FROM halls ORDER BY name COLLATE NOCASE ASC`).all();
+      const stitcherRows = db.prepare(`
+        SELECT id, hall_id, name, created_at
+        FROM stitchers
+        ORDER BY name COLLATE NOCASE ASC
+      `).all();
+      const byHall = new Map();
+      for (const s of stitcherRows) {
+        const arr = byHall.get(s.hall_id) || [];
+        arr.push({
+          id: s.id,
+          hallId: s.hall_id,
+          name: s.name,
+          createdAt: s.created_at
+        });
+        byHall.set(s.hall_id, arr);
+      }
+      return hallRows.map(h => ({
+        id: h.id,
+        name: h.name,
+        createdAt: h.created_at,
+        stitchers: byHall.get(h.id) || []
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   static getReceivingDropdowns() {
     const makers = db.prepare(`
       SELECT DISTINCT maker_contractor FROM store_receivings ORDER BY maker_contractor
@@ -983,6 +1066,11 @@ export class PackingService {
     ];
     defaultMakers.forEach(m => {
       if (!makers.includes(m)) makers.push(m);
+    });
+
+    const halls = this.getHallsWithStitchers();
+    halls.forEach(h => {
+      if (!makers.includes(h.name)) makers.push(h.name);
     });
 
     const customers = db.prepare(`
@@ -1004,7 +1092,7 @@ export class PackingService {
     `).all().map(r => r.po_number);
 
     const sizeStandards = this.getSizeStandards();
-    return { makers, customers, articles, poList, sizeStandards };
+    return { makers, customers, articles, poList, sizeStandards, halls };
   }
 
   // --- PACKAGING BOM LOOKUP ---
@@ -1054,6 +1142,70 @@ export class PackingService {
   }
 
   // --- CLOSED LOOP ALTERATION REWORK (Max 2-Rework Scrap Rule) ---
+  static assignAlterationTailor(reqNumber, tailorName, alterationId = null, pairsToAssign = null) {
+    const cleanTailor = String(tailorName || '').trim();
+    if (!cleanTailor) throw new Error('Select or enter a tailor name before assigning.');
+    return runAtomicWipStep(() => {
+      if (alterationId != null && Number(alterationId) > 0) {
+        const res = db.prepare(`
+          UPDATE alterations
+          SET tailor_name = ?
+          WHERE id = ? AND status = 'SENT_FOR_ALTERATION'
+        `).run(cleanTailor, Number(alterationId));
+        if (!res.changes) throw new Error(`No active alteration ticket #${alterationId} found to assign.`);
+        return { reqNumber, alterationId: Number(alterationId), tailorName: cleanTailor, updatedCount: res.changes };
+      }
+
+      const cleanReq = String(reqNumber || '').trim();
+      if (!cleanReq) throw new Error('Requisition number is required.');
+
+      const openRows = db.prepare(`
+        SELECT * FROM alterations
+        WHERE req_number = ? AND status = 'SENT_FOR_ALTERATION'
+        ORDER BY CASE WHEN COALESCE(TRIM(tailor_name), '') IN ('', 'Supervisor A') THEN 0 ELSE 1 END, id ASC
+      `).all(cleanReq);
+      if (openRows.length === 0) {
+        throw new Error(`No active alteration tickets pending for ${cleanReq}.`);
+      }
+
+      const totalOpen = openRows.reduce((sum, r) => sum + Number(r.pairs_count || 0), 0);
+      const requestedPairs = pairsToAssign == null ? totalOpen : Number(pairsToAssign);
+      if (!Number.isInteger(requestedPairs) || requestedPairs <= 0 || requestedPairs > totalOpen) {
+        throw new Error(`Invalid assign quantity ${requestedPairs}: only ${totalOpen} pairs pending for ${cleanReq}.`);
+      }
+
+      let remaining = requestedPairs;
+      let updatedCount = 0;
+      for (const row of openRows) {
+        if (remaining <= 0) break;
+        const rowPairs = Number(row.pairs_count || 0);
+        if (rowPairs <= remaining) {
+          db.prepare(`UPDATE alterations SET tailor_name = ? WHERE id = ?`).run(cleanTailor, row.id);
+          remaining -= rowPairs;
+          updatedCount += 1;
+        } else {
+          db.prepare(`UPDATE alterations SET pairs_count = pairs_count - ? WHERE id = ?`).run(remaining, row.id);
+          db.prepare(`
+            INSERT INTO alterations (req_number, source_stage, pairs_count, defect_reason, fault_party, tailor_name, rework_count, is_scrapped, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'SENT_FOR_ALTERATION')
+          `).run(
+            row.req_number,
+            row.source_stage,
+            remaining,
+            row.defect_reason,
+            row.fault_party || 'CONTRACTOR',
+            cleanTailor,
+            Number(row.rework_count || 1)
+          );
+          remaining = 0;
+          updatedCount += 1;
+        }
+      }
+
+      return { reqNumber: cleanReq, tailorName: cleanTailor, pairsAssigned: requestedPairs, updatedCount };
+    });
+  }
+
   static completeAlterationRepair(alterationId, tailorName = 'Supervisor A', isScrap = false, deductionRate = 150, pairsToProcess = null) {
     return runAtomicWipStep(() => {
       const alt = db.prepare(`SELECT * FROM alterations WHERE id = ?`).get(alterationId);
@@ -1257,7 +1409,9 @@ export class PackingService {
       'scrap_ledger',
       'export_shipments',
       'material_return_vouchers',
-      'pending_orders'
+      'pending_orders',
+      'halls',
+      'stitchers'
     ];
 
     const tableCounts = {};
@@ -1315,7 +1469,8 @@ export class PackingService {
       scrapLedger,
       mrvList,
       dropdowns,
-      pendingOrders
+      pendingOrders,
+      halls: dropdowns.halls
     };
   }
 
@@ -1454,6 +1609,9 @@ export class PackingService {
     const issuedPairs = Number(allocRow?.total_alloc || 0);
     const availableDockPairs = Math.max(0, receivedPairs - issuedPairs);
     const unclaimedDockPairs = Math.max(0, availableDockPairs - pendingReqPairs);
+    const unclaimedDockSizes = Object.fromEntries(
+      scaleCodes.map(sz => [sz, Math.max(0, Number(receivedSizes[sz] || 0) - Number(requestedSizes[sz] || 0))])
+    );
 
     return {
       sizeFormat,
@@ -1468,13 +1626,14 @@ export class PackingService {
       issuedPairs,
       availableDockPairs,
       unclaimedDockPairs,
+      unclaimedDockSizes,
       contractorAllocations
     };
   }
 
   static getPendingOrders() {
     try {
-      const rows = db.prepare(`SELECT * FROM pending_orders ORDER BY created_at DESC, order_id DESC`).all();
+      const rows = db.prepare(`SELECT * FROM active_orders ORDER BY created_at DESC, order_id DESC`).all();
       return rows.map(r => {
         const stock = this.getOrderStockSummary(r);
         return {
@@ -1496,9 +1655,11 @@ export class PackingService {
           receivedPairs: stock.receivedPairs,
           issuedPairs: stock.issuedPairs,
           requestedPairs: stock.requestedPairs,
+          requestedSizes: stock.requestedSizes,
           pendingReqPairs: stock.pendingReqPairs,
           availableDockPairs: stock.availableDockPairs,
           unclaimedDockPairs: stock.unclaimedDockPairs,
+          unclaimedDockSizes: stock.unclaimedDockSizes,
           remainingOrderSizes: stock.remainingOrderSizes,
           receivedSizes: stock.receivedSizes,
           contractorAllocations: stock.contractorAllocations
@@ -1511,12 +1672,20 @@ export class PackingService {
 
   static createPendingOrderAdmin(payload, actor = 'Super User', role = 'SUPER_USER') {
     this.enforceRolePermission(role, 'ORDER_CREATE');
+    if (Array.isArray(payload?.items) && payload.items.length > 0) {
+      const { baseOrderId, orderId, orderIds } = createPendingOrderBatch(db, payload, {
+        actor,
+        role,
+        recordAuditLog: entry => this.recordAuditLog(entry)
+      });
+      return { baseOrderId, orderId, orderIds, orders: this.getPendingOrders() };
+    }
     const { orderId } = createPendingOrder(db, payload, {
       actor,
       role,
       recordAuditLog: entry => this.recordAuditLog(entry)
     });
-    return { orderId, orders: this.getPendingOrders() };
+    return { orderId, orderIds: [orderId], orders: this.getPendingOrders() };
   }
 
   static deletePendingOrderAdmin(orderId, actor = 'Super User', role = 'SUPER_USER') {
@@ -1614,7 +1783,7 @@ export class PackingService {
     const cleanName = name.trim();
     const slug = cleanName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'ITEM';
     const prodId = id || `GLV-${slug}-${randomUUID().slice(0, 6).toUpperCase()}`;
-    const format = String(sizeFormat || 'LEGACY_7_11').trim() || 'LEGACY_7_11';
+    const format = String(sizeFormat || 'ALPHA_2XS_5XL').trim() || 'ALPHA_2XS_5XL';
     db.prepare(`
       INSERT INTO products (
         id, name, raw_name, article_code, raw_color, color_spec, size_format,
@@ -1646,6 +1815,175 @@ export class PackingService {
       Number(pairsPerCarton ?? 50)
     );
     return this.getProducts();
+  }
+
+  static createHallAdmin(name, actor = 'Super User', role = 'SUPER_USER') {
+    if (String(role || 'SUPER_USER').trim().toUpperCase() !== 'SUPER_USER') {
+      const err = new Error(`RBAC Forbidden: Role ${role} is not permitted to manage Halls.`);
+      err.statusCode = 403;
+      throw err;
+    }
+    const cleanName = String(name || '').trim();
+    if (!cleanName) {
+      const err = new Error('Hall name is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+    const duplicate = db.prepare(`SELECT id FROM halls WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1`).get(cleanName);
+    if (duplicate) {
+      const err = new Error(`Hall "${cleanName}" already exists.`);
+      err.statusCode = 409;
+      throw err;
+    }
+    const info = db.prepare(`INSERT INTO halls (name) VALUES (?)`).run(cleanName);
+    this.recordAuditLog({
+      actor,
+      role,
+      action: 'HALL_CREATE',
+      entityId: cleanName,
+      beforeSummary: 'Halls Registry',
+      afterSummary: `Added Hall ${cleanName}`
+    });
+    return {
+      id: Number(info.lastInsertRowid),
+      name: cleanName,
+      halls: this.getHallsWithStitchers()
+    };
+  }
+
+  static deleteHallAdmin(hallId, actor = 'Super User', role = 'SUPER_USER') {
+    if (String(role || 'SUPER_USER').trim().toUpperCase() !== 'SUPER_USER') {
+      const err = new Error(`RBAC Forbidden: Role ${role} is not permitted to manage Halls.`);
+      err.statusCode = 403;
+      throw err;
+    }
+    const numericId = Number(hallId);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      const err = new Error('Valid hall id is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+    const hall = db.prepare(`SELECT id, name FROM halls WHERE id = ?`).get(numericId);
+    if (!hall) {
+      const err = new Error('Hall not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+    const stitchers = db.prepare(`SELECT id, name FROM stitchers WHERE hall_id = ?`).all(numericId);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare(`DELETE FROM stitchers WHERE hall_id = ?`).run(numericId);
+      db.prepare(`DELETE FROM halls WHERE id = ?`).run(numericId);
+      this.recordAuditLog({
+        actor,
+        role,
+        action: 'HALL_DELETE',
+        entityId: hall.name,
+        beforeSummary: `Hall ${hall.name} (${stitchers.length} stitcher${stitchers.length === 1 ? '' : 's'})`,
+        afterSummary: 'Deleted Hall'
+      });
+      db.exec('COMMIT');
+    } catch (err) {
+      try { db.exec('ROLLBACK'); } catch {}
+      throw err;
+    }
+    return {
+      deleted: true,
+      hallId: numericId,
+      hallName: hall.name,
+      halls: this.getHallsWithStitchers()
+    };
+  }
+
+  static createStitcherAdmin(hallId, name, actor = 'Super User', role = 'SUPER_USER') {
+    if (String(role || 'SUPER_USER').trim().toUpperCase() !== 'SUPER_USER') {
+      const err = new Error(`RBAC Forbidden: Role ${role} is not permitted to manage Stitchers.`);
+      err.statusCode = 403;
+      throw err;
+    }
+    const numericHallId = Number(hallId);
+    if (!Number.isInteger(numericHallId) || numericHallId <= 0) {
+      const err = new Error('Valid hall id is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+    const hall = db.prepare(`SELECT id, name FROM halls WHERE id = ?`).get(numericHallId);
+    if (!hall) {
+      const err = new Error('Hall not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+    const cleanName = String(name || '').trim();
+    if (!cleanName) {
+      const err = new Error('Stitcher name is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+    const duplicate = db.prepare(
+      `SELECT id FROM stitchers WHERE hall_id = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1`
+    ).get(numericHallId, cleanName);
+    if (duplicate) {
+      const err = new Error(`Stitcher "${cleanName}" already exists in ${hall.name}.`);
+      err.statusCode = 409;
+      throw err;
+    }
+    const info = db.prepare(`INSERT INTO stitchers (hall_id, name) VALUES (?, ?)`).run(numericHallId, cleanName);
+    this.recordAuditLog({
+      actor,
+      role,
+      action: 'STITCHER_CREATE',
+      entityId: `${hall.name} / ${cleanName}`,
+      beforeSummary: `${hall.name} Stitchers`,
+      afterSummary: `Added Stitcher ${cleanName}`
+    });
+    return {
+      id: Number(info.lastInsertRowid),
+      hallId: numericHallId,
+      hallName: hall.name,
+      name: cleanName,
+      halls: this.getHallsWithStitchers()
+    };
+  }
+
+  static deleteStitcherAdmin(stitcherId, actor = 'Super User', role = 'SUPER_USER') {
+    if (String(role || 'SUPER_USER').trim().toUpperCase() !== 'SUPER_USER') {
+      const err = new Error(`RBAC Forbidden: Role ${role} is not permitted to manage Stitchers.`);
+      err.statusCode = 403;
+      throw err;
+    }
+    const numericId = Number(stitcherId);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      const err = new Error('Valid stitcher id is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+    const row = db.prepare(`
+      SELECT s.id, s.hall_id, s.name, h.name AS hall_name
+      FROM stitchers s
+      JOIN halls h ON h.id = s.hall_id
+      WHERE s.id = ?
+    `).get(numericId);
+    if (!row) {
+      const err = new Error('Stitcher not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+    db.prepare(`DELETE FROM stitchers WHERE id = ?`).run(numericId);
+    this.recordAuditLog({
+      actor,
+      role,
+      action: 'STITCHER_DELETE',
+      entityId: `${row.hall_name} / ${row.name}`,
+      beforeSummary: `${row.hall_name} Stitcher: ${row.name}`,
+      afterSummary: 'Deleted Stitcher'
+    });
+    return {
+      deleted: true,
+      stitcherId: numericId,
+      stitcherName: row.name,
+      hallName: row.hall_name,
+      halls: this.getHallsWithStitchers()
+    };
   }
 
   static overrideWipAdmin(reqNumber, payload) {
@@ -2076,7 +2414,7 @@ export class PackingService {
       reason = reason.reason || 'Short-shipped closure';
     }
     this.enforceRolePermission(role, 'ORDER_SHORT_CLOSE');
-    const ord = db.prepare(`SELECT * FROM pending_orders WHERE order_id = ?`).get(orderId);
+    const ord = db.prepare(`SELECT * FROM active_orders WHERE order_id = ?`).get(orderId);
     if (!ord) throw new Error(`Pending Order ${orderId} not found`);
 
     db.prepare(

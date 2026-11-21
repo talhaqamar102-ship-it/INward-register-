@@ -1,6 +1,6 @@
 # C7: AI Agent Harness, Skills & Governance (.claude/, CLAUDE.md)
 
-Cohesion Score: `0.72` • Total Nodes: 382
+Cohesion Score: `0.71` • Total Nodes: 385
 
 ## Nodes in Community
 
@@ -9,6 +9,7 @@ Cohesion Score: `0.72` • Total Nodes: 382
 - **buildProjectGraph()** (`fn:scripts/graphify.ts:buildProjectGraph`) — `scripts/graphify.ts:L133-L1008` (degree: 18)
 - **extractBraceBlock()** (`fn:scripts/graphify.ts:extractBraceBlock`) — `scripts/graphify.ts:L118-L1008` (degree: 17)
 - **docs/catalog-integration-plan.md** (`file:docs/catalog-integration-plan.md`) — `docs/catalog-integration-plan.md:L1` (degree: 15)
+- **docs/MES_APP_FLOW_AND_DESIGN_SYSTEM.md** (`file:docs/MES_APP_FLOW_AND_DESIGN_SYSTEM.md`) — `docs/MES_APP_FLOW_AND_DESIGN_SYSTEM.md:L1` (degree: 14)
 - **.agents/traces/2026-11-18-phase2-and-3-modular-views-and-styles.md** (`file:.agents/traces/2026-11-18-phase2-and-3-modular-views-and-styles.md`) — `.agents/traces/2026-11-18-phase2-and-3-modular-views-and-styles.md:L1` (degree: 13)
 - **.claude/CLAUDE.md** (`file:.claude/CLAUDE.md`) — `.claude/CLAUDE.md:L1` (degree: 12)
 - **.agents/skills/council-multi-model/scripts/review-with-codex.js** (`file:.agents/skills/council-multi-model/scripts/review-with-codex.js`) — `.agents/skills/council-multi-model/scripts/review-with-codex.js:L1` (degree: 11)
@@ -79,6 +80,7 @@ Cohesion Score: `0.72` • Total Nodes: 382
 - **.agents/skills/unslop/scripts/snapshot.mjs** (`file:.agents/skills/unslop/scripts/snapshot.mjs`) — `.agents/skills/unslop/scripts/snapshot.mjs:L1` (degree: 2)
 - **.agents/skills/unslop/scripts/story-path.mjs** (`file:.agents/skills/unslop/scripts/story-path.mjs`) — `.agents/skills/unslop/scripts/story-path.mjs:L1` (degree: 2)
 - **.agents/workflows/kotlin-test.md** (`file:.agents/workflows/kotlin-test.md`) — `.agents/workflows/kotlin-test.md:L1` (degree: 2)
+- **scripts/orch-reset.ts** (`file:scripts/orch-reset.ts`) — `scripts/orch-reset.ts:L1` (degree: 2)
 - **extractSection()** (`fn:.agents/skills/ck/commands/init.mjs:extractSection`) — `.agents/skills/ck/commands/init.mjs:L35-L39` (degree: 2)
 - **extractSection()** (`fn:.agents/skills/ck/commands/migrate.mjs:extractSection`) — `.agents/skills/ck/commands/migrate.mjs:L26-L30` (degree: 2)
 - **parseBullets()** (`fn:.agents/skills/ck/commands/migrate.mjs:parseBullets`) — `.agents/skills/ck/commands/migrate.mjs:L32-L38` (degree: 2)
@@ -133,6 +135,7 @@ Cohesion Score: `0.72` • Total Nodes: 382
 - **buildPersistedCatalog()** (`fn:scripts/build-catalog-seed.mjs:buildPersistedCatalog`) — `scripts/build-catalog-seed.mjs:L248-L256` (degree: 1)
 - **interface GraphNode** (`iface:scripts/graphify.ts:GraphNode`) — `scripts/graphify.ts:L29` (degree: 1)
 - **interface GraphEdge** (`iface:scripts/graphify.ts:GraphEdge`) — `scripts/graphify.ts:L42` (degree: 1)
+- **randomBase32()** (`fn:scripts/orch-reset.ts:randomBase32`) — `scripts/orch-reset.ts:L9-L24` (degree: 1)
 - **.agents/agents/a11y-architect.md** (`file:.agents/agents/a11y-architect.md`) — `.agents/agents/a11y-architect.md:L1` (degree: 0)
 - **.agents/agents/agent-evaluator.md** (`file:.agents/agents/agent-evaluator.md`) — `.agents/agents/agent-evaluator.md:L1` (degree: 0)
 - **.agents/agents/architect.md** (`file:.agents/agents/architect.md`) — `.agents/agents/architect.md:L1` (degree: 0)

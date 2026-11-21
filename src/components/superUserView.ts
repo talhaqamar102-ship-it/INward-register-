@@ -10,6 +10,7 @@ export type {
   SuperUserTab,
   SuperUserReportType,
   SystemUserRecord,
+  AdminOrderArticleLine,
   SuperUserRenderContext
 } from './superUser/types';
 export {

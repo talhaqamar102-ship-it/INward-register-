@@ -13,44 +13,98 @@ import {
   renderOrderReqChipsWithOverflow
 } from './shared';
 
+/* ---------- safe template engine ---------- */
+
+class RawHtml {
+  constructor(public readonly value: string) {}
+}
+const raw = (value: string): RawHtml => new RawHtml(value);
+
+const html = (strings: TemplateStringsArray, ...values: unknown[]): string =>
+  strings.reduce((acc, str, i) => {
+    if (i >= values.length) return acc + str;
+    const val = values[i];
+    const serialized = Array.isArray(val)
+      ? val.map(v => (v instanceof RawHtml ? v.value : escapeHtml(String(v ?? '')))).join('')
+      : val instanceof RawHtml
+        ? val.value
+        : escapeHtml(String(val ?? ''));
+    return acc + str + serialized;
+  }, '');
+
 /* ---------- helpers ---------- */
 
 // One number format everywhere (en-US so grouping never changes with browser locale)
 const n = (v: unknown): string => Number(v || 0).toLocaleString('en-US');
 
-// Slip tag: reference code with a small type dot. Same look as the Live Tracking tab.
-// TODO: hoist into shared.ts and use it inside renderOrderGrnChipsWithOverflow / renderOrderReqChipsWithOverflow too.
 type RefKind = 'grn' | 'req' | 'mreq' | 'areq';
-const refTag = (kind: RefKind, code: string, attrs: string): string =>
-  `<button type="button" class="su-db-ref su-db-ref--${kind} su-chip-btn" ${attrs}><i></i>${escapeHtml(code)}</button>`;
-const slip = (kind: RefKind, type: string, code: string, orderId: string): string =>
-  refTag(
-    kind,
-    code,
-    `data-su-action="open-slip" data-slip-type="${type}" data-ref-code="${escapeHtml(code)}" data-order-id="${escapeHtml(orderId)}"`
-  );
 
-// KPI card: label, one big figure with its unit, then short supporting lines
-const kpi = (label: string, value: string, unit: string, lines: string[], valueClass = ''): string => `
-  <div class="admin-kpi-card">
-    <div class="admin-kpi-label">${label}</div>
-    <div class="admin-kpi-value ${valueClass}">${value}${unit ? `<small>${unit}</small>` : ''}</div>
-    <div class="admin-kpi-sub">${lines.map(l => `<div>${l}</div>`).join('')}</div>
-  </div>`;
+const slip = (kind: RefKind, type: string, code: string, orderId: string): RawHtml =>
+  raw(html`
+    <button
+      type="button"
+      class="su-db-ref su-db-ref--${kind} su-chip-btn"
+      data-su-action="open-slip"
+      data-slip-type="${type}"
+      data-ref-code="${code}"
+      data-order-id="${orderId}"
+    >
+      <i></i>${code}
+    </button>
+  `);
 
-// One row shape for both exception tables
-const exceptionRow = (cells: { ref: string; orderId: string; maker?: string; badge: string; pairs: number; action: string }): string => `
-  <tr>
-    <td>${cells.ref}</td>
-    <td class="mono">${escapeHtml(cells.orderId)}</td>
-    <td>${cells.maker !== undefined ? escapeHtml(cells.maker || '') : ''}</td>
-    <td>${cells.badge}</td>
-    <td class="text-right num">${n(cells.pairs)}</td>
-    <td class="text-center">${cells.action}</td>
-  </tr>`;
+const kpi = (opts: {
+  label: string;
+  value: string;
+  unit?: string;
+  lines: RawHtml[];
+  valueClass?: string;
+  actionAttr?: string;
+}): RawHtml =>
+  raw(html`
+    <div class="admin-kpi-card" ${raw(opts.actionAttr ?? '')}>
+      <div class="admin-kpi-label">${opts.label}</div>
+      <div class="admin-kpi-value ${opts.valueClass ?? ''}">
+        ${opts.value}${opts.unit ? raw(html`<small>${opts.unit}</small>`) : ''}
+      </div>
+      <div class="admin-kpi-sub">
+        ${opts.lines.map(l => raw(html`<div>${l}</div>`))}
+      </div>
+    </div>
+  `);
 
-const jumpBtn = (screen: string, req: string, label: string): string =>
-  `<button type="button" class="table-btn su-db-link" data-su-action="open-req-screen" data-req-number="${escapeHtml(req)}" data-target-screen="${screen}">${label}</button>`;
+const jumpBtn = (screen: string, req: string, label: string): RawHtml =>
+  raw(html`
+    <button
+      type="button"
+      class="table-btn su-db-link"
+      data-su-action="open-req-screen"
+      data-req-number="${req}"
+      data-target-screen="${screen}"
+    >
+      ${label}
+    </button>
+  `);
+
+const exceptionRow = (cells: {
+  kind: 'areq' | 'mreq' | 'dock';
+  ref: RawHtml;
+  orderId: string;
+  maker?: string;
+  badge: RawHtml;
+  pairs: number;
+  action: RawHtml;
+}): RawHtml =>
+  raw(html`
+    <tr data-exception-kind="${cells.kind}">
+      <td>${cells.ref}</td>
+      <td class="mono">${cells.orderId}</td>
+      <td>${cells.maker ?? ''}</td>
+      <td>${cells.badge}</td>
+      <td class="text-right num">${n(cells.pairs)}</td>
+      <td class="text-center">${cells.action}</td>
+    </tr>
+  `);
 
 /* ---------- render ---------- */
 
@@ -58,17 +112,18 @@ export function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduct
   const s = ctx.rollupSummary;
   const hasDemoOrder = s.orderRollups.some(o => o.orderId === 'ORD-2026-600');
   const rawSearch = ctx.locationSearch ?? (typeof window !== 'undefined' ? window.location.search : '');
-  const hasDemoParam = /(?:^|[?&])demo=1(?:&|$)/.test(rawSearch);
-  const demoDrawerOpen = hasDemoOrder || Boolean(ctx.demoDrawerOpen) || hasDemoParam;
+  const demoDrawerOpen = hasDemoOrder || Boolean(ctx.demoDrawerOpen) || /(?:^|[?&])demo=1(?:&|$)/.test(rawSearch);
 
-  // Demo scenario drawer + reconciliation health (flagged, removable 600-pair demo)
-  const demoDrawer = `
-    <details class="su-demo-drawer"${demoDrawerOpen ? ' open' : ''}>
+  // 1. Demo scenario drawer + reconciliation health
+  const demoDrawer = raw(html`
+    <details class="su-demo-drawer"${raw(demoDrawerOpen ? ' open' : '')}>
       <summary>
         <div class="su-db-health">
           <strong>Reconciliation health</strong>
           <span class="su-badge su-badge-reconciled">${n(s.reconciledOrdersCount)} of ${n(s.totalOrders)} orders reconciled</span>
-          ${s.varianceOrdersCount > 0 ? `<span class="su-badge su-badge-variance">${n(s.varianceOrdersCount)} with variance</span>` : ''}
+          ${s.varianceOrdersCount > 0
+            ? raw(html`<span class="su-badge su-badge-variance">${n(s.varianceOrdersCount)} with variance</span>`)
+            : ''}
         </div>
         <span class="admin-meta-caption">Demo scenarios</span>
       </summary>
@@ -82,99 +137,120 @@ export function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduct
         <button type="button" class="btn-outline su-db-btn su-db-btn--danger" id="btn-load-demo-600-variance" data-su-action="load-demo" data-demo-phase="DELIBERATE_VARIANCE">
           Force deliberate variance (11.6)
         </button>
-        ${
-          hasDemoOrder
-            ? `<button type="button" class="btn-outline su-db-btn su-db-btn--danger" id="btn-remove-demo-600" data-su-action="remove-demo">Remove demo scenario</button>`
-            : ''
-        }
+        ${hasDemoOrder
+          ? raw(html`<button type="button" class="btn-outline su-db-btn su-db-btn--danger" id="btn-remove-demo-600" data-su-action="remove-demo">Remove demo scenario</button>`)
+          : ''}
       </div>
-    </details>`;
+    </details>
+  `);
 
-  // Factory pulse: four cards, figure + unit + supporting lines. Color only where something is wrong.
-  const kpis = `
+  // 2. Factory pulse KPI strip
+  const kpis = raw(html`
     <div class="admin-kpi-grid" data-testid="su-pulse-cards-grid">
-      ${kpi('Order book received', n(s.totalReceivedGrnPairs), `of ${n(s.totalPlannedPairs)} pairs`, [
-        `${n(s.totalOrders)} orders, ${n(s.totalGrnCount)} GRNs`,
-        `Contractor balance <strong>${n(s.totalContractorBalancePairs)}</strong> pairs`
-      ])}
-      ${kpi('Dock Available', n(s.totalDockAvailablePairs), 'pairs ready', [
-        `Issued to floor <strong>${n(s.totalIssuedReqPairs)}</strong> pairs across <strong>${n(s.totalReqCount)}</strong> REQs`
-      ])}
-      ${kpi('Floor WIP', n(s.totalFloorWipPairs), 'pairs in WIP', [
-        `Stage 4 hold, awaiting QC <strong>${n(s.stage4ReadyForQcPairs)}</strong>`,
-        `Packed, stage 5 <strong>${n(s.stage5PackedPairs)}</strong>`
-      ])}
-      ${kpi(
-        'Alteration and scrap',
-        n(s.totalAlterationPairs),
-        'pairs in rework',
-        [
-          `Scrap <strong>${n(s.totalScrappedPairs)}</strong> pairs, debit <strong>PKR ${n(totalScrapDeduction)}</strong>`,
-          `Orders completed <strong>${n(s.completedOrders)} of ${n(s.totalOrders)}</strong>`
+      ${kpi({
+        label: 'Order book received',
+        value: n(s.totalReceivedGrnPairs),
+        unit: `of ${n(s.totalPlannedPairs)} pairs`,
+        lines: [
+          raw(html`${n(s.totalOrders)} orders, ${n(s.totalGrnCount)} GRNs`),
+          raw(html`Contractor balance <strong>${n(s.totalContractorBalancePairs)}</strong> pairs`)
+        ]
+      })}
+      ${kpi({
+        label: 'Dock Available',
+        value: n(s.totalDockAvailablePairs),
+        unit: 'pairs ready',
+        lines: [
+          raw(html`Issued to floor <strong>${n(s.totalIssuedReqPairs)}</strong> pairs across <strong>${n(s.totalReqCount)}</strong> REQs`)
         ],
-        s.totalAlterationPairs > 0 ? 'su-db-neg' : ''
-      )}
-    </div>`;
+        actionAttr: s.totalDockAvailablePairs > 0 ? 'data-admin-tab-jump="grn"' : ''
+      })}
+      ${kpi({
+        label: 'Floor WIP',
+        value: n(s.totalFloorWipPairs),
+        unit: 'pairs in WIP',
+        lines: [
+          raw(html`Stage 4 hold, awaiting QC <strong>${n(s.stage4ReadyForQcPairs)}</strong>`),
+          raw(html`Packed, stage 5 <strong>${n(s.stage5PackedPairs)}</strong>`)
+        ]
+      })}
+      ${kpi({
+        label: 'Alteration and scrap',
+        value: n(s.totalAlterationPairs),
+        unit: 'pairs in rework',
+        valueClass: s.totalAlterationPairs > 0 ? 'su-db-neg' : '',
+        lines: [
+          raw(html`Scrap <strong>${n(s.totalScrappedPairs)}</strong> pairs, debit <strong>PKR ${n(totalScrapDeduction)}</strong>`),
+          raw(html`Orders completed <strong>${n(s.completedOrders)} of ${n(s.totalOrders)}</strong>`)
+        ],
+        actionAttr: s.totalAlterationPairs > 0 ? 'data-admin-tab-jump="repair"' : ''
+      })}
+    </div>
+  `);
 
-  // Exceptions: stage 4 hold (left), floor exceptions (right)
+  // 3. Exceptions: stage 4 hold (left), floor exceptions (right)
   const stage4Rows =
     s.stage4HoldReqs.length === 0
-      ? `<tr><td colspan="6" class="su-db-empty">Nothing waiting for final QC. Lots appear here when stage 4 finishes.</td></tr>`
-      : s.stage4HoldReqs
-          .map(
-            req => `
-        <tr>
-          <td class="mono">${escapeHtml(req.parentOrderId)}</td>
-          <td>${slip('req', 'REQ', req.reqNumber, req.parentOrderId)}</td>
-          <td>${slip('mreq', 'M-REQ', req.mreqNo, req.parentOrderId)}</td>
-          <td>${escapeHtml(req.article)}</td>
-          <td class="text-right num">${n(req.stage4Passed)}</td>
-          <td class="text-center">${jumpBtn('screen-qc', req.reqNumber, 'Inspect in final QC')}</td>
-        </tr>`
-          )
-          .join('');
+      ? raw(`<tr><td colspan="6" class="su-db-empty">Nothing waiting for final QC. Lots appear here when stage 4 finishes.</td></tr>`)
+      : raw(
+          s.stage4HoldReqs
+            .map(req =>
+              html`
+                <tr>
+                  <td class="mono">${req.parentOrderId}</td>
+                  <td>${slip('req', 'REQ', req.reqNumber, req.parentOrderId)}</td>
+                  <td>${slip('mreq', 'M-REQ', req.mreqNo, req.parentOrderId)}</td>
+                  <td>${req.article}</td>
+                  <td class="text-right num">${n(req.stage4Passed)}</td>
+                  <td class="text-center">${jumpBtn('screen-qc', req.reqNumber, 'Inspect in final QC')}</td>
+                </tr>
+              `
+            )
+            .join('')
+        );
 
-  const noExceptions =
-    s.activeAlterationReqs.length === 0 && s.pendingIssueReqs.length === 0 && s.unfulfilledMreqReqs.length === 0;
+  const exceptionList: RawHtml[] = [
+    ...s.activeAlterationReqs.map(req =>
+      exceptionRow({
+        kind: 'areq',
+        ref: slip('areq', 'A-REQ', req.altReqNo, req.parentOrderId),
+        orderId: req.parentOrderId,
+        maker: req.maker,
+        badge: raw(html`<span class="su-badge su-badge-areq">Rework, cycle ${Math.min(2, Math.max(1, req.alterationCycleCount || 1))} of 2</span>`),
+        pairs: req.inAlterationPairs,
+        action: jumpBtn('screen-repair', req.reqNumber, 'Open bay 2')
+      })
+    ),
+    ...s.unfulfilledMreqReqs.map(req =>
+      exceptionRow({
+        kind: 'mreq',
+        ref: slip('mreq', 'M-REQ', req.mreqNo, req.parentOrderId),
+        orderId: req.parentOrderId,
+        maker: req.maker,
+        badge: raw(html`<span class="su-badge su-badge-mreq">Unfulfilled M-REQ (${req.mreqStatus})</span>`),
+        pairs: req.issuedPairs,
+        action: jumpBtn('screen-packing', req.reqNumber, 'Fulfill M-REQ')
+      })
+    ),
+    ...s.pendingIssueReqs.map(req =>
+      exceptionRow({
+        kind: 'dock',
+        ref: slip('req', 'REQ', req.reqNumber, req.parentOrderId),
+        orderId: req.parentOrderId,
+        maker: req.maker,
+        badge: raw(html`<span class="su-badge su-badge-grn">Awaiting dock issue (${req.mreqNo})</span>`),
+        pairs: req.askingPairs,
+        action: jumpBtn('screen-grn', req.reqNumber, 'Issue at dock')
+      })
+    )
+  ];
 
-  const exceptionRows = noExceptions
-    ? `<tr><td colspan="6" class="su-db-empty">No open exceptions. Issued requisitions, M-REQs and alteration loops are clear.</td></tr>`
-    : [
-        ...s.activeAlterationReqs.map(req =>
-          exceptionRow({
-            ref: slip('areq', 'A-REQ', req.altReqNo, req.parentOrderId),
-            orderId: req.parentOrderId,
-            maker: req.maker || '',
-            badge: `<span class="su-badge su-badge-areq">Rework, cycle ${Math.min(2, Math.max(1, req.alterationCycleCount || 1))} of 2</span>`,
-            pairs: req.inAlterationPairs,
-            action: jumpBtn('screen-repair', req.reqNumber, 'Open bay 2')
-          })
-        ),
-        ...s.unfulfilledMreqReqs.map(req =>
-          exceptionRow({
-            ref: slip('mreq', 'M-REQ', req.mreqNo, req.parentOrderId),
-            orderId: req.parentOrderId,
-            maker: req.maker || '',
-            badge: `<span class="su-badge su-badge-mreq">Unfulfilled M-REQ (${escapeHtml(req.mreqStatus)})</span>`,
-            pairs: req.issuedPairs,
-            action: jumpBtn('screen-packing', req.reqNumber, 'Fulfill M-REQ')
-          })
-        ),
-        ...s.pendingIssueReqs.map(req =>
-          exceptionRow({
-            ref: slip('req', 'REQ', req.reqNumber, req.parentOrderId),
-            orderId: req.parentOrderId,
-            maker: req.maker || '',
-            badge: `<span class="su-badge su-badge-grn">Awaiting dock issue (${escapeHtml(req.mreqNo)})</span>`,
-            pairs: req.askingPairs,
-            action: jumpBtn('screen-grn', req.reqNumber, 'Issue at dock')
-          })
-        )
-      ].join('');
+  const exceptionRows =
+    exceptionList.length === 0
+      ? raw(`<tr><td colspan="6" class="su-db-empty">No open exceptions. Issued requisitions, M-REQs and alteration loops are clear.</td></tr>`)
+      : raw(exceptionList.map(r => r.value).join(''));
 
-  const exceptionCount = s.activeAlterationReqs.length + s.pendingIssueReqs.length + s.unfulfilledMreqReqs.length;
-
-  const exceptions = `
+  const exceptions = raw(html`
     <div class="two-column-grid" data-testid="su-exceptions-strip">
       <section class="panel-card">
         <div class="panel-card-header">
@@ -205,7 +281,7 @@ export function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduct
         <div class="panel-card-header">
           <div class="panel-card-title">
             <span>Floor exceptions</span>
-            <span class="panel-counter-badge">${n(exceptionCount)} open</span>
+            <span class="panel-counter-badge">${n(exceptionList.length)} open</span>
           </div>
           <span class="admin-meta-caption">Alterations return to stage 1, max 2 cycles</span>
         </div>
@@ -225,61 +301,65 @@ export function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduct
           </table>
         </div>
       </section>
-    </div>`;
+    </div>
+  `);
 
-  // Active orders: 16 columns folded to 11. Nothing dropped: PO sits under the order,
-  // contractor balance under planned, dock pool under received, stage 4 hold under floor.
+  // 4. Active orders: 11 columns
   const orderRows =
     s.orderRollups.length === 0
-      ? `
-    <tr>
-      <td colspan="11" class="su-db-empty su-db-empty--tall">
-        <div>No master orders yet. Create a buyer order in Order Creation and issue it to inward receiving.</div>
-        <button type="button" class="btn-outline su-db-btn" data-admin-tab-jump="orders">Go to order creation</button>
-      </td>
-    </tr>`
-      : s.orderRollups
-          .map(
-            o => `
-    <tr>
-      <td>
-        <button type="button" class="su-db-ref su-db-ref--req su-chip-btn" data-su-action="inspect-order" data-order-id="${escapeHtml(o.orderId)}"><i></i>${escapeHtml(o.orderId)}</button>
-        ${o.po ? `<div class="su-db-sub">PO ${escapeHtml(o.po)}</div>` : ''}
-      </td>
-      <td>
-        <div>${escapeHtml(o.buyer || '')}</div>
-        ${o.maker ? `<div class="su-db-sub">${escapeHtml(o.maker)}</div>` : ''}
-      </td>
-      <td>${escapeHtml(o.article)}</td>
-      <td class="text-right num">
-        <div>${n(o.plannedQty)}</div>
-        <div class="su-db-sub">Balance ${n(o.contractorBalanceQty)}</div>
-      </td>
-      <td class="text-right num">
-        <div>${n(o.receivedGrnQty)} <span class="su-db-sub">(${n(o.grnBatches.length)} ${o.grnBatches.length === 1 ? 'GRN' : 'GRNs'})</span></div>
-        <div class="su-db-sub">Dock pool ${n(o.dockAvailableQty)}</div>
-        ${o.grnBatches.length > 0 ? renderOrderGrnChipsWithOverflow(o) : ''}
-      </td>
-      <td class="text-right num">
-        <div>${n(o.issuedReqQty)} <span class="su-db-sub">(${n(o.reqBatches.length)} ${o.reqBatches.length === 1 ? 'REQ' : 'REQs'})</span></div>
-        ${o.reqBatches.length > 0 ? renderOrderReqChipsWithOverflow(o) : ''}
-      </td>
-      <td class="text-right num">
-        <div>${n(o.inFloorWipQty)}</div>
-        ${o.awaitingFinalQcQty > 0 ? `<div class="su-db-sub">${n(o.awaitingFinalQcQty)} at stage 4</div>` : ''}
-      </td>
-      <td class="text-right num ${o.inAlterationQty > 0 || o.scrappedQty > 0 ? 'su-db-neg' : ''}">${n(o.inAlterationQty)} / ${n(o.scrappedQty)}</td>
-      <td class="text-right num su-db-ok">${n(o.packedStage5Qty)}</td>
-      <td class="text-center">${renderDeliveryCountdownChip(o.deliveryCountdown, false)}</td>
-      <td class="text-center">
-        <div><span class="${getSuperUserStatusBadgeClass(o.orderStatus)}">${escapeHtml(o.orderStatus)}</span></div>
-        <div class="su-db-stack">${renderReconciliationBadge(o.reconciliation)}</div>
-      </td>
-    </tr>`
-          )
-          .join('');
+      ? raw(`
+          <tr>
+            <td colspan="11" class="su-db-empty su-db-empty--tall">
+              <div>No master orders yet. Create a buyer order in Order Creation and issue it to inward receiving.</div>
+              <button type="button" class="btn-outline su-db-btn" data-admin-tab-jump="orders">Go to order creation</button>
+            </td>
+          </tr>
+        `)
+      : raw(
+          s.orderRollups
+            .map(o =>
+              html`
+                <tr>
+                  <td>
+                    <button type="button" class="su-db-ref su-db-ref--req su-chip-btn" data-su-action="inspect-order" data-order-id="${o.orderId}"><i></i>${o.orderId}</button>
+                    ${o.po ? raw(html`<div class="su-db-sub">PO ${o.po}</div>`) : ''}
+                  </td>
+                  <td>
+                    <div>${o.buyer ?? ''}</div>
+                    ${o.maker ? raw(html`<div class="su-db-sub">${o.maker}</div>`) : ''}
+                  </td>
+                  <td>${o.article}</td>
+                  <td class="text-right num">
+                    <div>${n(o.plannedQty)}</div>
+                    <div class="su-db-sub">Balance ${n(o.contractorBalanceQty)}</div>
+                  </td>
+                  <td class="text-right num">
+                    <div>${n(o.receivedGrnQty)} <span class="su-db-sub">(${n(o.grnBatches.length)} ${o.grnBatches.length === 1 ? 'GRN' : 'GRNs'})</span></div>
+                    <div class="su-db-sub">Dock pool ${n(o.dockAvailableQty)}</div>
+                    ${o.grnBatches.length > 0 ? raw(renderOrderGrnChipsWithOverflow(o)) : ''}
+                  </td>
+                  <td class="text-right num">
+                    <div>${n(o.issuedReqQty)} <span class="su-db-sub">(${n(o.reqBatches.length)} ${o.reqBatches.length === 1 ? 'REQ' : 'REQs'})</span></div>
+                    ${o.reqBatches.length > 0 ? raw(renderOrderReqChipsWithOverflow(o)) : ''}
+                  </td>
+                  <td class="text-right num">
+                    <div>${n(o.inFloorWipQty)}</div>
+                    ${o.awaitingFinalQcQty > 0 ? raw(html`<div class="su-db-sub">${n(o.awaitingFinalQcQty)} at stage 4</div>`) : ''}
+                  </td>
+                  <td class="text-right num ${o.inAlterationQty > 0 || o.scrappedQty > 0 ? 'su-db-neg' : ''}">${n(o.inAlterationQty)} / ${n(o.scrappedQty)}</td>
+                  <td class="text-right num su-db-ok">${n(o.packedStage5Qty)}</td>
+                  <td class="text-center">${raw(renderDeliveryCountdownChip(o.deliveryCountdown, false))}</td>
+                  <td class="text-center">
+                    <div><span class="${getSuperUserStatusBadgeClass(o.orderStatus)}">${o.orderStatus}</span></div>
+                    <div class="su-db-stack">${raw(renderReconciliationBadge(o.reconciliation))}</div>
+                  </td>
+                </tr>
+              `
+            )
+            .join('')
+        );
 
-  const pulse = `
+  const pulse = raw(html`
     <section class="panel-card" id="su-active-orders-pulse-section" data-testid="su-active-orders-pulse">
       <div class="panel-card-header">
         <div class="panel-card-title">
@@ -311,8 +391,16 @@ export function renderDashboardTab(ctx: SuperUserRenderContext, totalScrapDeduct
           <tbody>${orderRows}</tbody>
         </table>
       </div>
-    </section>`;
+    </section>
+  `);
 
-  // Bar graph + order > GRN > REQ topology (own helper, unchanged)
-  return `<div class="su-db">${demoDrawer}${kpis}${exceptions}${pulse}<div>${renderDashboardVisualGraphs(s)}</div></div>`;
+  return html`
+    <div class="su-db">
+      ${demoDrawer}
+      ${kpis}
+      ${exceptions}
+      ${pulse}
+      <div>${raw(renderDashboardVisualGraphs(s))}</div>
+    </div>
+  `;
 }

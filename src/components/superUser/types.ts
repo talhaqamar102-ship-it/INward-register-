@@ -1,4 +1,5 @@
 import type {
+  HallWithStitchers,
   PendingOrder,
   SizeBreakdown,
   SuperUserDashboardSummary,
@@ -24,6 +25,22 @@ export interface SystemUserRecord {
   active: boolean;
 }
 
+export interface AdminOrderArticleLine {
+  lineId: string;
+  productId: string;
+  article: string;
+  color: string;
+  sizeFormat: string;
+  maker: string;
+  dueDate: string;
+  sizes: SizeBreakdown;
+  splitRows: Array<{
+    maker: string;
+    sizes: SizeBreakdown;
+    dueDate: string;
+  }>;
+}
+
 export interface SuperUserRenderContext {
   activeTab: SuperUserTab;
   adminNavCollapsed?: boolean;
@@ -44,6 +61,7 @@ export interface SuperUserRenderContext {
     customers: string[];
     articles: string[];
     poList: string[];
+    halls?: HallWithStitchers[];
   };
   systemUsers?: SystemUserRecord[];
   currentUserId?: string;
@@ -81,5 +99,8 @@ export interface SuperUserRenderContext {
     sizes: SizeBreakdown;
     dueDate: string;
   }>;
+  orderArticleLines?: AdminOrderArticleLine[];
+  multiArticlePickerOpen?: boolean;
+  multiArticleSearch?: string;
   openRegistryIds?: Record<string, boolean>;
 }

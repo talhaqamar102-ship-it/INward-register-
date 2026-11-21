@@ -54,7 +54,7 @@
 .su-vg .su-vg-empty-text  { font-size: 13px; color: var(--su-text-secondary); max-width: 36rem; line-height: 20px; }
 
 /* ---------- Order flow cards ---------- */
-.su-vg .su-vg-flow { padding: 16px; display: grid; gap: 12px; max-height: 300px; overflow-y: auto; }
+.su-vg .su-vg-flow { padding: 16px; display: grid; gap: 12px; max-height: 380px; overflow-y: auto; }
 .su-vg .su-vg-blueprint { padding: 16px; border: 1px dashed var(--su-border); border-radius: 6px; background: var(--su-bg-primary); text-align: center; display: grid; gap: 10px; justify-items: center; }
 .su-vg .su-vg-order { border: 1px solid var(--su-border); border-radius: 6px; padding: 12px; background: var(--su-white); display: grid; gap: 8px; min-width: 0; }
 .su-vg .su-vg-order-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
@@ -63,6 +63,146 @@
 .su-vg .su-vg-order-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .su-vg .su-vg-link { border: 0; background: transparent; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--su-text-secondary); cursor: pointer; white-space: nowrap; }
 .su-vg .su-vg-link:hover { background: var(--su-bg-tertiary); color: var(--su-text-primary); }
+
+/* ---------- Collapsible branching order tree ("mind map" for multi-article sub-orders) ---------- */
+.su-vg .su-tree-group {
+  border: 1px solid var(--su-border);
+  border-radius: 6px;
+  background: var(--su-white);
+  min-width: 0;
+  overflow: hidden;
+}
+.su-vg .su-tree-root {
+  padding: 10px 12px;
+  background: var(--su-bg-primary);
+  border-bottom: 1px solid var(--su-border-subtle);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.su-vg .su-tree-root::-webkit-details-marker {
+  display: none;
+}
+.su-vg .su-tree-group:not([open]) .su-tree-root {
+  border-bottom: 0;
+}
+.su-vg .su-tree-root-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.su-vg .su-tree-caret {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--su-text-secondary);
+  border-bottom: 1.5px solid var(--su-text-secondary);
+  transform: rotate(45deg);
+  transition: transform 150ms var(--vg-ease);
+  margin-top: -2px;
+  flex: none;
+}
+.su-vg .su-tree-group:not([open]) .su-tree-caret {
+  transform: rotate(-45deg);
+  margin-top: 0;
+}
+.su-vg .su-tree-root-id {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--su-req-primary);
+}
+.su-vg .su-tree-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--su-text-secondary);
+  background: var(--su-white);
+  border: 1px solid var(--su-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.su-vg .su-tree-summary-pct {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--su-text-secondary);
+  white-space: nowrap;
+}
+.su-vg .su-tree-branches {
+  list-style: none;
+  margin: 0;
+  padding: 10px 12px 12px 22px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.su-vg .su-tree-branch {
+  position: relative;
+  padding-left: 14px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.su-vg .su-tree-branch::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -10px;
+  bottom: -10px;
+  width: 1px;
+  background: var(--su-border);
+}
+.su-vg .su-tree-branch:last-child::before {
+  bottom: auto;
+  height: 22px;
+}
+.su-vg .su-tree-branch::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 11px;
+  height: 1px;
+  background: var(--su-border);
+}
+.su-vg .su-tree-branch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.su-vg .su-tree-branch-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.su-vg .su-tree-branch-art {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--su-text-primary);
+  overflow-wrap: anywhere;
+}
+.su-vg .su-tree-branch-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.su-vg .su-tree-branch-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--su-text-secondary);
+  white-space: nowrap;
+}
 
 .su-vg .su-vg-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 48px; align-items: center; gap: 8px; font-size: 12px; }
 .su-vg .su-vg-row-label { color: var(--su-text-secondary); font-weight: 500; white-space: nowrap; }
@@ -79,10 +219,111 @@
 .su-vg .su-vg-chain--center { justify-content: center; border: 0; background: transparent; padding: 0; }
 .su-vg .su-vg-arrow { width: 14px; height: 14px; stroke: var(--ink-600, #52525B); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
+/* ---------- Halls & Stitchers chain registry (Registry 04) ---------- */
+.su-halls-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--su-border);
+  display: grid;
+  gap: 12px;
+}
+.su-halls-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.su-halls-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--su-text-primary);
+}
+.su-halls-sub {
+  font-size: 12px;
+  color: var(--ink-600, #52525B);
+}
+.su-hall-add-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.su-hall-add-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.su-hall-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+.su-hall-card {
+  border: 1px solid var(--su-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--su-white);
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+}
+.su-hall-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.su-hall-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.su-hall-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--su-text-primary);
+  overflow-wrap: anywhere;
+}
+.su-hall-card-count {
+  font-size: 11px;
+  color: var(--ink-600, #52525B);
+  font-variant-numeric: tabular-nums;
+  background: var(--su-bg-primary);
+  border: 1px solid var(--su-border-subtle);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.su-hall-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.su-hall-stitcher-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.su-hall-stitcher-add input {
+  flex: 1 1 140px;
+  min-width: 0;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.su-hall-empty {
+  font-size: 12px;
+  color: var(--ink-600, #52525B);
+}
+
 /* ---------- touch (factory tablets) ---------- */
 @media (pointer: coarse) {
   .superuser-command-center .su-vg-link { min-height: 44px; padding: 0 12px; }
   .superuser-command-center button.su-ref,
   .superuser-command-center .su-ref-slip { min-height: 32px; height: 32px; }
+  .superuser-command-center .su-hall-add-row .btn-primary,
+  .superuser-command-center .su-hall-stitcher-add .btn-outline,
+  .superuser-command-center .su-hall-delete-btn { min-height: 44px; padding: 0 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .su-vg * { transition: none !important; } }

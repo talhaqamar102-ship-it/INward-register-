@@ -24,6 +24,19 @@ export function stationName(role: SystemUserRecord['role']): string {
   return names[role];
 }
 
+function renderShutterBrandText(text: string): string {
+  const chars = text.split('').map((ch, i) => {
+    const displayChar = ch === ' ' ? '&nbsp;' : escapeHtml(ch);
+    return `<span class="shutter-char-wrap" style="--char-i:${i}" aria-hidden="true">`
+      + `<span class="shutter-char-main">${displayChar}</span>`
+      + `<span class="shutter-char-slice shutter-slice-top">${displayChar}</span>`
+      + `<span class="shutter-char-slice shutter-slice-mid">${displayChar}</span>`
+      + `<span class="shutter-char-slice shutter-slice-bot">${displayChar}</span>`
+      + `</span>`;
+  }).join('');
+  return `<span class="auth-brand-text" aria-label="${escapeHtml(text)}">${chars}</span>`;
+}
+
 export function renderAuthScreen(state: any): string {
   if (state.authMode === 'checking') {
     return '<main class="auth-screen"><section class="auth-card"><h1>Hammad Industries MES</h1><p>Checking sign-in status…</p></section></main>';
@@ -45,7 +58,7 @@ export function renderAuthScreen(state: any): string {
   return `
     <main class="auth-screen">
       <section class="auth-card" aria-labelledby="auth-title">
-        <div class="auth-brand">${LOGO_SVG}<span>HAMMAD INDUSTRIES</span></div>
+        <div class="auth-brand">${LOGO_SVG}${renderShutterBrandText('HAMMAD INDUSTRIES')}</div>
         <h1 id="auth-title">${isSetup ? 'Create the first Super User' : 'Sign in to your station'}</h1>
         <p>${isSetup
           ? 'Set up the initial administrator account. This one-time step unlocks user and station management.'
@@ -68,7 +81,7 @@ export function renderAuthScreen(state: any): string {
               <input id="auth-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" required />
             </label>
           ` : ''}
-          <button type="submit" class="btn-primary">${isSetup ? 'Create Super User' : 'Sign In'}</button>
+          <button type="submit" class="btn-primary auth-submit-btn">${isSetup ? 'Create Super User' : 'Sign In'}</button>
         </form>
         ${isSetup ? '<p class="auth-hint">Use at least 8 characters. Passwords are stored as salted hashes.</p>' : ''}
       </section>

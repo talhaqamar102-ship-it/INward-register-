@@ -56,7 +56,10 @@ function getAllowedRoles(req) {
   const { method, path } = req;
   if (path === '/admin/pending-orders' && method === 'GET') return ['SUPER_USER', 'INWARD_CLERK', 'PACKING_SUPERVISOR'];
   if (path.startsWith('/admin/')) return ['SUPER_USER'];
-  if (path === '/store/dropdowns' || path.startsWith('/store/receivings')) {
+  if (path === '/store/dropdowns' && method === 'GET') {
+    return ['SUPER_USER', 'INWARD_CLERK', 'ALTERATION_LEAD'];
+  }
+  if (path.startsWith('/store/receivings')) {
     if (path.endsWith('/void')) return ['SUPER_USER'];
     return ['SUPER_USER', 'INWARD_CLERK'];
   }
@@ -80,7 +83,7 @@ function getAllowedRoles(req) {
   if (path === '/material-requisitions' && method === 'GET') {
     return ['SUPER_USER', 'PACKING_SUPERVISOR'];
   }
-  if (path === '/alterations' || /^\/alterations\/[^/]+\/(return|repair)$/.test(path)) {
+  if (path === '/alterations' || /^\/alterations\/(?:assign|[^/]+\/(?:return|repair))$/.test(path)) {
     return ['SUPER_USER', 'ALTERATION_LEAD', 'INWARD_CLERK'];
   }
   if (path === '/materials/return' || /^\/bom\/[^/]+$/.test(path)) {
@@ -306,6 +309,16 @@ apiRouter.post('/materials/return', handle((req) => {
 }));
 
 // --- ALTERATION REWORK ATTRIBUTION (TAILOR & MAX 2-REWORK SCRAP) ---
+apiRouter.post('/alterations/assign', handle((req) => {
+  const { reqNumber, tailorName, alterationId, pairsCount } = req.body || {};
+  return PackingService.assignAlterationTailor(
+    reqNumber,
+    tailorName,
+    alterationId,
+    pairsCount != null ? Number(pairsCount) : null
+  );
+}));
+
 apiRouter.post('/alterations/:id/repair', handle((req) => {
   const { tailorName, isScrap, deductionRate, pairsCount } = req.body || {};
   return PackingService.completeAlterationRepair(
@@ -418,6 +431,30 @@ apiRouter.post('/admin/pending-orders/:orderId/short-close', handle((req) => {
 apiRouter.delete('/admin/pending-orders/:orderId', handle((req) => {
   const { actor, role } = getActorMeta(req);
   return PackingService.deletePendingOrderAdmin(req.params.orderId, actor, role);
+}));
+
+apiRouter.get('/admin/halls', handle(() => {
+  return PackingService.getHallsWithStitchers();
+}));
+
+apiRouter.post('/admin/halls', handle((req) => {
+  const { actor, role } = getActorMeta(req, 'SUPER_USER');
+  return PackingService.createHallAdmin(req.body?.name, actor, role);
+}));
+
+apiRouter.delete('/admin/halls/:id', handle((req) => {
+  const { actor, role } = getActorMeta(req, 'SUPER_USER');
+  return PackingService.deleteHallAdmin(req.params.id, actor, role);
+}));
+
+apiRouter.post('/admin/halls/:id/stitchers', handle((req) => {
+  const { actor, role } = getActorMeta(req, 'SUPER_USER');
+  return PackingService.createStitcherAdmin(req.params.id, req.body?.name, actor, role);
+}));
+
+apiRouter.delete('/admin/stitchers/:id', handle((req) => {
+  const { actor, role } = getActorMeta(req, 'SUPER_USER');
+  return PackingService.deleteStitcherAdmin(req.params.id, actor, role);
 }));
 
 apiRouter.post('/admin/db/backup', handle(() => {

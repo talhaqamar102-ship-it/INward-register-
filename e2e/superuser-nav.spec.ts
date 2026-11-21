@@ -1426,23 +1426,52 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     await expect(altNavBtn).toBeVisible();
     await expect(altNavBtn).toContainText('Alteration Bay (1)');
     await altNavBtn.click();
-    await expect(page.locator('.sub-header-title')).toContainText('Alteration & Repair Bay #2');
-    await expect(page.locator('table.data-table')).toContainText('10 Prs');
+    await expect(page.locator('.rep-title')).toContainText('Alteration and repair bay 2');
+    await expect(page.locator('#defect-article')).toHaveAttribute('data-locked', 'true');
+    await expect(page.locator('#defect-po')).toHaveAttribute('data-locked', 'true');
+    await expect(page.locator('#defect-color')).toHaveAttribute('data-locked', 'true');
+    await expect(page.locator('#defect-req-meta')).toContainText('10 pairs logged by packing hall');
+    await expect(page.locator('#defect-qty')).toHaveValue('10');
+    await expect(page.locator('#defect-qty')).toHaveAttribute('max', '10');
+    await expect(page.locator('#repair-active-bench-panel')).toContainText('10');
 
-    // Return the 10 pairs back to Stage 1 Checking and confirm persistence across reload
+    // Step 1: Assign 6 pairs to Tailor in SQLite -> appears in In rework panel
     await page.fill('#defect-tailor', 'Master Tailor Khalid');
-    const returnBtn = page.locator('[data-alt-return-id]').first();
-    await expect(returnBtn).toBeVisible();
-    await returnBtn.click();
-    await expect(page.locator('table.data-table')).toContainText('Completed');
+    await page.fill('#defect-qty', '6');
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes('/api/alterations/assign') && res.status() === 200),
+      page.click('#btn-assign-tailor')
+    ]);
+    await expect(page.locator('#repair-active-bench-panel')).toContainText('Master Tailor Khalid');
+    await expect(page.locator('#repair-active-bench-panel')).toContainText('6');
+    await expect(page.locator('#repair-active-bench-panel')).toContainText('4');
+
+    // Step 2a: Inline partial Return (4) then Scrap remaining (2) on Khalid's 6-pair row
+    const khalidQtyInput = page.locator('#repair-active-bench-panel input.rep-row-qty[max="6"]');
+    await khalidQtyInput.fill('4');
+    await page.locator('#repair-active-bench-panel [data-alt-row-return][data-alt-tailor="Master Tailor Khalid"]').click();
+    await expect(page.locator('#repair-completed-ledger-panel')).toContainText('Returned to stage 1');
+
+    await page.locator('#repair-active-bench-panel [data-alt-row-scrap][data-alt-tailor="Master Tailor Khalid"]').click();
+    await expect(page.locator('#repair-completed-ledger-panel')).toContainText('Scrapped');
+
+    // Step 2b: Return remaining 4-pair row to Stage 1 -> Active dropdown clears, History toggle reveals past work across reload
+    await page.locator('#repair-active-bench-panel [data-alt-row-return]').first().click();
     await expect(page.locator('#btn-inward-nav-repair')).toHaveText('Alteration Bay');
+    await expect(page.locator('.rep-req-pill')).toContainText('All active cleared');
+
+    await page.click('#btn-repair-toggle-all');
+    await expect(page.locator('#repair-completed-ledger-panel')).toContainText('Returned to stage 1');
+    await expect(page.locator('#repair-completed-ledger-panel')).toContainText('Scrapped');
 
     await page.reload();
     await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
     await page.click('#btn-inward-nav-repair');
-    await expect(page.locator('table.data-table')).toContainText('Completed');
+    await page.click('#btn-repair-toggle-all');
+    await expect(page.locator('#repair-completed-ledger-panel')).toContainText('Returned to stage 1');
+    await expect(page.locator('#repair-completed-ledger-panel')).toContainText('Scrapped');
 
-    // 4. Sign back in as Super User and verify Stage 1 input in Packing Hall increased to 110 (100 + 10 returned)
+    // 4. Sign back in as Super User and verify Stage 1 input in Packing Hall increased to 8 (4 + 4 returned; 2 scrapped)
     await page.click('#btn-session-lock');
     await page.fill('#auth-username', TEST_ADMIN.username);
     await page.fill('#auth-password', TEST_ADMIN.password);
@@ -1450,7 +1479,7 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     await expect(page.locator('[data-testid="superuser-command-center"]')).toBeVisible();
     await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
     await page.locator(`#tracking-order-card-${orderId} button[data-su-action="open-req-screen"][data-target-screen="screen-packing"]`).first().click();
-    await expect(page.locator('#wip-stg1-in')).toHaveText('10');
+    await expect(page.locator('#wip-stg1-in')).toHaveText('8');
     await expect(page.locator('#btn-wip-step1')).toBeEnabled();
 
     expect(runtimeErrors).toEqual([]);
@@ -1589,6 +1618,534 @@ test.describe('Super User UI at 1440px & Core Interactive Flows', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.click('.admin-tab-btn[data-admin-tab="dashboard"]');
     await page.click('#btn-remove-demo-600');
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('Hall -> Stitcher chain receiving E2E: Registry 04 CRUD, reload persistence, Inward Dock cascade, Live Tracking, Alteration Bay & multi-viewport geometry', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    const hallName = 'Hall C Stitcher QA';
+    const stitcherA = 'Ustad Bilal';
+    const stitcherB = 'Ustad Kamran';
+    const altUser = 'e2e.alt.hall.qa';
+    const altPass = 'Alt-Hall-QA-2026!';
+
+    await authenticateAsSuperUser(page);
+
+    // 1. Registry 04: Add custom Hall and assigned Stitchers
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+    const makersRegistry = page.locator('details.su-collapsible-registry[data-registry-id="makers_pos"]');
+    await makersRegistry.locator('summary').click();
+    await expect(page.locator('#admin-add-hall-input')).toBeVisible();
+
+    await page.fill('#admin-add-hall-input', hallName);
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes('/api/admin/halls') && res.request().method() === 'POST' && res.status() === 200),
+      page.click('#btn-admin-add-hall')
+    ]);
+
+    const hallCard = page.locator(`.su-hall-card[data-hall-name="${hallName}"]`);
+    await expect(hallCard).toBeVisible();
+    await hallCard.locator('[data-hall-stitcher-input]').fill(stitcherA);
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes('/stitchers') && res.request().method() === 'POST' && res.status() === 200),
+      hallCard.locator('button[data-su-action="add-stitcher"]').click()
+    ]);
+    await expect(hallCard).toContainText(stitcherA);
+
+    await hallCard.locator('[data-hall-stitcher-input]').fill(stitcherB);
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes('/stitchers') && res.request().method() === 'POST' && res.status() === 200),
+      hallCard.locator('button[data-su-action="add-stitcher"]').click()
+    ]);
+    await expect(hallCard).toContainText('2 stitchers');
+
+    // Verify Registry 04 multi-viewport zero-overflow geometry
+    for (const vp of [
+      { width: 1440, height: 900 },
+      { width: 768, height: 1024 },
+      { width: 375, height: 812 }
+    ]) {
+      await page.setViewportSize(vp);
+      const regGeom = await page.evaluate(() => ({
+        sw: document.documentElement.scrollWidth,
+        cw: document.documentElement.clientWidth
+      }));
+      expect(regGeom.sw, `Registry 04 overflow at ${vp.width}px`).toBeLessThanOrEqual(regGeom.cw);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    // Reload and verify Hall & Stitchers persisted in SQLite
+    await page.reload();
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+    await page.locator('details.su-collapsible-registry[data-registry-id="makers_pos"] summary').click();
+    const persistedCard = page.locator(`.su-hall-card[data-hall-name="${hallName}"]`);
+    await expect(persistedCard).toBeVisible();
+    await expect(persistedCard).toContainText(stitcherA);
+    await expect(persistedCard).toContainText(stitcherB);
+
+    // 2. Provision an ALTERATION_LEAD user to verify Alteration Bay optgroups under real RBAC role
+    await page.click('.admin-tab-btn[data-admin-tab="users"]');
+    await page.fill('#admin-user-name', 'E2E Alteration Hall Lead');
+    await page.fill('#admin-user-username', altUser);
+    await page.fill('#admin-user-password', altPass);
+    await page.selectOption('#admin-user-role', 'ALTERATION_LEAD');
+    await page.click('#btn-admin-add-system-user');
+    await expect(page.locator('.su-user-table')).toContainText(altUser);
+
+    // 3. Create an 80-pair Pending Order for Hall C Stitcher QA and open Inward Dock
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+    await page.selectOption('#admin-pending-order-maker', hallName);
+    await page.selectOption('#admin-pending-order-article', 'Model A1');
+    await page.fill('#admin-pending-order-po', 'PO-HALL-CHAIN-01');
+    await page.fill('.admin-order-size-val[data-size="7"]', '80');
+    await page.click('#btn-admin-add-pending-order');
+    const createdDeleteBtn = page.locator('button[data-su-action="remove-pending-order"]').first();
+    await expect(createdDeleteBtn).toBeVisible();
+    const orderId = (await createdDeleteBtn.getAttribute('data-order-id'))!;
+
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${orderId}"]`);
+
+    // Auto-selected Hall C Stitcher QA because it has stitchers; verify Hall A disables #grn-stitcher & blank requires Received From
+    await expect(page.locator('.inw .sub-header-bar')).toBeVisible();
+    await expect(page.locator('#grn-hall')).toHaveValue(hallName);
+    await expect(page.locator('#grn-stitcher')).toBeEnabled();
+    await expect(page.locator('#grn-stitcher')).toContainText(stitcherA);
+    await expect(page.locator('#grn-stitcher')).toContainText(stitcherB);
+    await expect(page.locator('#grn-received-from')).not.toHaveAttribute('required', '');
+
+    await page.selectOption('#grn-hall', 'Hall A');
+    await expect(page.locator('#grn-stitcher')).toBeDisabled();
+    await page.selectOption('#grn-hall', '');
+    await expect(page.locator('#grn-stitcher')).toBeDisabled();
+    await expect(page.locator('#grn-received-from')).toHaveAttribute('required', '');
+
+    await page.selectOption('#grn-hall', hallName);
+    await expect(page.locator('#grn-stitcher')).toBeEnabled();
+
+    // Receive 40 pairs from Ustad Bilal with blank note -> defaults to "Ustad Bilal (Hall C Stitcher QA)"
+    const selectedOrderOptionText = await page.locator('#grn-pending-order option:checked').textContent();
+    expect(selectedOrderOptionText || '').toContain(orderId);
+    expect(selectedOrderOptionText || '').not.toContain('pairs [');
+    await expect(page.locator('#grn-balance-total')).toHaveText('0');
+    await expect(page.locator('[data-bal-size="7"]')).toHaveClass(/is-zero/);
+    await page.fill('.grn-size-val[data-size="7"]', '');
+    await expect(page.locator('#grn-balance-total')).toHaveText('80');
+    await expect(page.locator('[data-bal-size="7"]')).not.toHaveClass(/is-zero/);
+    const receiveBtnBg = await page.locator('#btn-print-grn-slip').evaluate(el => getComputedStyle(el).backgroundColor);
+    expect(receiveBtnBg).toBe('rgb(30, 64, 175)');
+    const sizeInputStyle = await page.locator('.inw .inw-size-input').first().evaluate(el => {
+      const cs = getComputedStyle(el);
+      return { maxWidth: cs.maxWidth, appearance: cs.appearance };
+    });
+    expect(sizeInputStyle.maxWidth).toBe('none');
+    expect(sizeInputStyle.appearance).toBe('textfield');
+    await page.selectOption('#grn-stitcher', stitcherA);
+    await page.fill('#grn-received-from', '');
+    await page.fill('.grn-size-val[data-size="7"]', '40');
+    await expect(page.locator('#grn-balance-total')).toHaveText('40');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await expect(page.locator('#global-modal')).toContainText(`${hallName} → ${stitcherA}`);
+    await expect(page.locator('#global-modal')).toContainText(`${stitcherA} (${hallName})`);
+    await page.click('#modal-btn-close');
+
+    // Receive remaining 40 pairs from Ustad Kamran with explicit Delivery Note
+    await page.selectOption('#grn-hall', hallName);
+    await page.selectOption('#grn-stitcher', stitcherB);
+    await page.fill('#grn-received-from', 'Brought by Courier Khalid');
+    await page.fill('.grn-size-val[data-size="7"]', '40');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await expect(page.locator('#global-modal')).toContainText(`${hallName} → ${stitcherB}`);
+    await expect(page.locator('#global-modal')).toContainText('Brought by Courier Khalid');
+    await page.click('#modal-btn-close');
+
+    // Verify Inward GRN History Table renders mono tags, Hall -> Stitcher, and Courier/Note
+    const grnTable = page.locator('table.data-table').first();
+    await expect(grnTable.locator('.su-ref--rcv').first()).toBeVisible();
+    await expect(grnTable.locator('.su-ref--req').first()).toBeVisible();
+    await expect(grnTable).toContainText(stitcherA);
+    await expect(grnTable).toContainText(stitcherB);
+    await expect(grnTable).toContainText('Brought by Courier Khalid');
+
+    // Verify Inward Register flexible full-width layout, sub-header, & zero overflow across 1600 / 1440 / 768 / 375px
+    for (const vp of [
+      { width: 1600, height: 900, expectOrderCols: 4, expectChainCols: 3, expectQueueCols: 4 },
+      { width: 1440, height: 900, expectOrderCols: 4, expectChainCols: 3, expectQueueCols: 4 },
+      { width: 768, height: 1024, expectOrderCols: 2, expectChainCols: 1, expectQueueCols: 2 },
+      { width: 375, height: 812, expectOrderCols: 1, expectChainCols: 1, expectQueueCols: 1 }
+    ]) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      const inwardGeom = await page.evaluate(() => {
+        const mainEl = document.querySelector<HTMLElement>('.inw .inw-main');
+        const orderRow = document.querySelector<HTMLElement>('.inward-order-row');
+        const chainBar = document.querySelector<HTMLElement>('.inward-chain-bar');
+        const queueMeta = document.querySelector<HTMLElement>('.inw-queue-meta');
+        return {
+          sw: document.documentElement.scrollWidth,
+          cw: document.documentElement.clientWidth,
+          mainMaxWidth: mainEl ? getComputedStyle(mainEl).maxWidth : '',
+          mainWidth: mainEl ? mainEl.getBoundingClientRect().width : 0,
+          orderCols: orderRow ? getComputedStyle(orderRow).gridTemplateColumns.trim().split(/\s+/).length : 0,
+          chainCols: chainBar ? getComputedStyle(chainBar).gridTemplateColumns.trim().split(/\s+/).length : 0,
+          queueCols: queueMeta ? getComputedStyle(queueMeta).gridTemplateColumns.trim().split(/\s+/).length : 0
+        };
+      });
+      expect(inwardGeom.sw, `Inward overflow at ${vp.width}px`).toBeLessThanOrEqual(inwardGeom.cw);
+      expect(inwardGeom.mainMaxWidth, `Inward main flexible maxWidth at ${vp.width}px`).toBe('none');
+      if (vp.width === 1600) {
+        expect(inwardGeom.mainWidth, 'Inward main stretches past 1440px on wide screens').toBeGreaterThanOrEqual(1550);
+      }
+      expect(inwardGeom.orderCols, `Inward order row cols at ${vp.width}px`).toBe(vp.expectOrderCols);
+      expect(inwardGeom.chainCols, `Inward chain bar cols at ${vp.width}px`).toBe(vp.expectChainCols);
+      expect(inwardGeom.queueCols, `Inward queue meta cols at ${vp.width}px`).toBe(vp.expectQueueCols);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    // 4. Super User Live Tracking: Search by Stitcher Name and verify Supply Stream batch sub-line
+    await page.click('#btn-return-admin');
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.fill('#admin-tracking-search', stitcherA);
+    const trackingCard = page.locator(`#tracking-order-card-${orderId}`);
+    await expect(trackingCard).toBeVisible();
+    await expect(trackingCard).toContainText(`${hallName} → ${stitcherA}`);
+    await page.fill('#admin-tracking-search', '');
+
+    // 5. Sign in as ALTERATION_LEAD and verify #defect-tailor-select groups Hall C Stitcher QA stitchers
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', altUser);
+    await page.fill('#auth-password', altPass);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await expect(page.locator('#defect-tailor-select')).toBeVisible();
+    await expect(page.locator(`#defect-tailor-select optgroup[label="${hallName} Stitchers"] option`)).toHaveCount(2);
+    await page.setViewportSize({ width: 1600, height: 900 });
+    const repairGeom = await page.evaluate(() => {
+      const vp = document.querySelector<HTMLElement>('.main-viewport');
+      return {
+        sw: document.documentElement.scrollWidth,
+        cw: document.documentElement.clientWidth,
+        maxWidth: vp ? getComputedStyle(vp).maxWidth : '',
+        width: vp ? vp.getBoundingClientRect().width : 0
+      };
+    });
+    expect(repairGeom.sw).toBeLessThanOrEqual(repairGeom.cw);
+    expect(repairGeom.maxWidth).toBe('none');
+    expect(repairGeom.width).toBeGreaterThanOrEqual(1550);
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    // 6. Sign back in as Super User & clean up temporary Hall C Stitcher QA
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', TEST_ADMIN.username);
+    await page.fill('#auth-password', TEST_ADMIN.password);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('[data-testid="superuser-command-center"]')).toBeVisible();
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+    const cleanupDetails = page.locator('details.su-collapsible-registry[data-registry-id="makers_pos"]');
+    if (!(await cleanupDetails.evaluate(el => el.hasAttribute('open')))) {
+      await cleanupDetails.locator('summary').click();
+    }
+    const hallDeleteBtn = page.locator(`.su-hall-card[data-hall-name="${hallName}"] button[data-su-action="delete-hall"]`);
+    await hallDeleteBtn.click();
+    await expect(page.locator('#confirm-dialog-confirm')).toBeVisible();
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes('/api/admin/halls/') && res.request().method() === 'DELETE' && res.status() === 200),
+      page.click('#confirm-dialog-confirm')
+    ]);
+    await expect(page.locator(`.su-hall-card[data-hall-name="${hallName}"]`)).toHaveCount(0);
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('Multi-article Buyer Orders (-1/-2) -> Packing Hall stock-only filter -> Dashboard Branching Order Tree', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        runtimeErrors.push(`console.error: ${msg.text()}`);
+      }
+    });
+    page.on('response', res => {
+      if (res.status() >= 500) {
+        runtimeErrors.push(`http ${res.status()}: ${res.url()}`);
+      }
+    });
+
+    await page.addInitScript(() => {
+      window.print = () => {};
+    });
+
+    await authenticateAsSuperUser(page);
+
+    // 1. Create temporary Packing Supervisor user to verify Packing Hall stock-only visibility
+    await page.click('.admin-tab-btn[data-admin-tab="users"]');
+    const packUser = 'e2e.pack.stockonly';
+    const packPass = 'Pack-Stock-Only-2026!';
+    await page.fill('#admin-user-name', 'Packing Stock Supervisor');
+    await page.fill('#admin-user-username', packUser);
+    await page.fill('#admin-user-password', packPass);
+    await page.selectOption('#admin-user-role', 'PACKING_SUPERVISOR');
+    await page.click('#btn-admin-add-system-user');
+    await expect(page.locator('.su-user-table')).toContainText(packUser);
+
+    // 2. Multi-article Buyer Order Creation (OXFORD, 2 articles, default Hall A + override Hall B)
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+    await page.selectOption('#admin-pending-order-buyer', 'OXFORD');
+    await page.fill('#admin-pending-order-po', 'PO-MULTI-TREE-01');
+    await page.selectOption('#admin-pending-order-maker', 'Hall A');
+    await page.click('#btn-admin-toggle-multi-articles');
+    await expect(page.locator('[data-testid="admin-multi-article-picker"]')).toBeVisible();
+
+    // Verify responsive zero overflow on Order Creation with picker open across 1440 / 768 / 375
+    for (const vp of [
+      { width: 1440, height: 900 },
+      { width: 768, height: 1024 },
+      { width: 375, height: 812 }
+    ]) {
+      await page.setViewportSize(vp);
+      const ovf = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+      expect(ovf, `Order creation picker overflow at ${vp.width}px`).toBe(false);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    const checkboxes = page.locator('.admin-multi-art-check');
+    expect(await checkboxes.count()).toBeGreaterThanOrEqual(2);
+    await checkboxes.nth(0).check();
+    await checkboxes.nth(1).check();
+
+    const subCards = page.locator('.su-suborder-card');
+    await expect(subCards).toHaveCount(2);
+    await expect(page.locator('.admin-line-maker[data-line-index="0"]')).toHaveValue('Hall A');
+    await expect(page.locator('.admin-line-maker[data-line-index="1"]')).toHaveValue('Hall A');
+
+    // Override sub-order 2 contractor to Hall B cleanly
+    await page.selectOption('.admin-line-maker[data-line-index="1"]', 'Hall B');
+    await page.locator('.admin-line-size-val[data-line-index="0"]').first().fill('100');
+    await page.locator('.admin-line-size-val[data-line-index="1"]').first().fill('60');
+    await expect(page.locator('#btn-admin-add-pending-order')).toContainText('Save & Issue 2 Sub-Orders');
+
+    const [batchRes] = await Promise.all([
+      page.waitForResponse(res => res.url().includes('/api/admin/pending-orders') && res.request().method() === 'POST' && res.status() === 200),
+      page.click('#btn-admin-add-pending-order')
+    ]);
+    const batchJson = await batchRes.json();
+    const baseOrderId: string = batchJson.data.baseOrderId;
+    const sub1: string = batchJson.data.orderIds[0];
+    const sub2: string = batchJson.data.orderIds[1];
+    expect(sub1).toBe(`${baseOrderId}-1`);
+    expect(sub2).toBe(`${baseOrderId}-2`);
+
+    // Reload persistence check for sub-orders
+    await page.reload();
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await page.click('.admin-tab-btn[data-admin-tab="orders"]');
+    await expect(page.locator(`button[data-su-action="remove-pending-order"][data-order-id="${sub1}"]`)).toBeVisible();
+    await expect(page.locator(`button[data-su-action="remove-pending-order"][data-order-id="${sub2}"]`)).toBeVisible();
+
+    // 3. Sign in as Packing Supervisor BEFORE GRN: unreceived sub1/sub2 must NOT appear in Packing Hall
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', packUser);
+    await page.fill('#auth-password', packPass);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('#root')).toHaveAttribute('data-sync-ready', 'true');
+    await expect(page.locator('#wip-batch-select')).toBeVisible();
+    const preGrnOptions = await page.locator('#wip-batch-select').innerText();
+    expect(preGrnOptions).not.toContain(sub1);
+    expect(preGrnOptions).not.toContain(sub2);
+
+    // 4. Sign in as Super User -> receive partial 40 of 100 pairs on sub1 at Inward Register
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', TEST_ADMIN.username);
+    await page.fill('#auth-password', TEST_ADMIN.password);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('[data-testid="superuser-command-center"]')).toBeVisible();
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${sub1}"]`);
+    await page.fill('#grn-received-from', 'OXFORD Sub1 Carrier');
+    await page.locator('.grn-size-val').first().fill('40');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    // 5. Return as Packing Supervisor -> ONLY sub1 shows (40 pairs available, never 100), sub2 still hidden
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', packUser);
+    await page.fill('#auth-password', packPass);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('#wip-batch-select')).toBeVisible();
+    const afterGrn1Text = await page.locator('#wip-batch-select').innerText();
+    expect(afterGrn1Text).toContain(`${sub1}`);
+    expect(afterGrn1Text).not.toContain(sub2);
+    const sub1OptionText = await page.locator(`#wip-batch-select option[value="ORDER:${sub1}"]`).textContent();
+    expect(sub1OptionText || '').toContain('40 pairs available');
+    expect(sub1OptionText || '').not.toContain('100 pairs');
+
+    // Open REQ modal by choosing Load ORDER:sub1 -> verify stock-only summary & Available row (no Order Remaining)
+    await page.selectOption('#wip-batch-select', `ORDER:${sub1}`);
+    await expect(page.locator('#new-req-cap-summary')).toContainText('Available at Dock: 40 Prs');
+    await expect(page.locator('#new-req-cap-summary')).not.toContainText('Order Remaining');
+    await expect(page.locator('#new-req-cap-summary')).not.toContainText('Inward Received');
+    await expect(page.locator('[data-testid="new-req-avail-row"]')).toContainText('40');
+
+    await page.locator('.req-size-val').first().fill('25');
+    await expect(page.locator('#new-req-pairs')).toHaveValue('25');
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes(`/api/orders/${encodeURIComponent(sub1)}/requisitions`) && res.status() === 200),
+      page.click('#btn-confirm-lot-draw')
+    ]);
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+
+    // Remaining unclaimed stock on sub1 now drops to 15 pairs available
+    const sub1AfterReqText = await page.locator(`#wip-batch-select option[value="ORDER:${sub1}"]`).textContent();
+    expect(sub1AfterReqText || '').toContain('15 pairs available');
+
+    // 6. Receive 60 pairs on sub2 & create 30-pair REQ on sub2
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', TEST_ADMIN.username);
+    await page.fill('#auth-password', TEST_ADMIN.password);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('[data-testid="superuser-command-center"]')).toBeVisible();
+    await page.click('.admin-tab-btn[data-admin-tab="tracking"]');
+    await page.click(`button[data-su-action="quick-receive-grn"][data-order-id="${sub2}"]`);
+    await page.fill('#grn-received-from', 'OXFORD Sub2 Carrier');
+    await page.locator('.grn-size-val').first().fill('60');
+    await page.click('#btn-print-grn-slip');
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', packUser);
+    await page.fill('#auth-password', packPass);
+    await page.click('#auth-form button[type="submit"]');
+    await page.selectOption('#wip-batch-select', `ORDER:${sub2}`);
+    await expect(page.locator('#new-req-cap-summary')).toContainText('Available at Dock: 60 Prs');
+    await page.locator('.req-size-val').first().fill('30');
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes(`/api/orders/${encodeURIComponent(sub2)}/requisitions`) && res.status() === 200),
+      page.click('#btn-confirm-lot-draw')
+    ]);
+    await expect(page.locator('#global-modal.open')).toHaveCount(0);
+
+    // 7. Sign in as Super User -> verify Dashboard Branching Order Tree ("mind map")
+    await page.click('#btn-session-lock');
+    await page.fill('#auth-username', TEST_ADMIN.username);
+    await page.fill('#auth-password', TEST_ADMIN.password);
+    await page.click('#auth-form button[type="submit"]');
+    await expect(page.locator('[data-testid="superuser-command-center"]')).toBeVisible();
+    await page.click('.admin-tab-btn[data-admin-tab="dashboard"]');
+
+    const treeGroup = page.locator(`[data-testid="su-order-tree-group"][data-base-order="${baseOrderId}"]`);
+    await expect(treeGroup).toBeVisible();
+    await expect(treeGroup).toContainText('2 sub-orders');
+    await expect(treeGroup.locator(`[data-sub-order="${sub1}"]`)).toBeVisible();
+    await expect(treeGroup.locator(`[data-sub-order="${sub2}"]`)).toBeVisible();
+    await expect(treeGroup.locator(`[data-sub-order="${sub1}"] button[data-slip-type="M-REQ"]`)).toBeVisible();
+    await expect(treeGroup.locator(`[data-sub-order="${sub1}"] button[data-slip-type="A-REQ"]`)).toBeVisible();
+
+    // Click M-REQ slip directly in tree -> opens printable slip modal cleanly without toggling <details>
+    await treeGroup.locator(`[data-sub-order="${sub1}"] button[data-slip-type="M-REQ"]`).click();
+    await expect(page.locator('#global-modal.open')).toBeVisible();
+    await page.click('#modal-btn-close');
+
+    // Verify Dashboard Order Tree has zero horizontal overflow across 1440 / 768 / 375
+    for (const vp of [
+      { width: 1440, height: 900 },
+      { width: 768, height: 1024 },
+      { width: 375, height: 812 }
+    ]) {
+      await page.setViewportSize(vp);
+      const ovf = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+      expect(ovf, `Dashboard order tree overflow at ${vp.width}px`).toBe(false);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    // Click Filter all on parent tree header -> opens Live Tracking with both sub-orders visible
+    await treeGroup.locator(`summary button[data-su-action="inspect-order"][data-order-id="${baseOrderId}"]`).click();
+    await expect(page.locator('#admin-tracking-search')).toHaveValue(baseOrderId);
+    await expect(page.locator(`#tracking-order-card-${sub1}`)).toBeVisible();
+    await expect(page.locator(`#tracking-order-card-${sub2}`)).toBeVisible();
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('Auth screen brand is centered and enlarged inside auth-card', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', err => runtimeErrors.push(`pageerror: ${err.message}`));
+    page.on('console', msg => {
+      if (msg.type() === 'error') runtimeErrors.push(`console.error: ${msg.text()}`);
+    });
+
+    await page.goto('/');
+    await expect(page.locator('.auth-card')).toBeVisible();
+
+    const brand = page.locator('.auth-brand');
+    await expect(brand).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const cardEl = document.querySelector('.auth-card') as HTMLElement;
+      const brandEl = document.querySelector('.auth-brand') as HTMLElement;
+      const svgEl = document.querySelector('.auth-brand .brand-logo-svg') as HTMLElement;
+      const textEl = document.querySelector('.auth-brand-text') as HTMLElement;
+      const btnEl = document.querySelector('.auth-submit-btn') as HTMLElement;
+      const cardRect = cardEl.getBoundingClientRect();
+      const svgRect = svgEl.getBoundingClientRect();
+      const textRect = textEl.getBoundingClientRect();
+      const btnRect = btnEl.getBoundingClientRect();
+      const contentLeft = Math.min(svgRect.left, textRect.left);
+      const contentRight = Math.max(svgRect.right, textRect.right);
+      const contentCenterX = (contentLeft + contentRight) / 2;
+      const cardCenterX = cardRect.left + cardRect.width / 2;
+      const btnCenterX = btnRect.left + btnRect.width / 2;
+      const brandStyle = getComputedStyle(brandEl);
+      const textStyle = getComputedStyle(textEl);
+      const svgStyle = getComputedStyle(svgEl);
+      return {
+        justifyContent: brandStyle.justifyContent,
+        ariaLabel: textEl.getAttribute('aria-label'),
+        shutterChars: document.querySelectorAll('.auth-brand-text .shutter-char-wrap').length,
+        shutterSlices: document.querySelectorAll('.auth-brand-text .shutter-char-slice').length,
+        fontSize: parseFloat(textStyle.fontSize),
+        svgWidth: parseFloat(svgStyle.width),
+        svgHeight: parseFloat(svgStyle.height),
+        centerDelta: Math.abs(contentCenterX - cardCenterX),
+        btnWidth: btnRect.width,
+        cardWidth: cardRect.width,
+        btnCenterDelta: Math.abs(btnCenterX - cardCenterX),
+        overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
+      };
+    });
+
+    expect(metrics.justifyContent).toBe('center');
+    expect(metrics.ariaLabel).toBe('HAMMAD INDUSTRIES');
+    expect(metrics.shutterChars).toBe('HAMMAD INDUSTRIES'.length);
+    expect(metrics.shutterSlices).toBe('HAMMAD INDUSTRIES'.length * 3);
+    expect(metrics.fontSize).toBeGreaterThanOrEqual(20);
+    expect(metrics.svgWidth).toBeCloseTo(39, 1);
+    expect(metrics.svgHeight).toBeCloseTo(39, 1);
+    expect(metrics.centerDelta).toBeLessThanOrEqual(2);
+    expect(metrics.btnWidth).toBeLessThan(metrics.cardWidth * 0.6);
+    expect(metrics.btnCenterDelta).toBeLessThanOrEqual(2);
+    expect(metrics.overflow).toBe(false);
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(mobileOverflow).toBe(false);
+
     expect(runtimeErrors).toEqual([]);
   });
 });

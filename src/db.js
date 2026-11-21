@@ -16,6 +16,23 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 export const db = new DatabaseSync(dbPath);
+export { dbPath };
+
+export function getReadOnlyDb() {
+  const roDb = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    roDb.exec('PRAGMA busy_timeout = 5000;');
+  } catch {
+    // Ignore if unsupported
+  }
+  return roDb;
+}
+
+function isTestRuntime() {
+  return process.env.NODE_ENV === 'test'
+    || Boolean(process.env.MES_DB_PATH && /playwright|test/i.test(process.env.MES_DB_PATH))
+    || process.argv.some(a => /test/i.test(a));
+}
 
 export function initDatabase() {
   // On Windows bind mounts (Docker Desktop) even non-WAL pragma writes can fail if
@@ -205,6 +222,9 @@ export function initDatabase() {
       gate_pass_no TEXT DEFAULT '',
       vehicle_no TEXT DEFAULT '',
       received_from TEXT NOT NULL DEFAULT '',
+      hall_name TEXT NOT NULL DEFAULT '',
+      stitcher_name TEXT NOT NULL DEFAULT '',
+      receiving_note TEXT NOT NULL DEFAULT '',
       color_shade TEXT NOT NULL DEFAULT 'Standard',
       overage_allowed_pct REAL DEFAULT 2.0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -293,6 +313,7 @@ export function initDatabase() {
       short_closed INTEGER NOT NULL DEFAULT 0,
       short_close_reason TEXT DEFAULT '',
       notes TEXT DEFAULT '',
+      deleted_at DATETIME DEFAULT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -367,6 +388,20 @@ export function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS halls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS stitchers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hall_id INTEGER NOT NULL REFERENCES halls(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(hall_id, name COLLATE NOCASE)
+    );
+
     CREATE TRIGGER IF NOT EXISTS trg_audit_trail_no_update
     BEFORE UPDATE ON audit_trail
     BEGIN
@@ -378,6 +413,43 @@ export function initDatabase() {
     BEGIN
       SELECT RAISE(ABORT, 'Immutable Audit Trail: DELETE is forbidden on audit_trail');
     END;
+
+    -- 18. Orchestrator Sealed HMAC Audit Chain (Append-Only)
+    CREATE TABLE IF NOT EXISTS orchestrator_audit_chain (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      seq INTEGER NOT NULL UNIQUE,
+      ts TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target_id TEXT DEFAULT '',
+      details TEXT DEFAULT '{}',
+      prev_hash TEXT NOT NULL,
+      hmac_hash TEXT NOT NULL
+    );
+
+    CREATE TRIGGER IF NOT EXISTS trg_orch_audit_no_update
+    BEFORE UPDATE ON orchestrator_audit_chain
+    BEGIN
+      SELECT RAISE(ABORT, 'Immutable Orchestrator Audit Chain: UPDATE is forbidden');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_orch_audit_no_delete
+    BEFORE DELETE ON orchestrator_audit_chain
+    BEGIN
+      SELECT RAISE(ABORT, 'Immutable Orchestrator Audit Chain: DELETE is forbidden');
+    END;
+
+    -- 19. Orchestrator Alerts
+    CREATE TABLE IF NOT EXISTS orchestrator_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'WARN',
+      category TEXT NOT NULL,
+      message TEXT NOT NULL,
+      actor TEXT DEFAULT '',
+      meta TEXT DEFAULT '{}',
+      acknowledged INTEGER NOT NULL DEFAULT 0
+    );
 
     -- DB Reliability Indexes (Query Acceleration & Foreign Key Optimizations)
     CREATE INDEX IF NOT EXISTS idx_store_receivings_po ON store_receivings(po_number);
@@ -395,15 +467,31 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_products_customer_id ON products(customer_id);
     CREATE INDEX IF NOT EXISTS idx_grn_req_alloc_order ON grn_req_allocations(order_id, rcv_number, req_number);
     CREATE INDEX IF NOT EXISTS idx_audit_trail_entity ON audit_trail(entity_id, action);
+    CREATE INDEX IF NOT EXISTS idx_stitchers_hall_id ON stitchers(hall_id);
+  `);
+
+  try {
+    db.exec('ALTER TABLE pending_orders ADD COLUMN deleted_at DATETIME DEFAULT NULL;');
+  } catch {
+    // Column already exists
+  }
+  db.exec(`
+    CREATE VIEW IF NOT EXISTS active_orders AS
+    SELECT * FROM pending_orders WHERE deleted_at IS NULL;
   `);
 
   migrateDatabase();
-  seedInitialData();
-  // Clean inspection mode: demo receiving sheet disabled (no dummy transactions)
-  // seedDemoSheet();
-  seedPackagingBOM();
-  seedSizeBreakdowns();
-  seedCatalogMaster();
+  if (isTestRuntime()) {
+    seedInitialData();
+    // Clean inspection mode: demo receiving sheet disabled (no dummy transactions)
+    // seedDemoSheet();
+    seedPackagingBOM();
+    seedSizeBreakdowns();
+    seedCatalogMaster();
+  } else {
+    seedCleanSizeStandards();
+    seedCleanMaterialInventory();
+  }
   installSizeFormatTriggers();
 }
 
@@ -456,6 +544,16 @@ function migrateDatabase() {
     if (!rcvCols.includes('color_shade')) {
       db.exec(`ALTER TABLE store_receivings ADD COLUMN color_shade TEXT NOT NULL DEFAULT 'Standard'`);
     }
+    if (!rcvCols.includes('hall_name')) {
+      db.exec(`ALTER TABLE store_receivings ADD COLUMN hall_name TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!rcvCols.includes('stitcher_name')) {
+      db.exec(`ALTER TABLE store_receivings ADD COLUMN stitcher_name TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!rcvCols.includes('receiving_note')) {
+      db.exec(`ALTER TABLE store_receivings ADD COLUMN receiving_note TEXT NOT NULL DEFAULT ''`);
+    }
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_store_receivings_hall ON store_receivings(hall_name, stitcher_name)`);
   }
 
   // glove_requisitions
@@ -597,6 +695,17 @@ function migrateDatabase() {
     }
     if (!ctnCols.includes('aql_status')) {
       db.exec(`ALTER TABLE cartons ADD COLUMN aql_status TEXT DEFAULT 'PENDING'`);
+    }
+  }
+
+  if (isTestRuntime()) {
+    try {
+      const hallCountRow = db.prepare(`SELECT COUNT(*) AS cnt FROM halls`).get();
+      if (Number(hallCountRow?.cnt || 0) === 0) {
+        db.prepare(`INSERT OR IGNORE INTO halls (name) VALUES (?), (?)`).run('Hall A', 'Hall B');
+      }
+    } catch {
+      // Ignore if halls table is not ready
     }
   }
 
@@ -743,6 +852,41 @@ function seedSizeBreakdowns() {
   insertSize.run('RCV-2026-0001', '8/M', 1500, 1500, 0);
   insertSize.run('RCV-2026-0001', '9/L', 1500, 1500, 0);
   insertSize.run('RCV-2026-0001', '10/XL', 785, 784, 1);
+}
+
+function seedCleanSizeStandards() {
+  db.exec(`DELETE FROM size_standards WHERE code NOT IN ('ALPHA_2XS_5XL', 'NUMERIC_6_12')`);
+  const upsertStandard = db.prepare(`
+    INSERT INTO size_standards (code, raw_label, sizes_json, is_legacy)
+    VALUES (?, ?, ?, 0)
+    ON CONFLICT(code) DO UPDATE SET
+      raw_label = excluded.raw_label,
+      sizes_json = excluded.sizes_json,
+      is_legacy = 0
+  `);
+  upsertStandard.run(
+    'ALPHA_2XS_5XL',
+    '2XS - 5XL (Alpha)',
+    JSON.stringify(['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'])
+  );
+  upsertStandard.run(
+    'NUMERIC_6_12',
+    '6 - 12 (Numeric)',
+    JSON.stringify(['6', '7', '8', '9', '10', '11', '12'])
+  );
+}
+
+function seedCleanMaterialInventory() {
+  const matCount = db.prepare('SELECT COUNT(*) as count FROM store_materials_inventory').get().count;
+  if (matCount > 0) return;
+  const insertMatStock = db.prepare(`
+    INSERT INTO store_materials_inventory (material_code, material_name, available_qty, unit)
+    VALUES (?, ?, ?, ?)
+  `);
+  insertMatStock.run('POLYBAG', 'Individual Protective Polybags', 25000, 'pcs');
+  insertMatStock.run('SILICA_GEL', 'Moisture Absorbing Silica Gel Packets', 30000, 'pouches');
+  insertMatStock.run('STICKER_BARCODE', 'Cardboard Barcode Labels & Hangtags', 50000, 'stickers');
+  insertMatStock.run('INNER_POLY', 'Inner Bundle Separation Sheeting', 15000, 'sheets');
 }
 
 function seedCatalogMaster() {

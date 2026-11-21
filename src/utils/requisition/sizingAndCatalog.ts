@@ -38,11 +38,17 @@ export function formatSizeColumnLabel(code: string, sizeFormat = 'LEGACY_7_11'):
   return code;
 }
 
-export function getScaleSizeCodes(sizeStandards: SizeStandardOption[] | undefined, sizeFormat = 'LEGACY_7_11'): string[] {
-  const target = String(sizeFormat || 'LEGACY_7_11').trim() || 'LEGACY_7_11';
+export function getScaleSizeCodes(sizeStandards: SizeStandardOption[] | undefined, sizeFormat = 'ALPHA_2XS_5XL'): string[] {
+  const target = String(sizeFormat || 'ALPHA_2XS_5XL').trim() || 'ALPHA_2XS_5XL';
   const matched = (sizeStandards || []).find(s => s.code === target);
   if (matched && Array.isArray(matched.sizes) && matched.sizes.length > 0) {
     return matched.sizes;
+  }
+  if (target === 'ALPHA_2XS_5XL') {
+    return ['2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+  }
+  if (target === 'NUMERIC_6_12') {
+    return ['6', '7', '8', '9', '10', '11', '12'];
   }
   return ['7', '8', '9', '10', '11'];
 }
@@ -275,6 +281,8 @@ export interface PendingOrder {
   availableDockPairs?: number;
   unclaimedDockPairs?: number;
   remainingOrderSizes?: SizeBreakdown;
+  requestedSizes?: SizeBreakdown;
+  unclaimedDockSizes?: SizeBreakdown;
   receivedSizes?: SizeBreakdown;
   contractorAllocations?: ContractorOrderAllocation[];
 }

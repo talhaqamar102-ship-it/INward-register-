@@ -50,6 +50,7 @@ export interface PackingHallViewParams {
   cartons: PackingHallCartonRow[];
   rollupSummary: RollupSummaryParam;
   getOrderAvailableDockPairs: (orderId: string) => number;
+  getOrderUnclaimedDockPairs?: (orderId: string) => number;
   remainingStagePairs: (input: number, passed: number, defects: number) => number;
   escapeHtml: (value: string) => string;
   isInitialSyncing?: boolean;
@@ -68,12 +69,16 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
     cartons,
     rollupSummary,
     getOrderAvailableDockPairs,
+    getOrderUnclaimedDockPairs,
     remainingStagePairs,
     escapeHtml,
     isInitialSyncing = false,
     isManualSync = false,
     syncError = ''
   } = params;
+
+  const getUnclaimed = getOrderUnclaimedDockPairs || getOrderAvailableDockPairs;
+  const dockReadyOrders = pendingOrders.filter(o => !o.shortClosed && getUnclaimed(o.orderId) > 0);
 
   const baseReq = normalizeBaseReqNumber(wip.selectedBatch);
   const aReq = getAlterationReqNumber(baseReq);
@@ -141,12 +146,14 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
                     : stage === 'STEP_5' ? 'Stage 5 (Cartons)'
                     : 'Completed';
                   const label = isEmptyPlaceholder
-                    ? 'No active requisition — choose a master order below'
+                    ? (dockReadyOrders.length > 0
+                        ? 'No active requisition — choose ready dock stock below'
+                        : 'No active requisition — awaiting Inward dock receiving')
                     : `${r}${art ? ` — ${art}` : ''} [${stageLabel}]`;
                   return `<option value="${escapeHtml(r)}" ${r === baseReq ? 'selected' : ''}>${escapeHtml(label)}</option>`;
-                }).join('') + (pendingOrders.length > 0
-                  ? `<optgroup label="Master Orders — create requisition">${pendingOrders.map(order =>
-                    `<option value="ORDER:${escapeHtml(order.orderId)}">Load ${escapeHtml(order.orderId)} — ${escapeHtml(order.article)} (${Number(order.totalQty || 0).toLocaleString()} pairs)</option>`
+                }).join('') + (dockReadyOrders.length > 0
+                  ? `<optgroup label="Dock Stock Ready — create requisition">${dockReadyOrders.map(order =>
+                    `<option value="ORDER:${escapeHtml(order.orderId)}">Load ${escapeHtml(order.orderId)} — ${escapeHtml(order.article)} (${getUnclaimed(order.orderId).toLocaleString()} pairs available)</option>`
                   ).join('')}</optgroup>`
                   : '');
               })()}
@@ -175,7 +182,7 @@ export function renderPackingHallScreen(params: PackingHallViewParams): string {
           </div>
           ` : ''}
           <div class="packing-toolbar-actions">
-            <button type="button" class="btn-primary" id="btn-wip-new-req" ${pendingOrders.length === 0 ? 'disabled title="A pending master order is needed first."' : ''}>+ Generate Requisition</button>
+            <button type="button" class="btn-primary" id="btn-wip-new-req" ${dockReadyOrders.length === 0 ? 'disabled title="No unclaimed Inward Register stock available yet."' : ''}>+ Generate Requisition</button>
           </div>
         </div>
       </section>

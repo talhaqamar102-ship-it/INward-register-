@@ -7,7 +7,7 @@ import {
   SuperUserGrnBatchItem,
   SuperUserReqBatchItem,
   buildRequisitionAnalyticsSeries,
-  renderRequisitionWipAnalyticsChart,
+  RequisitionAnalyticsPoint,
   getSuperUserStatusBadgeClass,
   canVoidGrnBatch,
   canVoidRequisitionLot,
@@ -61,6 +61,89 @@ const stat = (label: string, value: string, mod = '', sub = ''): string =>
 
 /* ---------- render ---------- */
 
+function renderLiveTrackingMiniChart(series: RequisitionAnalyticsPoint[]): string {
+  const totalDemand = series.reduce((sum, item) => sum + Number(item.plannedDemandPairs || 0), 0);
+  const totalIssued = series.reduce((sum, item) => sum + Number(item.issuedFloorPairs || 0), 0);
+  const totalStage4 = series.reduce((sum, item) => sum + Number(item.stage4FirstPackedPairs || 0), 0);
+  const totalPacked = series.reduce((sum, item) => sum + Number(item.actualPackedPairs || 0), 0);
+  const totalAltScrap = series.reduce((sum, item) => sum + Number(item.alterationAndScrapPairs || 0), 0);
+  const overallPct = totalDemand > 0 ? Math.round((totalPacked / totalDemand) * 100) : 0;
+
+  if (series.length === 0) {
+    return `
+      <section class="su-lt-mini" data-testid="wip-analytics-dashboard">
+        <div class="su-lt-mini-head">
+          <div class="su-lt-mini-title-wrap">
+            <span class="su-lt-mini-dot" aria-hidden="true"></span>
+            <span class="su-lt-mini-title">WIP Activity</span>
+            <span class="su-lt-mini-sub">0 Active REQs</span>
+          </div>
+          <div class="su-lt-mini-readout" id="su-lt-mini-readout" data-default-pct="0">0<small>%</small></div>
+        </div>
+        <div style="font-size: 12.5px; color: var(--su-text-muted); padding: 8px 0;">
+          No active Packing Hall requisitions yet. Draw a requisition from dock stock to see activity bars.
+        </div>
+      </section>
+    `;
+  }
+
+  const maxVol = Math.max(
+    1,
+    ...series.map(item => Math.max(item.issuedFloorPairs, item.plannedDemandPairs, item.actualPackedPairs))
+  );
+
+  return `
+    <section class="su-lt-mini" id="su-lt-mini-chart" data-testid="wip-analytics-dashboard">
+      <div class="su-lt-mini-head">
+        <div class="su-lt-mini-title-wrap">
+          <span class="su-lt-mini-dot" aria-hidden="true"></span>
+          <span class="su-lt-mini-title">WIP Activity</span>
+          <span class="su-lt-mini-sub">${series.length} ${series.length === 1 ? 'active REQ' : 'active REQs'} &middot; Click bar to open Packing Hall</span>
+        </div>
+        <div class="su-lt-mini-readout" id="su-lt-mini-readout" data-default-pct="${overallPct}">
+          <span>${overallPct}</span><small>%</small>
+        </div>
+      </div>
+
+      <div class="su-lt-mini-bars" role="list" aria-label="Requisition WIP activity bars">
+        ${series.map(item => {
+          const vol = Math.max(item.issuedFloorPairs, item.plannedDemandPairs, item.actualPackedPairs);
+          const heightPx = Math.max(14, Math.round((vol / maxVol) * 76));
+          const pct = Math.max(0, Math.min(100, Math.round(item.packedCompletionPct || 0)));
+          const shortLabel = item.reqNumber.replace(/^REQ-\d{4}-/, '');
+          return `
+            <button
+              type="button"
+              role="listitem"
+              class="su-lt-mini-col"
+              data-su-action="open-req-screen"
+              data-req-number="${escapeHtml(item.reqNumber)}"
+              data-target-screen="screen-packing"
+              data-mini-pct="${pct}"
+              data-mini-req="${escapeHtml(item.reqNumber)}"
+              title="${escapeHtml(item.reqNumber)} (${escapeHtml(item.article)}) — ${pct}% packed"
+            >
+              <span class="su-lt-mini-tip">${escapeHtml(item.reqNumber)} &middot; ${pct}% (${n(item.actualPackedPairs)}/${n(item.plannedDemandPairs)})</span>
+              <span class="su-lt-mini-bar" style="height: ${heightPx}px;">
+                ${pct > 0 ? `<span class="su-lt-mini-bar-packed" style="height: ${pct}%;"></span>` : ''}
+              </span>
+              <span class="su-lt-mini-label">${escapeHtml(shortLabel)}</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="su-lt-mini-kpis">
+        <span>Planned <strong>${n(totalDemand)}</strong></span>
+        <span>Issued <strong>${n(totalIssued)}</strong></span>
+        <span>Stage 4 <strong>${n(totalStage4)}</strong></span>
+        <span>Packed <strong>${n(totalPacked)}</strong></span>
+        <span>Alt / scrap <strong>${n(totalAltScrap)}</strong></span>
+      </div>
+    </section>
+  `;
+}
+
 export function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
   const s = ctx.rollupSummary;
   const search = (ctx.trackingSearch || '').trim().toLowerCase();
@@ -102,7 +185,13 @@ export function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
       o.po,
       o.article,
       o.color,
-      ...o.grnBatches.map(g => g.grnCode),
+      ...o.grnBatches.flatMap(g => [
+        g.grnCode,
+        g.hallName || '',
+        g.stitcherName || '',
+        g.receivedFrom || '',
+        g.receivingNote || ''
+      ]),
       ...o.reqBatches.flatMap(r => [r.reqNumber, r.mreqNo, r.altReqNo])
     ]
       .join(' ')
@@ -212,10 +301,9 @@ export function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
       }
     </section>`;
 
-  // The one big chart on the screen. Keep it 280 to 360 tall inside renderRequisitionWipAnalyticsChart.
   const chart = (() => {
     const series = buildRequisitionAnalyticsSeries(s, undefined, true);
-    return `<div class="su-lt-chart">${renderRequisitionWipAnalyticsChart({ series, mode: 'super-user' })}</div>`;
+    return `<div class="su-lt-chart">${renderLiveTrackingMiniChart(series)}</div>`;
   })();
 
   const emptyState =
@@ -369,9 +457,12 @@ export function renderLiveTrackingTab(ctx: SuperUserRenderContext): string {
                 const sizeTxt = isLegacy
                   ? sizeCodes.map(sz => n(g.sizes?.[sz])).join(' / ')
                   : sizeCodes.filter(sz => Number(g.sizes?.[sz] || 0) > 0).map(sz => `${escapeHtml(sz)}:${n(g.sizes?.[sz])}`).join(' / ') || '0';
+                const sourceTxt = g.hallName && g.stitcherName
+                  ? `${escapeHtml(g.hallName)} &rarr; ${escapeHtml(g.stitcherName)}`
+                  : (g.receivedFrom && g.receivedFrom !== g.maker ? escapeHtml(g.receivedFrom) : '');
                 return `
           <tr id="tracking-chip-row-${escapeHtml(g.grnCode)}" class="${ctx.highlightedRefCode === g.grnCode ? 'is-highlighted' : ''}">
-            <td>${refTag('grn', g.grnCode)}<div class="su-lt-sub">Batch ${g.orderBatchSeq}</div></td>
+            <td>${refTag('grn', g.grnCode)}<div class="su-lt-sub">Batch ${g.orderBatchSeq}${sourceTxt ? ` &middot; ${sourceTxt}` : ''}</div></td>
             <td class="muted">${escapeHtml(g.date)}</td>
             <td class="mono">${sizeTxt}</td>
             <td class="text-right num"><strong>${n(g.rcvdPairs)}</strong></td>

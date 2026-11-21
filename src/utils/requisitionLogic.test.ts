@@ -42,6 +42,8 @@ import {
   allocateGrnsToRequisitions,
   migrateLegacyRecordsToRelationalHierarchy,
   executeAtomicWipTransition,
+  parseParentOrderGroupKey,
+  groupOrderRollupsForTree,
   canTransitionOrderStatus,
   canTransitionReqStatus,
   processAlterationCycle,
@@ -75,7 +77,7 @@ import {
   PendingOrder,
   OrderWipState
 } from './requisitionLogic';
-import { renderSuperUserScreen, SuperUserRenderContext } from '../components/superUserView';
+import { renderSuperUserScreen, renderDashboardVisualGraphs, SuperUserRenderContext } from '../components/superUserView';
 
 test('R1, 2.8, 3.8, 4.6, 4.7: authoritative size set constant supports standard 7..11 and extended 6..12 plus configurable policy defaults', () => {
   assert.deepEqual(STANDARD_GLOVE_SIZES, ['7', '8', '9', '10', '11']);
@@ -2135,4 +2137,210 @@ test('Receiving Hall fixes: live DD-MM-YYYY date, Option B split confirmation po
   assert.ok(confirmHtml.includes('Hall A (60 Prs), Hall B (40 Prs)'), 'Displays all contractors order is split among');
   assert.ok(confirmHtml.includes('18-11-2026'), 'Shows saved date instead of hardcoded 31-10-2026');
   assert.ok(confirmHtml.includes('id="doc-preview-container"'), 'Wraps printable slip(s) inside #doc-preview-container for modal Print button');
+});
+
+test('Hall -> Stitcher chain receiving: monochrome GRN slips escape HTML & Live Tracking surfaces stitcher attribution', () => {
+  const slipHtml = buildGrnReceivingSlipHtml({
+    grnRef: 'GRN-2026-0099',
+    date: '19-11-2026',
+    pendingOrderId: 'ORD-2026-888',
+    maker: 'Hall C',
+    hallName: 'Hall C <script>alert(1)</script>',
+    stitcherName: 'Ustad Bilal <img src=x onerror=alert(2)>',
+    receivingNote: 'Courier Note <script>alert(3)</script>',
+    article: 'Model A1',
+    color: 'Black',
+    receivedFrom: 'Ustad Bilal (Hall C)',
+    rcvdPairs: 40,
+    sizes: { '7': 10, '8': 10, '9': 10, '10': 10, '11': 0 }
+  });
+
+  assert.ok(!slipHtml.includes('<script>'), 'Escapes script tags in Hall / Stitcher / Note slip fields');
+  assert.ok(!slipHtml.includes('<img '), 'Escapes raw img tags in Stitcher field');
+  assert.ok(!slipHtml.includes('--su-'), 'GRN slip remains 100% monochrome with zero Super User palette variables');
+  assert.ok(slipHtml.includes('Hall / Stitcher:'), 'Slip prints Hall / Stitcher row');
+  assert.ok(slipHtml.includes('Receiving Note:'), 'Slip prints distinct Receiving Note row when present');
+  assert.ok(slipHtml.includes('&lt;script&gt;alert(1)&lt;/script&gt;'), 'Escaped Hall name renders cleanly');
+
+  const confirmHtml = buildGrnReceiveConfirmationHtml({
+    pendingOrderId: 'ORD-2026-888',
+    date: '19-11-2026',
+    batches: [{
+      grnRef: 'GRN-2026-0099',
+      date: '19-11-2026',
+      pendingOrderId: 'ORD-2026-888',
+      maker: 'Hall C',
+      hallName: 'Hall C',
+      stitcherName: 'Ustad Bilal',
+      receivingNote: 'Gate 2 Delivery',
+      article: 'Model A1',
+      color: 'Black',
+      receivedFrom: 'Gate 2 Delivery',
+      rcvdPairs: 40,
+      sizes: { '7': 10, '8': 10, '9': 10, '10': 10, '11': 0 }
+    }]
+  });
+  assert.ok(confirmHtml.includes('Hall C → Ustad Bilal') || confirmHtml.includes('Hall C &rarr; Ustad Bilal'));
+  assert.ok(confirmHtml.includes('Gate 2 Delivery'));
+
+  const rollup = buildSuperUserOrderRollups({
+    pendingOrders: [{
+      orderId: 'ORD-2026-888',
+      buyer: 'Globex',
+      maker: 'Hall C',
+      po: 'PO-888',
+      article: 'Model A1',
+      color: 'Black',
+      sizes: { '7': 40, '8': 0, '9': 0, '10': 0, '11': 0 },
+      totalQty: 40
+    }],
+    grnList: [{
+      sr: 99,
+      grnCode: 'GRN-2026-0099',
+      date: '19-11-2026',
+      pendingOrderId: 'ORD-2026-888',
+      maker: 'Hall C',
+      hallName: 'Hall C',
+      stitcherName: 'Ustad Bilal',
+      receivedFrom: 'Ustad Bilal (Hall C)',
+      receivingNote: 'Direct Hall Receipt',
+      article: 'Model A1',
+      rcvdPairs: 40,
+      sizes: { '7': 40, '8': 0, '9': 0, '10': 0, '11': 0 },
+      status: 'Received'
+    }],
+    requisitions: [],
+    defectList: []
+  });
+  assert.equal(rollup.orderRollups[0].grnBatches[0].hallName, 'Hall C');
+  assert.equal(rollup.orderRollups[0].grnBatches[0].stitcherName, 'Ustad Bilal');
+  assert.equal(rollup.orderRollups[0].grnBatches[0].receivingNote, 'Direct Hall Receipt');
+
+  const suTrackingHtml = renderSuperUserScreen({
+    activeTab: 'tracking',
+    activeReport: 'order_grn_balance',
+    trackingSearch: 'bilal',
+    trackingStatusFilter: 'ALL',
+    expandedOrderIds: { 'ORD-2026-888': true },
+    pendingOrders: [],
+    dropdownOptions: {
+      makers: ['Hall C'],
+      customers: ['Globex'],
+      articles: ['Model A1'],
+      poList: ['PO-888'],
+      halls: [{ id: 1, name: 'Hall C', stitchers: [{ id: 10, hallId: 1, name: 'Ustad Bilal' }] }]
+    },
+    adminOverview: {
+      dbHealth: { journalMode: 'wal', integrity: 'ok', tableCounts: {}, totalTables: 0 },
+      customers: [],
+      products: [],
+      sizeStandards: [],
+      receivings: [],
+      alterations: [],
+      scrapLedger: []
+    },
+    lastBackupPath: '',
+    rollupSummary: rollup
+  });
+  assert.ok(suTrackingHtml.includes('ORD-2026-888'), 'Live Tracking search matches Stitcher name');
+  assert.ok(suTrackingHtml.includes('Hall C &rarr; Ustad Bilal'), 'Live Tracking Supply Stream renders Hall -> Stitcher attribution');
+});
+
+test('Branching Order Tree: groups linked sub-orders (-1, -2) under parent order with clickable M-REQ / A-REQ slip links', () => {
+  const summary = buildSuperUserOrderRollups({
+    pendingOrders: [
+      {
+        orderId: 'ORD-2026-005-1',
+        buyer: 'OXFORD',
+        maker: 'Hall A',
+        po: 'PO-27351',
+        article: 'BRISBANE AIR',
+        color: 'Black',
+        sizes: { '7': 100, '8': 0, '9': 0, '10': 0, '11': 0 },
+        totalQty: 100
+      },
+      {
+        orderId: 'ORD-2026-005-2',
+        buyer: 'OXFORD',
+        maker: 'Hall B',
+        po: 'PO-27351',
+        article: 'AERO TEC',
+        color: 'Red',
+        sizes: { '7': 200, '8': 0, '9': 0, '10': 0, '11': 0 },
+        totalQty: 200
+      }
+    ],
+    grnList: [
+      {
+        sr: 1,
+        grnCode: 'GRN-2026-0001',
+        date: '19-11-2026',
+        pendingOrderId: 'ORD-2026-005-1',
+        maker: 'Hall A',
+        article: 'BRISBANE AIR',
+        rcvdPairs: 60,
+        sizes: { '7': 60, '8': 0, '9': 0, '10': 0, '11': 0 },
+        status: 'Received'
+      }
+    ],
+    requisitions: [
+      {
+        reqNumber: 'REQ-2026-0001',
+        parentOrderId: 'ORD-2026-005-1',
+        allocatedGrnRefs: [{ grnCode: 'GRN-2026-0001', pairs: 60 }],
+        article: 'BRISBANE AIR',
+        po: 'PO-27351',
+        maker: 'Hall A',
+        buyer: 'OXFORD',
+        plannedQty: 40,
+        issueStatus: 'Issued by Inward Register',
+        sizes: { '7': 40, '8': 0, '9': 0, '10': 0, '11': 0 },
+        stage1In: 40,
+        stage1Passed: 40,
+        stage1Defects: 0,
+        stage2In: 40,
+        stage2Passed: 0,
+        stage2Defects: 0,
+        stage3In: 0,
+        stage3Passed: 0,
+        stage3Defects: 0,
+        mreqNo: 'M-REQ-2026-0001',
+        altReqNo: 'A-REQ-2026-0001',
+        mreqQty: '0 Sets',
+        mreqStatus: 'Locked',
+        stage4In: 0,
+        stage4Passed: 0,
+        stage4Pending: 0,
+        stage5Cartons: '0 Cartons',
+        stage5Pending: '0 Cartons',
+        lineEfficiency: '100.0%',
+        outputPairs: 0,
+        outputCartons: 0,
+        inAlteration: 0,
+        scrappedPairs: 0
+      }
+    ],
+    defectList: []
+  });
+
+  const parsed = parseParentOrderGroupKey('ORD-2026-005-2');
+  assert.deepEqual(parsed, { baseOrderId: 'ORD-2026-005', subIndex: 2, isSubOrder: true });
+  assert.deepEqual(parseParentOrderGroupKey('ORD-2026-010'), { baseOrderId: 'ORD-2026-010', subIndex: null, isSubOrder: false });
+
+  const groups = groupOrderRollupsForTree(summary.orderRollups);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].baseOrderId, 'ORD-2026-005');
+  assert.equal(groups[0].isMultiSubOrder, true);
+  assert.equal(groups[0].plannedQty, 300);
+  assert.equal(groups[0].receivedGrnQty, 60);
+  assert.deepEqual(groups[0].orders.map(o => o.orderId), ['ORD-2026-005-1', 'ORD-2026-005-2']);
+
+  const html = renderDashboardVisualGraphs(summary);
+  assert.ok(html.includes('data-testid="su-order-tree-group"'));
+  assert.ok(html.includes('data-base-order="ORD-2026-005"'));
+  assert.ok(html.includes('2 sub-orders'));
+  assert.ok(html.includes('data-sub-order="ORD-2026-005-1"'));
+  assert.ok(html.includes('data-sub-order="ORD-2026-005-2"'));
+  assert.ok(html.includes('data-slip-type="M-REQ" data-ref-code="M-REQ-2026-0001"'));
+  assert.ok(html.includes('data-slip-type="A-REQ" data-ref-code="A-REQ-2026-0001"'));
 });

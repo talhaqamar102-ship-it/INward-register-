@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   backfillOrderSequence,
   createPendingOrder,
+  createPendingOrderBatch,
   deletePendingOrder
 } from '../src/services/orderService.js';
 
@@ -124,6 +125,66 @@ test('order deletion is blocked when GRN or requisition records reference it', (
     recordAuditLog: () => {}
   }), /linked production records/);
   assert.ok(database.prepare('SELECT 1 FROM pending_orders WHERE order_id = ?').get(orderId));
+  database.close();
+});
+
+test('multi-article order batch creates atomic -1..-3 sub-orders sharing one sequence increment and rolls back on failure', () => {
+  const database = createTestDatabase();
+  const audits = [];
+  const res = createPendingOrderBatch(database, {
+    buyer: 'OXFORD',
+    po: 'PO-MULTI-10',
+    dueDate: '2026-12-01',
+    maker: 'Hall A',
+    items: [
+      { article: 'BRISBANE AIR', color: 'Black', sizes: { '7': 40, '8': 0, '9': 0, '10': 0, '11': 0 } },
+      { article: 'AERO TEC', color: 'White', maker: 'Hall B', sizes: { '7': 0, '8': 60, '9': 0, '10': 0, '11': 0 } },
+      { article: 'TRACKER PRO', color: 'Red', sizes: { '7': 0, '8': 0, '9': 30, '10': 0, '11': 0 } }
+    ]
+  }, {
+    year: 2026,
+    actor: 'Super User',
+    role: 'SUPER_USER',
+    recordAuditLog: (entry) => audits.push(entry)
+  });
+
+  assert.equal(res.baseOrderId, 'ORD-2026-001');
+  assert.deepEqual(res.orderIds, ['ORD-2026-001-1', 'ORD-2026-001-2', 'ORD-2026-001-3']);
+  assert.equal(audits.length, 3);
+  const rows = database.prepare('SELECT order_id, maker_contractor, article_name, total_qty FROM pending_orders ORDER BY order_id ASC').all();
+  assert.deepEqual(rows.map(r => r.order_id), ['ORD-2026-001-1', 'ORD-2026-001-2', 'ORD-2026-001-3']);
+  assert.equal(rows[0].maker_contractor, 'Hall A');
+  assert.equal(rows[1].maker_contractor, 'Hall B');
+  assert.equal(rows[2].maker_contractor, 'Hall A');
+
+  // Verify backfillOrderSequence handles -1..-3 sub-order suffixes before next sequence allocation
+  database.prepare('DELETE FROM order_seq WHERE year = 2026').run();
+  backfillOrderSequence(database);
+  const seqAfterBackfill = database.prepare('SELECT last_n FROM order_seq WHERE year = 2026').get();
+  assert.equal(seqAfterBackfill.last_n, 1);
+
+  // Mid-batch failure rolls back both sub-orders and sequence increment
+  assert.throws(() => createPendingOrderBatch(database, {
+    buyer: 'OXFORD',
+    po: 'PO-FAIL-11',
+    maker: 'Hall A',
+    items: [
+      { article: 'Art 1', sizes: { '7': 10, '8': 0, '9': 0, '10': 0, '11': 0 } },
+      { article: 'Art 2', sizes: { '7': 20, '8': 0, '9': 0, '10': 0, '11': 0 } }
+    ]
+  }, {
+    year: 2026,
+    actor: 'Super User',
+    role: 'SUPER_USER',
+    recordAuditLog: (entry) => {
+      if (entry.entityId.endsWith('-2')) throw new Error('Simulated audit failure');
+    }
+  }), /Simulated audit failure/);
+
+  const countAfterRollback = database.prepare('SELECT COUNT(*) AS cnt FROM pending_orders').get().cnt;
+  assert.equal(countAfterRollback, 3);
+  const seqAfterRollback = database.prepare('SELECT last_n FROM order_seq WHERE year = 2026').get();
+  assert.equal(seqAfterRollback.last_n, 1);
   database.close();
 });
 

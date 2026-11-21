@@ -1246,4 +1246,350 @@ describe('HTTP Endpoints & UI Static Files Test Suite', () => {
       }
     }
   });
+
+  test('API Hall -> Stitcher Chain CRUD, RBAC 403, Validation, and Inward Receiving', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const hallCName = `Hall C-${suffix}`;
+    const hallDName = `Hall D-${suffix}`;
+    let hallCId;
+    let hallDId;
+    let stitcherBilalId;
+    let stitcherKamranId;
+    let altUserId;
+    let altSessionToken;
+    const rcvNumbers = [];
+
+    try {
+      const altUser = AuthService.createUser({
+        name: 'HTTP Alteration Lead',
+        username: `http-alt-${suffix}`,
+        password: `Test-${suffix}-Pass`,
+        role: 'ALTERATION_LEAD',
+        station: 'Alteration Bay'
+      });
+      altUserId = altUser.userId;
+      const altSession = AuthService.createSession(altUserId);
+      altSessionToken = altSession.token;
+      const altCookie = `mes_session=${altSessionToken}`;
+
+      // Non-Super-User roles cannot create halls or stitchers (403)
+      for (const badCookie of [inwardCookie, packingCookie, altCookie]) {
+        const denyHall = await apiFetch(`${baseUrl}/api/admin/halls`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Unauthorized Hall' })
+        }, badCookie);
+        assert.equal(denyHall.status, 403);
+      }
+
+      // Create Hall C & duplicate NOCASE rejection (409)
+      const createHallC = await apiFetch(`${baseUrl}/api/admin/halls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: hallCName })
+      });
+      assert.equal(createHallC.status, 200);
+      hallCId = (await createHallC.json()).data.id;
+
+      const dupHallC = await apiFetch(`${baseUrl}/api/admin/halls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: hallCName.toLowerCase() })
+      });
+      assert.equal(dupHallC.status, 409);
+
+      const createHallD = await apiFetch(`${baseUrl}/api/admin/halls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: hallDName })
+      });
+      assert.equal(createHallD.status, 200);
+      hallDId = (await createHallD.json()).data.id;
+
+      // Add Stitchers to Hall C & Hall D + duplicate stitcher check
+      const addBilal = await apiFetch(`${baseUrl}/api/admin/halls/${hallCId}/stitchers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Ustad Bilal' })
+      });
+      assert.equal(addBilal.status, 200);
+      stitcherBilalId = (await addBilal.json()).data.id;
+
+      const dupBilal = await apiFetch(`${baseUrl}/api/admin/halls/${hallCId}/stitchers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'ustad bilal' })
+      });
+      assert.equal(dupBilal.status, 409);
+
+      const addKamran = await apiFetch(`${baseUrl}/api/admin/halls/${hallCId}/stitchers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Ustad Kamran' })
+      });
+      assert.equal(addKamran.status, 200);
+      stitcherKamranId = (await addKamran.json()).data.id;
+
+      const addZahid = await apiFetch(`${baseUrl}/api/admin/halls/${hallDId}/stitchers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Ustad Zahid' })
+      });
+      assert.equal(addZahid.status, 200);
+
+      // GET /api/store/dropdowns allowed for INWARD_CLERK and ALTERATION_LEAD
+      for (const okCookie of [adminCookie, inwardCookie, altCookie]) {
+        const ddRes = await apiFetch(`${baseUrl}/api/store/dropdowns`, {}, okCookie);
+        assert.equal(ddRes.status, 200);
+        const ddJson = await ddRes.json();
+        const foundHallC = ddJson.data.halls.find(h => h.id === hallCId);
+        assert.ok(foundHallC);
+        assert.deepEqual(
+          foundHallC.stitchers.map(s => s.name),
+          ['Ustad Bilal', 'Ustad Kamran']
+        );
+      }
+
+      // Chain validation failures (400)
+      const stitcherNoHall = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          makerContractor: 'Maker A',
+          stitcherName: 'Ustad Bilal',
+          articleName: 'Model A1',
+          receivedFrom: 'Driver',
+          strictInwardEntry: true,
+          rcvdPairs: 10
+        })
+      }, inwardCookie);
+      assert.equal(stitcherNoHall.status, 400);
+
+      const hallNoStitcher = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hallName: hallCName,
+          articleName: 'Model A1',
+          strictInwardEntry: true,
+          rcvdPairs: 10
+        })
+      }, inwardCookie);
+      assert.equal(hallNoStitcher.status, 400);
+
+      const crossHallStitcher = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hallName: hallCName,
+          stitcherName: 'Ustad Zahid',
+          articleName: 'Model A1',
+          strictInwardEntry: true,
+          rcvdPairs: 10
+        })
+      }, inwardCookie);
+      assert.equal(crossHallStitcher.status, 400);
+
+      const externalNoPerson = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          makerContractor: 'Maker A',
+          articleName: 'Model A1',
+          strictInwardEntry: true,
+          rcvdPairs: 10
+        })
+      }, inwardCookie);
+      assert.equal(externalNoPerson.status, 400);
+
+      // Valid Hall -> Stitcher receipt without receivedFrom defaults to "Stitcher (Hall)"
+      const rcvAutoFrom = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hallName: hallCName,
+          stitcherName: 'Ustad Bilal',
+          articleName: 'Model A1',
+          strictInwardEntry: true,
+          rcvdPairs: 40,
+          sizes: [{ sizeCode: '7', orderPairs: 40, rcvdPairs: 40 }]
+        })
+      }, inwardCookie);
+      assert.equal(rcvAutoFrom.status, 200);
+      const rcv1 = (await rcvAutoFrom.json()).data;
+      rcvNumbers.push(rcv1.rcv_number);
+      assert.equal(rcv1.hall_name, hallCName);
+      assert.equal(rcv1.stitcher_name, 'Ustad Bilal');
+      assert.equal(rcv1.received_from, `Ustad Bilal (${hallCName})`);
+      assert.equal(rcv1.receiving_note, '');
+
+      // Valid Hall -> Stitcher receipt with custom Courier / Note
+      const rcvWithNote = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hallName: hallCName,
+          stitcherName: 'Ustad Kamran',
+          receivedFrom: 'Courier Salman',
+          receivingNote: 'Courier Salman',
+          articleName: 'Model A1',
+          strictInwardEntry: true,
+          rcvdPairs: 25
+        })
+      }, inwardCookie);
+      assert.equal(rcvWithNote.status, 200);
+      const rcv2 = (await rcvWithNote.json()).data;
+      rcvNumbers.push(rcv2.rcv_number);
+      assert.equal(rcv2.received_from, 'Courier Salman');
+      assert.equal(rcv2.receiving_note, 'Courier Salman');
+
+      // Search receivings by stitcher / note
+      const searchRes = await apiFetch(`${baseUrl}/api/store/receivings?search=Kamran`, {}, inwardCookie);
+      assert.equal(searchRes.status, 200);
+      const searchRows = (await searchRes.json()).data;
+      assert.ok(searchRows.some(r => r.rcv_number === rcv2.rcv_number));
+
+      // Delete individual stitcher & cascade delete halls
+      const delKamran = await apiFetch(`${baseUrl}/api/admin/stitchers/${stitcherKamranId}`, { method: 'DELETE' });
+      assert.equal(delKamran.status, 200);
+      stitcherKamranId = null;
+
+      const delHallC = await apiFetch(`${baseUrl}/api/admin/halls/${hallCId}`, { method: 'DELETE' });
+      assert.equal(delHallC.status, 200);
+      const remainingStitchers = db.prepare('SELECT COUNT(*) AS cnt FROM stitchers WHERE hall_id = ?').get(hallCId).cnt;
+      assert.equal(remainingStitchers, 0);
+      hallCId = null;
+    } finally {
+      for (const rcvNo of rcvNumbers) {
+        db.prepare('DELETE FROM receiving_size_breakdowns WHERE rcv_number = ?').run(rcvNo);
+        db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNo);
+      }
+      if (stitcherKamranId) db.prepare('DELETE FROM stitchers WHERE id = ?').run(stitcherKamranId);
+      if (stitcherBilalId) db.prepare('DELETE FROM stitchers WHERE id = ?').run(stitcherBilalId);
+      if (hallCId) db.prepare('DELETE FROM halls WHERE id = ?').run(hallCId);
+      if (hallDId) db.prepare('DELETE FROM halls WHERE id = ?').run(hallDId);
+      if (altSessionToken) AuthService.destroySession(altSessionToken);
+      if (altUserId) AuthService.deleteUser(altUserId);
+    }
+  });
+
+  test('API Multi-Article Sub-Orders & Per-Size Unclaimed Dock Stock: batch creation + per-size dock deduction', async () => {
+    const prods = db.prepare(`
+      SELECT p.id, p.name, p.customer_id, p.size_format, p.color_spec, c.name AS buyer_name
+      FROM products p
+      JOIN customers c ON c.id = p.customer_id
+      WHERE c.name = 'OXFORD'
+      ORDER BY p.id ASC
+      LIMIT 2
+    `).all();
+    assert.ok(prods.length >= 2, 'Expected at least 2 OXFORD catalog articles for multi-article test');
+
+    const [p1, p2] = prods;
+    const p1Codes = JSON.parse(db.prepare(`SELECT sizes_json FROM size_standards WHERE code = ?`).get(p1.size_format).sizes_json);
+    const p2Codes = JSON.parse(db.prepare(`SELECT sizes_json FROM size_standards WHERE code = ?`).get(p2.size_format).sizes_json);
+    const sizes1 = Object.fromEntries(p1Codes.map((c, i) => [c, i === 0 ? 50 : i === 1 ? 30 : 0]));
+    const sizes2 = Object.fromEntries(p2Codes.map((c, i) => [c, i === 0 ? 40 : 0]));
+
+    let createdOrderIds = [];
+    let rcvNumber = null;
+    let reqNumber = null;
+    try {
+      const batchResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: p1.customer_id,
+          buyer: p1.buyer_name,
+          po: 'PO-MULTI-API-01',
+          dueDate: '2026-12-15',
+          maker: 'Hall A',
+          items: [
+            {
+              productId: p1.id,
+              article: p1.name,
+              color: p1.color_spec || 'Black',
+              sizeFormat: p1.size_format,
+              sizes: sizes1
+            },
+            {
+              productId: p2.id,
+              article: p2.name,
+              color: p2.color_spec || 'White',
+              sizeFormat: p2.size_format,
+              maker: 'Hall B',
+              sizes: sizes2
+            }
+          ]
+        })
+      });
+      assert.equal(batchResp.status, 200);
+      const batchJson = await batchResp.json();
+      assert.equal(batchJson.success, true);
+      assert.equal(batchJson.data.orderIds.length, 2);
+      createdOrderIds = batchJson.data.orderIds;
+      assert.match(batchJson.data.baseOrderId, /^ORD-\d{4}-\d{3}$/);
+      assert.equal(createdOrderIds[0], `${batchJson.data.baseOrderId}-1`);
+      assert.equal(createdOrderIds[1], `${batchJson.data.baseOrderId}-2`);
+
+      const sub1 = batchJson.data.orders.find(o => o.orderId === createdOrderIds[0]);
+      const sub2 = batchJson.data.orders.find(o => o.orderId === createdOrderIds[1]);
+      assert.equal(sub1.maker, 'Hall A');
+      assert.equal(sub2.maker, 'Hall B');
+      assert.equal(sub1.unclaimedDockPairs, 0);
+      assert.equal(sub2.unclaimedDockPairs, 0);
+
+      // Receive 35 pairs on sub1 (25 + 10) at Inward Dock
+      const rcvResp = await apiFetch(`${baseUrl}/api/store/receivings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: createdOrderIds[0],
+          makerContractor: 'Hall A',
+          receivedFrom: 'Driver Raza',
+          customerName: p1.buyer_name,
+          poNumber: 'PO-MULTI-API-01',
+          articleName: p1.name,
+          colorShade: p1.color_spec || 'Black',
+          orderQty: 80,
+          rcvdPairs: 35,
+          sizes: [
+            { sizeCode: p1Codes[0], orderPairs: 50, rcvdPairs: 25 },
+            { sizeCode: p1Codes[1], orderPairs: 30, rcvdPairs: 10 }
+          ]
+        })
+      });
+      assert.equal(rcvResp.status, 200);
+      rcvNumber = (await rcvResp.json()).data.rcv_number;
+
+      // Create REQ for 15 of p1Codes[0] -> leaves 10 of p1Codes[0] & 10 of p1Codes[1] unclaimed
+      const reqSizes = Object.fromEntries(p1Codes.map((c, i) => [c, i === 0 ? 15 : 0]));
+      const reqResp = await apiFetch(`${baseUrl}/api/orders/${createdOrderIds[0]}/requisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sizes: reqSizes })
+      });
+      assert.equal(reqResp.status, 200);
+      reqNumber = (await reqResp.json()).data.reqNumber;
+
+      const listOrdersResp = await apiFetch(`${baseUrl}/api/admin/pending-orders`);
+      const listOrders = (await listOrdersResp.json()).data;
+      const updatedSub1 = listOrders.find(o => o.orderId === createdOrderIds[0]);
+      assert.equal(updatedSub1.unclaimedDockPairs, 20);
+      assert.equal(updatedSub1.unclaimedDockSizes[p1Codes[0]], 10);
+      assert.equal(updatedSub1.unclaimedDockSizes[p1Codes[1]], 10);
+    } finally {
+      if (reqNumber) {
+        db.prepare('DELETE FROM packing_wip WHERE req_number = ?').run(reqNumber);
+        db.prepare('DELETE FROM glove_requisitions WHERE req_number = ?').run(reqNumber);
+      }
+      if (rcvNumber) {
+        db.prepare('DELETE FROM receiving_size_breakdowns WHERE rcv_number = ?').run(rcvNumber);
+        db.prepare('DELETE FROM store_receivings WHERE rcv_number = ?').run(rcvNumber);
+      }
+      for (const oid of createdOrderIds) {
+        db.prepare('DELETE FROM order_contractor_allocations WHERE order_id = ?').run(oid);
+        db.prepare('DELETE FROM pending_orders WHERE order_id = ?').run(oid);
+      }
+    }
+  });
 });

@@ -1,6 +1,6 @@
 {
-  "total_files": 359,
-  "total_words": 386921,
+  "total_files": 365,
+  "total_words": 415047,
   "files": {
     "code": [
       ".agents/skills/ck/commands/forget.mjs",
@@ -29,6 +29,7 @@
       "public/styles.css",
       "scripts/build-catalog-seed.mjs",
       "scripts/graphify.ts",
+      "scripts/orch-reset.ts",
       "scripts/rollback-catalog-migration.mjs",
       "server.ts",
       "src/components/authView.ts",
@@ -46,12 +47,15 @@
       "src/db.js",
       "src/main.ts",
       "src/routes/api.js",
+      "src/routes/orchestrator.js",
       "src/server.js",
       "src/services/aqlService.js",
       "src/services/authService.js",
+      "src/services/orchestratorService.js",
       "src/services/orderService.js",
       "src/services/packingService.js",
       "src/style.css",
+      "src/styles/inward-register.css",
       "src/styles/print.css",
       "src/styles/shopFloor.css",
       "src/styles/su-dashboard.css",
@@ -72,6 +76,7 @@
       "test/db-reliability.test.js",
       "test/enterprise-gaps.test.js",
       "test/http.test.js",
+      "test/orchestrator.test.js",
       "test/order-integrity.test.js",
       "test/packing-system.test.js",
       "vite.config.ts"
@@ -351,6 +356,7 @@
       "CLAUDE.md",
       "GEMINI.md",
       "README.md",
+      "docs/MES_APP_FLOW_AND_DESIGN_SYSTEM.md",
       "docs/catalog-integration-plan.md",
       "docs/domain-integration-reasoning.md",
       "docs/last-5-turns-senior-audit.md",

@@ -276,6 +276,9 @@ export interface GrnSlipParams {
   pendingOrderId?: string;
   date: string;
   maker: string;
+  hallName?: string;
+  stitcherName?: string;
+  receivingNote?: string;
   article: string;
   color?: string;
   receivedFrom?: string;
@@ -291,6 +294,9 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
   const article = params.article || '---';
   const color = params.color || 'Standard';
   const maker = params.maker || '---';
+  const hallName = String(params.hallName || '').trim();
+  const stitcherName = String(params.stitcherName || '').trim();
+  const receivingNote = String(params.receivingNote || '').trim();
   const receivedFrom = params.receivedFrom || maker || '---';
   const dateStr = params.date || formatCurrentDateDDMMYYYY();
   const grnRef = params.grnRef || 'GRN-2026-0001';
@@ -312,10 +318,12 @@ export function buildGrnReceivingSlipHtml(params: GrnSlipParams): string {
         <div><span>Receiving Date:</span> <strong>${escapeHtml(dateStr)}</strong></div>
         <div><span>Pending Order #:</span> <strong>${escapeHtml(pendingOrderId)}</strong></div>
         <div><span>Maker / Contractor:</span> <strong>${escapeHtml(maker)}</strong></div>
+        ${hallName ? `<div><span>Hall / Stitcher:</span> <strong>${escapeHtml(hallName)}${stitcherName ? ` &rarr; ${escapeHtml(stitcherName)}` : ''}</strong></div>` : ''}
         ${params.splitSummary ? `<div><span>Order Split:</span> <strong>${escapeHtml(params.splitSummary)}</strong></div>` : ''}
         <div><span>Article / Model:</span> <strong>${escapeHtml(article)}</strong></div>
         <div><span>Colour / Shade:</span> <strong>${escapeHtml(color)}</strong></div>
         <div><span>Received From:</span> <strong>${escapeHtml(receivedFrom)}</strong></div>
+        ${receivingNote && receivingNote !== receivedFrom ? `<div><span>Receiving Note:</span> <strong>${escapeHtml(receivingNote)}</strong></div>` : ''}
         <div><span>Total Received:</span> <strong>${rcvd.toLocaleString()} Pairs</strong></div>
       </div>
 
@@ -361,10 +369,12 @@ export function buildGrnReceiveConfirmationHtml(params: {
   const senderSummary = params.batches
     .map(b => {
       const who = String(b.receivedFrom || b.maker || '---').trim();
-      const makerName = String(b.maker || '').trim();
-      return params.batches.length > 1 && makerName
-        ? `${who} (${makerName}: ${Number(b.rcvdPairs || 0).toLocaleString()} Prs)`
-        : `${who} (${makerName || 'Direct'})`;
+      const sourceLabel = b.hallName && b.stitcherName
+        ? `${b.hallName} → ${b.stitcherName}`
+        : String(b.maker || '').trim();
+      return params.batches.length > 1 && sourceLabel
+        ? `${who} (${sourceLabel}: ${Number(b.rcvdPairs || 0).toLocaleString()} Prs)`
+        : `${who} (${sourceLabel || 'Direct'})`;
     })
     .join(' • ');
   const slipsHtml = params.batches

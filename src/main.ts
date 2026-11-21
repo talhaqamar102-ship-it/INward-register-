@@ -7,6 +7,7 @@
 import {
   SizeBreakdown,
   PendingOrder,
+  HallWithStitchers,
   STANDARD_GLOVE_SIZES,
   OrderWipState,
   AuditTrailEntry,
@@ -63,7 +64,8 @@ import {
   buildSuperUserReportHtml,
   SuperUserTab,
   SuperUserReportType,
-  SystemUserRecord
+  SystemUserRecord,
+  AdminOrderArticleLine
 } from './components/superUserView';
 import { renderPackingHallScreen } from './components/packingHallView';
 import {
@@ -100,6 +102,9 @@ interface GRNRecord {
   date: string;
   pendingOrderId: string;
   maker: string;
+  hallName?: string;
+  stitcherName?: string;
+  receivingNote?: string;
   article: string;
   color?: string;
   receivedFrom?: string;
@@ -244,6 +249,8 @@ const state = {
   grnForm: {
     pendingOrderId: '',
     maker: '',
+    hallName: '',
+    stitcherName: '',
     article: '',
     color: '',
     receivedFrom: '',
@@ -251,7 +258,13 @@ const state = {
     sizeFormat: 'LEGACY_7_11',
     sizeCodes: undefined as string[] | undefined,
     sizes: createEmptySizes(),
-    splitRows: [] as Array<{ maker: string; receivedFrom: string; sizes: SizeBreakdown }>
+    splitRows: [] as Array<{
+      maker: string;
+      hallName?: string;
+      stitcherName?: string;
+      receivedFrom: string;
+      sizes: SizeBreakdown;
+    }>
   },
 
   repairForm: {
@@ -286,40 +299,12 @@ const state = {
 
   // Dynamic dropdown options populated from backend SQLite database
   dropdownOptions: {
-    makers: [
-      'Hall A',
-      'Hall B',
-      'Maker A',
-      'Maker B',
-      'Maker C',
-      'Maker D',
-      'Farooq Workshop',
-      'Tariq Stitching Unit'
-    ],
+    makers: [] as string[],
     customers: [] as string[],
-    articles: [
-      'Model A1',
-      'Model A2',
-      'Model A3',
-      'Model A4',
-      'Model A5',
-      'Model A6',
-      'Model A7',
-      'Model A8',
-      'Model A9',
-      'Model A11',
-      'Model A12',
-      'Model A13',
-      'Model A14',
-      'Model A15',
-      'Sierra',
-      'Pro Cut-5 Heavy Duty',
-      'Arctic Thermo Grip Waterproof',
-      'Delta Heavy Grip',
-      'Premium Cowhide Driver Glove'
-    ],
-    poList: ['1292', '2326', '2726', '3326', '27344', '27345', '27346', '27347', '27348', '27349', '27350'],
-    defectBatchIds: [getAlterationReqNumber(DEFAULT_REQ_NUMBER)]
+    articles: [] as string[],
+    poList: [] as string[],
+    defectBatchIds: [] as string[],
+    halls: [] as HallWithStitchers[]
   },
 
   adminNavCollapsed: false,
@@ -354,6 +339,11 @@ const state = {
     sizes: createEmptySizes()
   },
   adminOrderSplitRows: [] as Array<{ maker: string; sizes: SizeBreakdown; dueDate: string }>,
+  adminOrderArticleLines: [] as AdminOrderArticleLine[],
+  adminMultiArticlePickerOpen: false,
+  adminMultiArticleSearch: '',
+  adminOrderLastDefaultMaker: '',
+  adminOrderLastDefaultDueDate: '',
   systemUsers: [] as SystemUserRecord[],
   auditTrail: [] as AuditTrailEntry[],
   lastBackupPath: '',
@@ -436,6 +426,14 @@ function formatGrnRemainingCaps(caps: GrnRemainingCaps, enteredSizes: SizeBreakd
   return `Remaining after current entry: ${remainingBySize} | Total: ${remainingTotal.toLocaleString()} pairs`;
 }
 
+function findHallByName(name?: string): HallWithStitchers | undefined {
+  const needle = String(name || '').trim().toLowerCase();
+  if (!needle) return undefined;
+  return (state.dropdownOptions.halls || []).find(
+    h => String(h.name || '').trim().toLowerCase() === needle
+  );
+}
+
 function getOrderStockState(orderId: string): {
   totalReceived: number;
   totalIssued: number;
@@ -445,12 +443,20 @@ function getOrderStockState(orderId: string): {
   remainingOrderSizes: SizeBreakdown;
   remainingOrderTotal: number;
   receivedSizes: SizeBreakdown;
+  unclaimedDockSizes: SizeBreakdown;
   hasServerCounts: boolean;
 } {
   const order = state.pendingOrders.find(candidate => candidate.orderId === orderId);
   const activeSizes = getOrderSizeCodes(orderId, order?.sizeCodes, order?.sizeFormat);
   if (order && order.availableDockPairs !== undefined) {
     const remainingOrderSizes = { ...createEmptySizes(activeSizes), ...(order.remainingOrderSizes || order.sizes || {}) };
+    const receivedSizes = { ...createEmptySizes(activeSizes), ...(order.receivedSizes || {}) };
+    const requestedSizes = { ...createEmptySizes(activeSizes), ...(order.requestedSizes || {}) };
+    const unclaimedDockSizes = {
+      ...createEmptySizes(activeSizes),
+      ...(order.unclaimedDockSizes ||
+        Object.fromEntries(activeSizes.map(sz => [sz, Math.max(0, Number(receivedSizes[sz] || 0) - Number(requestedSizes[sz] || 0))])))
+    };
     return {
       totalReceived: Number(order.receivedPairs || 0),
       totalIssued: Number(order.issuedPairs || 0),
@@ -459,7 +465,8 @@ function getOrderStockState(orderId: string): {
       unclaimedPairs: Math.max(0, Number(order.unclaimedDockPairs ?? order.availableDockPairs ?? 0)),
       remainingOrderSizes,
       remainingOrderTotal: calculateSizeTotal(remainingOrderSizes),
-      receivedSizes: { ...createEmptySizes(activeSizes), ...(order.receivedSizes || {}) },
+      receivedSizes,
+      unclaimedDockSizes,
       hasServerCounts: true
     };
   }
@@ -497,8 +504,10 @@ function getOrderStockState(orderId: string): {
   }
 
   const remainingOrderSizes = createEmptySizes(activeSizes);
+  const unclaimedDockSizes = createEmptySizes(activeSizes);
   for (const size of activeSizes) {
     remainingOrderSizes[size] = Math.max(0, Number(order?.sizes?.[size] || 0) - requestedSizes[size]);
+    unclaimedDockSizes[size] = Math.max(0, receivedSizes[size] - requestedSizes[size]);
   }
   const availablePairs = Math.max(0, totalReceived - totalIssued);
   const unclaimedPairs = Math.max(0, availablePairs - pendingReqPairs);
@@ -512,6 +521,7 @@ function getOrderStockState(orderId: string): {
     remainingOrderSizes,
     remainingOrderTotal: calculateSizeTotal(remainingOrderSizes),
     receivedSizes,
+    unclaimedDockSizes,
     hasServerCounts: false
   };
 }
@@ -678,6 +688,7 @@ function renderScreenPacking(): string {
     cartons: state.cartons,
     rollupSummary: getCurrentRollupSummary(),
     getOrderAvailableDockPairs: (orderId: string) => getOrderStockState(orderId).availablePairs,
+    getOrderUnclaimedDockPairs: (orderId: string) => getOrderStockState(orderId).unclaimedPairs,
     remainingStagePairs,
     escapeHtml,
     isInitialSyncing: state.isInitialSyncing,
@@ -713,7 +724,8 @@ function renderScreenAdmin(): string {
       makers: state.dropdownOptions.makers,
       customers: state.dropdownOptions.customers,
       articles: state.dropdownOptions.articles,
-      poList: state.dropdownOptions.poList
+      poList: state.dropdownOptions.poList,
+      halls: state.dropdownOptions.halls
     },
     systemUsers: state.systemUsers,
     currentUserId: state.currentUser?.userId,
@@ -723,6 +735,9 @@ function renderScreenAdmin(): string {
     rollupSummary,
     orderDraft: state.adminOrderDraft,
     orderSplitRows: state.adminOrderSplitRows,
+    orderArticleLines: state.adminOrderArticleLines,
+    multiArticlePickerOpen: state.adminMultiArticlePickerOpen,
+    multiArticleSearch: state.adminMultiArticleSearch,
     openRegistryIds: state.adminOpenRegistries
   });
 }
@@ -903,6 +918,8 @@ function attachEventHandlers(): void {
     state.grnForm = {
       pendingOrderId: '',
       maker: '',
+      hallName: '',
+      stitcherName: '',
       article: '',
       color: '',
       receivedFrom: '',
@@ -1003,6 +1020,8 @@ function attachEventHandlers(): void {
 function attachGRNHandlers(): void {
   const pendingOrderSelect = document.getElementById('grn-pending-order') as HTMLSelectElement;
   const makerSelect = document.getElementById('grn-maker') as HTMLSelectElement;
+  const hallSelect = document.getElementById('grn-hall') as HTMLSelectElement | null;
+  const stitcherSelect = document.getElementById('grn-stitcher') as HTMLSelectElement | null;
   const articleInput = document.getElementById('grn-article') as HTMLInputElement;
   const colorInput = document.getElementById('grn-color') as HTMLInputElement;
   const receivedFromInput = document.getElementById('grn-received-from') as HTMLInputElement;
@@ -1025,7 +1044,12 @@ function attachGRNHandlers(): void {
         const caps = getGrnRemainingCaps(state.grnForm.pendingOrderId, alloc.maker);
         const existingRow = state.grnForm.splitRows[idx];
         const rfInp = document.querySelector<HTMLInputElement>(`.grn-split-received-from[data-split-idx="${idx}"]`);
+        const stitcherSel = document.querySelector<HTMLSelectElement>(`.grn-split-stitcher[data-split-idx="${idx}"]`);
         const receivedFrom = rfInp ? rfInp.value : (existingRow?.receivedFrom || '');
+        const hallName = stitcherSel && stitcherSel.value
+          ? (stitcherSel.getAttribute('data-hall-name') || existingRow?.hallName || '')
+          : (existingRow?.hallName || '');
+        const stitcherName = stitcherSel ? stitcherSel.value : (existingRow?.stitcherName || '');
         const sizes = createEmptySizes(activeCodes);
         const rowInputs = Array.from(document.querySelectorAll<HTMLInputElement>(`.grn-split-size-val[data-split-idx="${idx}"]`));
         rowInputs.forEach(inp => {
@@ -1067,7 +1091,7 @@ function attachGRNHandlers(): void {
         const rowSum = calculateSizeTotal(sizes);
         const rowCell = document.getElementById(`grn-split-row-total-${idx}`);
         if (rowCell) rowCell.textContent = rowSum.toLocaleString();
-        return { maker: alloc.maker, receivedFrom, sizes };
+        return { maker: alloc.maker, hallName, stitcherName, receivedFrom, sizes };
       });
       state.grnForm.splitRows = nextRows;
       const grandTotal = nextRows.reduce((s, r) => s + calculateSizeTotal(r.sizes), 0);
@@ -1136,6 +1160,18 @@ function attachGRNHandlers(): void {
     if (totalDisplay) {
       totalDisplay.textContent = sizeSum.toLocaleString();
     }
+    document.querySelectorAll<HTMLElement>('[data-bal-size]').forEach(el => {
+      const sz = el.getAttribute('data-bal-size') || '';
+      const rem = caps ? Math.max(0, (caps.sizeRemaining[sz] ?? 0) - Number(sizes[sz] || 0)) : null;
+      el.textContent = rem !== null ? rem.toLocaleString() : '—';
+      el.classList.toggle('is-zero', rem === 0);
+    });
+    const balanceTotalEl = document.getElementById('grn-balance-total');
+    if (balanceTotalEl) {
+      balanceTotalEl.textContent = caps
+        ? Math.max(0, caps.totalRemaining - sizeSum).toLocaleString()
+        : '—';
+    }
     if (capsDisplay) {
       capsDisplay.textContent = caps
         ? formatGrnRemainingCaps(caps, sizes)
@@ -1152,6 +1188,8 @@ function attachGRNHandlers(): void {
     state.grnForm.pendingOrderId = val;
     if (!val) {
       state.grnForm.maker = '';
+      state.grnForm.hallName = '';
+      state.grnForm.stitcherName = '';
       state.grnForm.article = '';
       state.grnForm.color = '';
       state.grnForm.receivedFrom = '';
@@ -1180,15 +1218,30 @@ function attachGRNHandlers(): void {
     state.grnForm.sizes = createEmptySizes(activeCodes);
     state.grnForm.rcvdPairs = '';
     if (hasSplit && filled.contractorAllocations) {
+      state.grnForm.hallName = '';
+      state.grnForm.stitcherName = '';
       state.grnForm.receivedFrom = '';
-      state.grnForm.splitRows = filled.contractorAllocations.map(a => ({
-        maker: a.maker,
-        receivedFrom: '',
-        sizes: createEmptySizes(activeCodes)
-      }));
+      state.grnForm.splitRows = filled.contractorAllocations.map(a => {
+        const matchedHall = findHallByName(a.maker);
+        return {
+          maker: a.maker,
+          hallName: matchedHall && matchedHall.stitchers.length > 0 ? matchedHall.name : '',
+          stitcherName: '',
+          receivedFrom: '',
+          sizes: createEmptySizes(activeCodes)
+        };
+      });
     } else {
       state.grnForm.splitRows = [];
-      if (!state.grnForm.receivedFrom?.trim() || state.grnForm.receivedFrom.endsWith(' Representative')) {
+      const matchedHall = findHallByName(filled.maker);
+      const hasHallStitchers = Boolean(matchedHall && matchedHall.stitchers.length > 0);
+      state.grnForm.hallName = hasHallStitchers ? matchedHall!.name : '';
+      state.grnForm.stitcherName = '';
+      if (hasHallStitchers) {
+        if (state.grnForm.receivedFrom.endsWith(' Representative')) {
+          state.grnForm.receivedFrom = '';
+        }
+      } else if (!state.grnForm.receivedFrom?.trim() || state.grnForm.receivedFrom.endsWith(' Representative')) {
         state.grnForm.receivedFrom = filled.maker ? `${filled.maker} Representative` : '';
       }
     }
@@ -1204,23 +1257,65 @@ function attachGRNHandlers(): void {
   makerSelect?.addEventListener('change', () => {
     const activeOrder = state.pendingOrders.find(o => o.orderId === state.grnForm.pendingOrderId);
     const hasSplit = (activeOrder?.contractorAllocations?.length || 0) > 1;
+    const prevHall = state.grnForm.hallName;
     state.grnForm.maker = makerSelect.value;
-    if (!hasSplit) {
-      if (!state.grnForm.receivedFrom?.trim() || state.grnForm.receivedFrom.endsWith(' Representative')) {
-        state.grnForm.receivedFrom = state.grnForm.maker ? `${state.grnForm.maker} Representative` : '';
-        if (receivedFromInput) receivedFromInput.value = state.grnForm.receivedFrom;
+    const matchedHall = findHallByName(state.grnForm.maker);
+    const hasHallStitchers = Boolean(matchedHall && matchedHall.stitchers.length > 0);
+    state.grnForm.hallName = hasHallStitchers ? matchedHall!.name : '';
+    state.grnForm.stitcherName = '';
+    if (hasHallStitchers) {
+      if (state.grnForm.receivedFrom.endsWith(' Representative')) {
+        state.grnForm.receivedFrom = '';
       }
-      syncSizesAndReceived();
-    } else {
-      if (state.grnForm.maker && (!state.grnForm.receivedFrom?.trim() || state.grnForm.receivedFrom.endsWith(' Representative'))) {
-        state.grnForm.receivedFrom = `${state.grnForm.maker} Representative`;
-      }
+    } else if (!state.grnForm.receivedFrom?.trim() || state.grnForm.receivedFrom.endsWith(' Representative')) {
+      state.grnForm.receivedFrom = state.grnForm.maker ? `${state.grnForm.maker} Representative` : '';
+      if (receivedFromInput) receivedFromInput.value = state.grnForm.receivedFrom;
+    }
+    syncSizesAndReceived();
+    if (hasSplit || prevHall !== state.grnForm.hallName || hasHallStitchers) {
       renderApp();
     }
   });
+
+  hallSelect?.addEventListener('change', () => {
+    syncSizesAndReceived();
+    const selectedHall = findHallByName(hallSelect.value);
+    state.grnForm.hallName = selectedHall ? selectedHall.name : '';
+    state.grnForm.stitcherName = '';
+    if (selectedHall && selectedHall.stitchers.length > 0) {
+      if (state.grnForm.receivedFrom.endsWith(' Representative')) {
+        state.grnForm.receivedFrom = '';
+      }
+      if (!state.grnForm.pendingOrderId && (!state.grnForm.maker || findHallByName(state.grnForm.maker))) {
+        state.grnForm.maker = selectedHall.name;
+      }
+    } else if (!selectedHall && state.grnForm.maker && findHallByName(state.grnForm.maker) && !state.grnForm.pendingOrderId) {
+      state.grnForm.maker = '';
+    }
+    renderApp();
+  });
+
+  stitcherSelect?.addEventListener('change', () => {
+    state.grnForm.stitcherName = stitcherSelect.value;
+    applyFieldValidationErrors([
+      [stitcherSelect, ''],
+      [receivedFromInput, '']
+    ]);
+    const noteHintEl = document.getElementById('grn-note-hint');
+    const curHall = findHallByName(state.grnForm.hallName);
+    if (noteHintEl && curHall && curHall.stitchers.length > 0) {
+      const whoLabel = state.grnForm.stitcherName || 'Stitcher';
+      noteHintEl.innerHTML = `Optional: defaults to <strong>${escapeHtml(`${whoLabel} (${curHall.name})`)}</strong> if left blank.`;
+    }
+  });
+
   receivedFromInput?.addEventListener('input', () => {
     state.grnForm.receivedFrom = receivedFromInput.value;
-    applyFieldValidationErrors([[receivedFromInput, receivedFromInput.value.trim() ? '' : 'Enter who goods were received from.']]);
+    const curHall = findHallByName(state.grnForm.hallName);
+    const isOptional = Boolean(curHall && curHall.stitchers.length > 0);
+    applyFieldValidationErrors([
+      [receivedFromInput, isOptional || receivedFromInput.value.trim() ? '' : 'Enter who goods were received from.']
+    ]);
   });
 
   document.querySelectorAll('.grn-size-val').forEach(inp => {
@@ -1228,6 +1323,17 @@ function attachGRNHandlers(): void {
   });
   document.querySelectorAll('.grn-split-size-val').forEach(inp => {
     inp.addEventListener('input', () => syncSizesAndReceived(inp as HTMLInputElement));
+  });
+  document.querySelectorAll<HTMLSelectElement>('.grn-split-stitcher').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const idx = Number(sel.getAttribute('data-split-idx'));
+      const hName = sel.getAttribute('data-hall-name') || '';
+      if (state.grnForm.splitRows[idx]) {
+        state.grnForm.splitRows[idx].hallName = sel.value ? hName : '';
+        state.grnForm.splitRows[idx].stitcherName = sel.value;
+      }
+      applyFieldValidationErrors([[sel, '']]);
+    });
   });
   document.querySelectorAll<HTMLInputElement>('.grn-split-received-from').forEach(inp => {
     inp.addEventListener('input', () => {
@@ -1244,6 +1350,8 @@ function attachGRNHandlers(): void {
     state.grnForm = {
       pendingOrderId: '',
       maker: '',
+      hallName: '',
+      stitcherName: '',
       article: '',
       color: '',
       receivedFrom: '',
@@ -1261,6 +1369,9 @@ function attachGRNHandlers(): void {
     entryPendingOrder: string;
     selectedOrder?: PendingOrder;
     entryMaker: string;
+    entryHallName?: string;
+    entryStitcherName?: string;
+    entryReceivingNote?: string;
     entryArticle: string;
     entryColor: string;
     entryReceivedFrom: string;
@@ -1283,6 +1394,9 @@ function attachGRNHandlers(): void {
           pendingOrderId: params.entryPendingOrder,
           customerName: params.selectedOrder?.buyer || 'Standard',
           makerContractor: params.entryMaker,
+          hallName: params.entryHallName || '',
+          stitcherName: params.entryStitcherName || '',
+          receivingNote: params.entryReceivingNote || '',
           articleName: params.entryArticle,
           colorShade: params.entryColor,
           receivedFrom: params.entryReceivedFrom,
@@ -1316,6 +1430,9 @@ function attachGRNHandlers(): void {
     const persistedOrderId = savedReceiving?.order_id || params.entryPendingOrder;
     const addedPairs = Number(savedReceiving?.rcvd_pairs || params.rcvdPairs);
     const savedMaker = savedReceiving?.maker_contractor || params.entryMaker;
+    const savedHallName = savedReceiving?.hall_name || params.entryHallName || '';
+    const savedStitcherName = savedReceiving?.stitcher_name || params.entryStitcherName || '';
+    const savedReceivingNote = savedReceiving?.receiving_note || params.entryReceivingNote || '';
     const savedArticle = savedReceiving?.article_name || params.entryArticle;
     const savedColor = savedReceiving?.color_shade || params.entryColor;
     const savedFrom = savedReceiving?.received_from || params.entryReceivedFrom;
@@ -1326,6 +1443,9 @@ function attachGRNHandlers(): void {
       date: persistedDate,
       pendingOrderId: persistedOrderId,
       maker: savedMaker,
+      hallName: savedHallName,
+      stitcherName: savedStitcherName,
+      receivingNote: savedReceivingNote,
       article: savedArticle,
       color: savedColor,
       receivedFrom: savedFrom,
@@ -1348,6 +1468,11 @@ function attachGRNHandlers(): void {
           params.selectedOrder.receivedSizes[size] =
             Number(params.selectedOrder.receivedSizes[size] || 0) + Number(params.entrySizes[size] || 0);
         }
+      }
+      params.selectedOrder.unclaimedDockSizes = params.selectedOrder.unclaimedDockSizes || createEmptySizes(params.activeCodes);
+      for (const size of params.activeCodes) {
+        params.selectedOrder.unclaimedDockSizes[size] =
+          Number(params.selectedOrder.unclaimedDockSizes[size] || 0) + Number(params.entrySizes[size] || 0);
       }
       if (params.selectedOrder.contractorAllocations?.length) {
         const alloc = params.selectedOrder.contractorAllocations.find(
@@ -1378,6 +1503,9 @@ function attachGRNHandlers(): void {
       date: persistedDate,
       pendingOrderId: persistedOrderId,
       maker: savedMaker,
+      hallName: savedHallName || undefined,
+      stitcherName: savedStitcherName || undefined,
+      receivingNote: savedReceivingNote || undefined,
       article: savedArticle,
       color: savedColor,
       receivedFrom: savedFrom,
@@ -1418,7 +1546,16 @@ function attachGRNHandlers(): void {
       const missingSenderFields: Array<[HTMLElement | null, string]> = [];
       for (const item of activeRows) {
         const rfInp = document.querySelector<HTMLElement>(`.grn-split-received-from[data-split-idx="${item.idx}"]`);
-        if (!item.row.receivedFrom.trim()) {
+        const stitcherSel = document.querySelector<HTMLElement>(`.grn-split-stitcher[data-split-idx="${item.idx}"]`);
+        const rowHall = findHallByName(item.row.maker);
+        const hasHallStitchers = Boolean(rowHall && rowHall.stitchers.length > 0);
+        if (hasHallStitchers) {
+          if (!item.row.stitcherName?.trim()) {
+            missingSenderFields.push([stitcherSel, `Select a stitcher from ${rowHall!.name}.`]);
+          } else {
+            applyFieldValidationErrors([[stitcherSel, ''], [rfInp, '']]);
+          }
+        } else if (!item.row.receivedFrom.trim()) {
           missingSenderFields.push([rfInp, `Enter who delivered goods for ${item.row.maker}.`]);
         } else {
           applyFieldValidationErrors([[rfInp, '']]);
@@ -1434,19 +1571,28 @@ function attachGRNHandlers(): void {
       }
       if (missingSenderFields.length > 0) {
         applyFieldValidationErrors(missingSenderFields);
-        showToast('Enter Received From (person name) for each contractor delivering goods.');
+        showToast('Complete stitcher / received-from attribution for each contractor delivering goods.');
         return;
       }
 
       const savedBatches: GrnSlipParams[] = [];
       for (const item of activeRows) {
+        const rowHall = findHallByName(item.row.maker);
+        const hasHallStitchers = Boolean(rowHall && rowHall.stitchers.length > 0);
+        const noteVal = item.row.receivedFrom.trim();
+        const effectiveFrom = hasHallStitchers
+          ? (noteVal || `${item.row.stitcherName} (${rowHall!.name})`)
+          : noteVal;
         const saved = await persistAndRecordGrnBatch({
           entryPendingOrder: formPendingOrder,
           selectedOrder: activeOrder,
           entryMaker: item.row.maker,
+          entryHallName: hasHallStitchers ? rowHall!.name : (item.row.hallName || ''),
+          entryStitcherName: hasHallStitchers ? (item.row.stitcherName || '') : '',
+          entryReceivingNote: hasHallStitchers ? noteVal : '',
           entryArticle: activeOrder.article || formArt || '---',
           entryColor: activeOrder.color || formColor || 'Standard',
-          entryReceivedFrom: item.row.receivedFrom.trim(),
+          entryReceivedFrom: effectiveFrom,
           entrySizes: { ...item.row.sizes },
           rcvdPairs: item.total,
           activeCodes,
@@ -1461,11 +1607,16 @@ function attachGRNHandlers(): void {
         savedBatches.push(saved);
       }
 
-      state.grnForm.splitRows = (activeOrder.contractorAllocations || []).map(a => ({
-        maker: a.maker,
-        receivedFrom: '',
-        sizes: createEmptySizes(activeCodes)
-      }));
+      state.grnForm.splitRows = (activeOrder.contractorAllocations || []).map(a => {
+        const matchedHall = findHallByName(a.maker);
+        return {
+          maker: a.maker,
+          hallName: matchedHall && matchedHall.stitchers.length > 0 ? matchedHall.name : '',
+          stitcherName: '',
+          receivedFrom: '',
+          sizes: createEmptySizes(activeCodes)
+        };
+      });
       state.grnForm.rcvdPairs = '';
       const confirmHtml = buildGrnReceiveConfirmationHtml({
         pendingOrderId: formPendingOrder,
@@ -1478,7 +1629,10 @@ function attachGRNHandlers(): void {
       return;
     }
 
+    const formHall = (hallSelect?.value ?? state.grnForm.hallName ?? '').trim();
+    const formStitcher = (stitcherSelect?.value ?? state.grnForm.stitcherName ?? '').trim();
     const formReceivedFrom = (receivedFromInput?.value ?? state.grnForm.receivedFrom ?? '').trim();
+    const selectedHallObj = findHallByName(formHall);
     const sizeTotal = calculateSizeTotal(state.grnForm.sizes);
     const rcvdPairs = Math.max(0, parseInt(rcvdPairsInput?.value || '0', 10) || sizeTotal);
     const caps = getGrnRemainingCaps(formPendingOrder, formMaker);
@@ -1490,25 +1644,44 @@ function attachGRNHandlers(): void {
       return;
     }
 
-    if (formPendingOrder || formMaker || formArt || rcvdPairs > 0) {
+    if (formPendingOrder || formMaker || formHall || formArt || rcvdPairs > 0) {
       if (formPendingOrder && !formMaker) {
         applyFieldValidationErrors([[makerSelect, 'Choose the delivering contractor for this order.']]);
         showToast('Choose which allocated contractor delivered these goods.');
         return;
       }
-      if (!formReceivedFrom) {
+      if (formHall) {
+        if (!selectedHallObj || selectedHallObj.stitchers.length === 0) {
+          applyFieldValidationErrors([[hallSelect, 'Add stitchers to this Hall in Registry 04 before receiving from it, or clear Hall.']]);
+          showToast(`No stitchers are assigned to ${formHall} in Registry 04 yet.`);
+          return;
+        }
+        if (!formStitcher) {
+          applyFieldValidationErrors([[stitcherSelect, `Select which stitcher in ${selectedHallObj.name} delivered these goods.`]]);
+          showToast(`Select a Stitcher from ${selectedHallObj.name}.`);
+          return;
+        }
+      } else if (!formReceivedFrom) {
         applyFieldValidationErrors([[receivedFromInput, 'Enter the person name goods were received from.']]);
         showToast('Enter the person name in Received From.');
         return;
       }
 
+      const effectiveReceivedFrom = selectedHallObj && formStitcher
+        ? (formReceivedFrom || `${formStitcher} (${selectedHallObj.name})`)
+        : formReceivedFrom;
+      const effectiveReceivingNote = selectedHallObj && formStitcher ? formReceivedFrom : '';
+
       const saved = await persistAndRecordGrnBatch({
         entryPendingOrder: formPendingOrder || 'ORD-INWARD',
         selectedOrder: activeOrder,
-        entryMaker: formMaker || '---',
+        entryMaker: formMaker || selectedHallObj?.name || '---',
+        entryHallName: selectedHallObj?.name || '',
+        entryStitcherName: selectedHallObj ? formStitcher : '',
+        entryReceivingNote: effectiveReceivingNote,
         entryArticle: activeOrder?.article || formArt || '---',
         entryColor: activeOrder?.color || formColor || 'Standard',
-        entryReceivedFrom: formReceivedFrom,
+        entryReceivedFrom: effectiveReceivedFrom,
         entrySizes: { ...state.grnForm.sizes },
         rcvdPairs,
         activeCodes,
@@ -1520,6 +1693,10 @@ function attachGRNHandlers(): void {
 
       state.grnForm.sizes = createEmptySizes(activeCodes);
       state.grnForm.rcvdPairs = '';
+      if (selectedHallObj) {
+        state.grnForm.stitcherName = '';
+        state.grnForm.receivedFrom = '';
+      }
       const confirmHtml = buildGrnReceiveConfirmationHtml({
         pendingOrderId: saved.pendingOrderId || 'ORD-INWARD',
         date: saved.date,
@@ -1551,6 +1728,9 @@ function attachGRNHandlers(): void {
         date: latest?.date || todayDate,
         pendingOrderId,
         maker,
+        hallName: latest?.hallName || undefined,
+        stitcherName: latest?.stitcherName || undefined,
+        receivingNote: latest?.receivingNote || undefined,
         article,
         color,
         receivedFrom,
@@ -1737,8 +1917,36 @@ function attachGRNHandlers(): void {
 // Handlers for Screen 3: Alteration / Repair Bay (Uses A-Prefix Requisition Number)
 function attachRepairHandlers(): void {
   const defaultAltId = getAlterationReqNumber(state.packingWip.selectedBatch);
+  const batchSelect = document.getElementById('defect-batch-id') as HTMLSelectElement | null;
+  const articleSelect = document.getElementById('defect-article') as HTMLSelectElement | null;
   const tailorSelect = document.getElementById('defect-tailor-select') as HTMLSelectElement | null;
   const tailorInput = document.getElementById('defect-tailor') as HTMLInputElement | null;
+
+  batchSelect?.addEventListener('change', () => {
+    state.repairForm.batchId = batchSelect.value;
+    state.repairForm.article = '';
+    renderApp();
+  });
+
+  articleSelect?.addEventListener('change', () => {
+    state.repairForm.article = articleSelect.value;
+    renderApp();
+  });
+
+  document.getElementById('btn-repair-toggle-all')?.addEventListener('click', () => {
+    (state.repairForm as any).showAllBatches = !(state.repairForm as any).showAllBatches;
+    if (!(state.repairForm as any).showAllBatches) {
+      state.repairForm.batchId = '';
+    }
+    renderApp();
+  });
+
+  document.getElementById('btn-repair-max-qty')?.addEventListener('click', () => {
+    const btn = document.getElementById('btn-repair-max-qty');
+    const qtyInput = document.getElementById('defect-qty') as HTMLInputElement | null;
+    const maxVal = btn?.getAttribute('data-max-qty') || '0';
+    if (qtyInput) qtyInput.value = maxVal;
+  });
 
   const getTailor = (fallback: string): string => {
     const selected = tailorSelect?.value || '__custom__';
@@ -1782,11 +1990,69 @@ function attachRepairHandlers(): void {
     if (tailorSelect?.value === '__custom__') state.repairForm.tailor = tailorInput.value;
   });
 
+  const getDefectSummaryForReq = (reqNumber: string): string => {
+    const activeReasons = Array.from(new Set(
+      state.defectList
+        .filter(d => (d.rawStatus === 'SENT_FOR_ALTERATION' || d.status === 'In Rework') && normalizeBaseReqNumber(d.reqNumber || d.id) === reqNumber)
+        .map(d => String(d.defectClass || '').trim())
+        .filter(Boolean)
+    ));
+    return activeReasons.length > 0 ? activeReasons.join(', ') : 'Workmanship Defect';
+  };
+
+  document.getElementById('btn-assign-tailor')?.addEventListener('click', async () => {
+    const batchId = (document.getElementById('defect-batch-id') as HTMLSelectElement)?.value || defaultAltId;
+    const tailor = getTailor('');
+    if (!tailor) {
+      showToast('Select or enter a tailor name before assigning.');
+      return;
+    }
+    const qtyNum = parseInt((document.getElementById('defect-qty') as HTMLInputElement)?.value || '0', 10) || 0;
+    const targetReq = normalizeBaseReqNumber(batchId);
+    const openServerRows = state.defectList.filter(
+      d => d.altId && d.rawStatus === 'SENT_FOR_ALTERATION' && normalizeBaseReqNumber(d.reqNumber || d.id) === targetReq
+    );
+    if (openServerRows.length > 0) {
+      const totalOpen = openServerRows.reduce((sum, d) => sum + Number(d.pairsCount || 0), 0);
+      const assignQty = qtyNum > 0 ? qtyNum : totalOpen;
+      if (assignQty <= 0 || assignQty > totalOpen) {
+        showToast(`Enter an assign quantity between 1 and ${totalOpen} pairs.`);
+        return;
+      }
+      try {
+        const res = await fetch('/api/alterations/assign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reqNumber: targetReq, tailorName: tailor, pairsCount: assignQty })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || 'Unable to assign tailor.');
+        }
+        saveTailorName(tailor);
+        await syncBackendData();
+        showToast(`Assigned ${assignQty} pairs of ${batchId} to ${tailor}.`);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Unable to assign tailor.');
+      }
+      return;
+    }
+    state.defectList.forEach(d => {
+      if (normalizeBaseReqNumber(d.reqNumber || d.id) === targetReq && (d.rawStatus === 'SENT_FOR_ALTERATION' || d.status === 'In Rework')) {
+        d.tailor = tailor;
+      }
+    });
+    saveTailorName(tailor);
+    renderApp();
+    showToast(`Assigned ${batchId} to ${tailor}.`);
+  });
+
   const handleAlterationSubmit = async (isScrap: boolean) => {
     const batchId = (document.getElementById('defect-batch-id') as HTMLSelectElement)?.value || defaultAltId;
     const article = (document.getElementById('defect-article') as HTMLSelectElement)?.value || state.packingWip.article || '---';
     const po = (document.getElementById('defect-po') as HTMLSelectElement)?.value || state.packingWip.po || '---';
-    const defectType = (document.getElementById('defect-type') as HTMLSelectElement)?.value || 'Stitching Skip / Broken Seam (سلائی ٹوٹ)';
+    const targetReq = normalizeBaseReqNumber(batchId);
+    const defectType = getDefectSummaryForReq(targetReq);
     const tailor = getTailor(isScrap ? 'Scrap Authority' : 'Supervisor A');
     const qtyNum = parseInt((document.getElementById('defect-qty') as HTMLInputElement)?.value || '0', 10) || 0;
 
@@ -1794,8 +2060,6 @@ function attachRepairHandlers(): void {
       showToast(isScrap ? 'Enter a scrap quantity greater than zero.' : 'Enter a repair quantity greater than zero.');
       return;
     }
-
-    const targetReq = normalizeBaseReqNumber(batchId);
     const openServerRows = state.defectList.filter(
       d => d.altId && d.rawStatus === 'SENT_FOR_ALTERATION' && normalizeBaseReqNumber(d.reqNumber || d.id) === targetReq
     );
@@ -1864,6 +2128,187 @@ function attachRepairHandlers(): void {
   document.getElementById('btn-complete-repair')?.addEventListener('click', () => void handleAlterationSubmit(false));
   document.getElementById('btn-log-scrap')?.addEventListener('click', () => void handleAlterationSubmit(true));
 
+  document.querySelectorAll<HTMLElement>('[data-alt-split-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const altId = Number(btn.getAttribute('data-alt-split-id') || 0);
+      const totalPairs = Number(btn.getAttribute('data-alt-pairs') || 0);
+      const rowTailor = btn.getAttribute('data-alt-tailor') || 'Supervisor A';
+      const rowReq = btn.getAttribute('data-alt-req') || defaultAltId;
+      if (!altId || totalPairs <= 0) return;
+
+      openModal(`Split Outcome — ${escapeHtml(rowReq)}`, `
+        <div style="font-size: 13px;">
+          <p style="margin: 0 0 12px; color: var(--ink-700);">
+            Batch with <strong>${escapeHtml(rowTailor)}</strong>: <strong>${totalPairs} Pairs</strong> pending. Enter how many pairs are returning repaired to Stage 1 and/or scrapped.
+          </p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label for="alt-split-return">Return to Stage 1 (Repaired)</label>
+              <input type="number" id="alt-split-return" class="form-input" min="0" max="${totalPairs}" value="${totalPairs}" />
+            </div>
+            <div class="form-group">
+              <label for="alt-split-scrap">Log as Scrap (Unrepairable)</label>
+              <input type="number" id="alt-split-scrap" class="form-input" min="0" max="${totalPairs}" value="0" />
+            </div>
+          </div>
+          <div id="alt-split-summary" style="padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: 4px; background: var(--ink-50); font-size: 12px; color: var(--ink-700); margin-bottom: 14px;">
+            Remaining in Rework after save: <strong>0 Pairs</strong>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn-outline" data-modal-cancel>Cancel</button>
+            <button type="button" class="btn-primary" id="btn-confirm-alt-split">Confirm Outcome</button>
+          </div>
+        </div>
+      `, false, { hideGlobalFooter: true });
+
+      const returnInput = document.getElementById('alt-split-return') as HTMLInputElement | null;
+      const scrapInput = document.getElementById('alt-split-scrap') as HTMLInputElement | null;
+      const summaryEl = document.getElementById('alt-split-summary');
+      const updateSummary = () => {
+        const retVal = Math.max(0, parseInt(returnInput?.value || '0', 10) || 0);
+        const scrVal = Math.max(0, parseInt(scrapInput?.value || '0', 10) || 0);
+        const rem = totalPairs - retVal - scrVal;
+        if (summaryEl) {
+          summaryEl.innerHTML = rem < 0
+            ? `<span style="color: #991B1B; font-weight: 700;">Total (${retVal + scrVal}) exceeds ${totalPairs} pending pairs.</span>`
+            : `Remaining in Rework after save: <strong>${rem} Pairs</strong>`;
+        }
+      };
+
+      scrapInput?.addEventListener('input', () => {
+        const scrVal = Math.min(totalPairs, Math.max(0, parseInt(scrapInput.value || '0', 10) || 0));
+        if (returnInput) returnInput.value = String(Math.max(0, totalPairs - scrVal));
+        updateSummary();
+      });
+      returnInput?.addEventListener('input', updateSummary);
+
+      let splitInFlight = false;
+      document.getElementById('btn-confirm-alt-split')?.addEventListener('click', async () => {
+        if (splitInFlight) return;
+        const retVal = Math.max(0, parseInt(returnInput?.value || '0', 10) || 0);
+        const scrVal = Math.max(0, parseInt(scrapInput?.value || '0', 10) || 0);
+        if (retVal + scrVal <= 0 || retVal + scrVal > totalPairs) {
+          showToast(`Enter valid Return + Scrap quantities between 1 and ${totalPairs} pairs.`);
+          return;
+        }
+        splitInFlight = true;
+        const effectiveTailor = getTailor(rowTailor) || rowTailor;
+        try {
+          if (retVal > 0) {
+            const res = await fetch(`/api/alterations/${altId}/repair`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tailorName: effectiveTailor, isScrap: false, deductionRate: 150, pairsCount: retVal })
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.error || 'Unable to return repaired pairs.');
+          }
+          if (scrVal > 0) {
+            const res = await fetch(`/api/alterations/${altId}/repair`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tailorName: effectiveTailor, isScrap: true, deductionRate: 150, pairsCount: scrVal })
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.error || 'Unable to log scrap pairs.');
+          }
+          closeModal();
+          saveTailorName(effectiveTailor);
+          await syncBackendData();
+          showToast(`Processed ${rowReq}: ${retVal} returned to Stage 1, ${scrVal} scrapped.`);
+        } catch (err) {
+          showToast(err instanceof Error ? err.message : 'Unable to save split outcome.');
+        } finally {
+          splitInFlight = false;
+        }
+      });
+    });
+  });
+
+  document.querySelectorAll<HTMLElement>('[data-alt-row-return], [data-alt-row-scrap]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const isScrap = btn.hasAttribute('data-alt-row-scrap');
+      const altId = Number(btn.getAttribute(isScrap ? 'data-alt-row-scrap' : 'data-alt-row-return') || 0);
+      if (!altId) return;
+      const qtyInput = document.querySelector<HTMLInputElement>(`[data-alt-qty-id="${altId}"]`);
+      const maxPairs = Number(qtyInput?.getAttribute('max') || 0);
+      const pairsCount = parseInt(qtyInput?.value || '0', 10) || 0;
+      if (pairsCount <= 0 || (maxPairs > 0 && pairsCount > maxPairs)) {
+        showToast(`Enter a valid quantity between 1 and ${maxPairs || 1} pairs.`);
+        return;
+      }
+      const rowTailor = btn.getAttribute('data-alt-tailor') || '';
+      const tailor = getTailor(rowTailor || (isScrap ? 'Scrap Authority' : 'Supervisor A'));
+      try {
+        const res = await fetch(`/api/alterations/${altId}/repair`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tailorName: tailor, isScrap, deductionRate: 150, pairsCount })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || 'Unable to update alteration record.');
+        }
+        saveTailorName(tailor);
+        await syncBackendData();
+        showToast(json.data?.message || (isScrap ? `${pairsCount} pairs logged as Scrap.` : `${pairsCount} pairs returned to STAGE 1 Checking.`));
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Unable to update alteration record.');
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLElement>('[data-alt-row-print]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const selBatch = btn.getAttribute('data-alt-req') || defaultAltId;
+      const selArt = (document.getElementById('defect-article') as HTMLSelectElement | HTMLElement | null)?.textContent?.trim()
+        || (document.getElementById('defect-article') as HTMLSelectElement | null)?.value
+        || state.packingWip.article
+        || '---';
+      const selPo = (document.getElementById('defect-po') as HTMLElement | null)?.textContent?.replace(/^PO\s+/i, '').trim()
+        || state.packingWip.po
+        || '---';
+      const selColor = (document.getElementById('defect-color') as HTMLElement | null)?.textContent?.replace(/^Colour\s+/i, '').trim()
+        || '---';
+      const selDefect = btn.getAttribute('data-alt-defect') || getDefectSummaryForReq(normalizeBaseReqNumber(selBatch));
+      const selTailor = escapeHtml(btn.getAttribute('data-alt-tailor') || getTailor('---'));
+      const altId = btn.getAttribute('data-alt-row-print') || '';
+      const qtyInput = document.querySelector<HTMLInputElement>(`[data-alt-qty-id="${altId}"]`);
+      const selQty = qtyInput?.value || btn.getAttribute('data-alt-pairs') || '0';
+
+      const docHtml = `
+        <div style="border: 2px dashed var(--ink-900); padding: 18px; background: var(--white); color: var(--ink-950); font-family: sans-serif;">
+          <div style="text-align: center; border-bottom: 2px solid var(--ink-900); padding-bottom: 10px; margin-bottom: 14px;">
+            <div style="font-size: 18px; font-weight: 800; color: var(--ink-950); letter-spacing: 0.05em;">MANDATORY REWORK ROUTE TAG</div>
+            <div style="font-size: 12px; font-weight: bold; color: var(--ink-600);">الٹریشن اور مرمت کا سرکاری روٹ کارڈ</div>
+          </div>
+          <div class="printable-meta-grid" style="color: var(--ink-950);">
+            <div><span>Alteration Requisition #:</span> <strong>${escapeHtml(selBatch)}</strong></div>
+            <div><span>Parent Requisition #:</span> <strong>${escapeHtml(normalizeBaseReqNumber(selBatch))}</strong></div>
+            <div><span>Article Name:</span> <strong>${escapeHtml(selArt)}</strong></div>
+            <div><span>Color:</span> <strong>${escapeHtml(selColor)}</strong></div>
+            <div><span>PO Number:</span> <strong>${escapeHtml(selPo)}</strong></div>
+            <div><span>Defect Category:</span> <strong>${escapeHtml(selDefect)}</strong></div>
+            <div><span>Batch Quantity:</span> <strong>${escapeHtml(selQty)} Pairs</strong></div>
+            <div><span>Assigned Master Tailor:</span> <strong>${selTailor}</strong></div>
+            <div><span>Max Rework Policy:</span> <strong>Strict 2-Cycle Limit &rarr; Auto-Scrap</strong></div>
+          </div>
+          <div style="background: var(--ink-100); border: 1px solid var(--ink-900); padding: 10px; border-radius: 4px; text-align: center; font-weight: 800; font-size: 12px; margin: 14px 0; color: var(--ink-950);">
+            SHOP-FLOOR ENFORCEMENT: ALL REPAIRED UNITS MUST RETURN DIRECTLY TO STAGE 1 CHECKING FOR 100% RE-INSPECTION. SKIPPING INSPECTION IS SYSTEM-BLOCKED.
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 20px; border-top: 1px dashed var(--ink-500); padding-top: 8px;">
+            <span>Tailor Sign (درزی دستخط): _______________</span>
+            <span>Alteration Bay Lead: _______________</span>
+            <span>Approved By: _______________</span>
+          </div>
+        </div>
+      `;
+
+      openModal(`Alteration Route Tag - ${selBatch}`, docHtml);
+      printDocument(`Alteration Route Tag - ${selBatch}`, docHtml);
+    });
+  });
+
   document.querySelectorAll<HTMLElement>('[data-alt-return-id], [data-alt-scrap-id]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const isScrap = btn.hasAttribute('data-alt-scrap-id');
@@ -1893,7 +2338,8 @@ function attachRepairHandlers(): void {
     const selBatch = (document.getElementById('defect-batch-id') as HTMLSelectElement)?.value || defaultAltId;
     const selArt = (document.getElementById('defect-article') as HTMLSelectElement)?.value || state.packingWip.article || '---';
     const selPo = (document.getElementById('defect-po') as HTMLSelectElement)?.value || state.packingWip.po || '---';
-    const selDefect = (document.getElementById('defect-type') as HTMLSelectElement)?.value || 'Stitching Skip / Broken Seam (سلائی ٹوٹ)';
+    const selColor = (document.getElementById('defect-color') as HTMLInputElement)?.value || '---';
+    const selDefect = getDefectSummaryForReq(normalizeBaseReqNumber(selBatch));
     const selTailor = escapeHtml(getTailor('---'));
     const selQty = (document.getElementById('defect-qty') as HTMLInputElement)?.value || '0';
 
@@ -1904,12 +2350,13 @@ function attachRepairHandlers(): void {
           <div style="font-size: 12px; font-weight: bold; color: var(--ink-600);">الٹریشن اور مرمت کا سرکاری روٹ کارڈ</div>
         </div>
         <div class="printable-meta-grid" style="color: var(--ink-950);">
-          <div><span>Alteration Requisition #:</span> <strong>${selBatch}</strong></div>
-          <div><span>Parent Requisition #:</span> <strong>${normalizeBaseReqNumber(selBatch)}</strong></div>
-          <div><span>Article Name:</span> <strong>${selArt}</strong></div>
-          <div><span>PO Number:</span> <strong>${selPo}</strong></div>
-          <div><span>Defect Category:</span> <strong>${selDefect}</strong></div>
-          <div><span>Batch Quantity:</span> <strong>${selQty} Pairs</strong></div>
+          <div><span>Alteration Requisition #:</span> <strong>${escapeHtml(selBatch)}</strong></div>
+          <div><span>Parent Requisition #:</span> <strong>${escapeHtml(normalizeBaseReqNumber(selBatch))}</strong></div>
+          <div><span>Article Name:</span> <strong>${escapeHtml(selArt)}</strong></div>
+          <div><span>Color:</span> <strong>${escapeHtml(selColor)}</strong></div>
+          <div><span>PO Number:</span> <strong>${escapeHtml(selPo)}</strong></div>
+          <div><span>Defect Category:</span> <strong>${escapeHtml(selDefect)}</strong></div>
+          <div><span>Batch Quantity:</span> <strong>${escapeHtml(selQty)} Pairs</strong></div>
           <div><span>Assigned Master Tailor:</span> <strong>${selTailor}</strong></div>
           <div><span>Max Rework Policy:</span> <strong>Strict 2-Cycle Limit &rarr; Auto-Scrap</strong></div>
         </div>
@@ -2874,9 +3321,10 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
     const perSizeMax = createEmptySizes(sizeCodes);
     for (const size of sizeCodes) {
       const remOrder = Number(stock.remainingOrderSizes[size] || 0);
+      const dockSizeAvail = Math.max(0, Number(stock.unclaimedDockSizes[size] || 0));
       perSizeMax[size] = hasSizeGrnBreakdown
-        ? Math.min(remOrder, Math.max(0, Number(stock.receivedSizes[size] || 0)))
-        : remOrder;
+        ? Math.min(remOrder, dockSizeAvail)
+        : Math.min(remOrder, maxTotalAllowed);
     }
     const defaultSizes = createEmptySizes(sizeCodes);
     let remainingBudget = Math.min(calculateSizeTotal(perSizeMax), maxTotalAllowed);
@@ -2894,7 +3342,8 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
     sizeCodes: string[],
     perSizeMax: SizeBreakdown,
     currentSizes: SizeBreakdown,
-    totalVal: number
+    totalVal: number,
+    maxTotalAllowed: number
   ): string {
     return `
       <div style="font-weight: 700; color: var(--ink-950); margin-bottom: 6px; font-size: 11.5px; text-transform: uppercase;">
@@ -2904,12 +3353,21 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
         <table class="size-matrix-table" style="margin: 0;">
           <thead>
             <tr>
+              <th scope="col" aria-label="Row" style="min-width: 76px; text-align: left;"></th>
               ${sizeCodes.map(sz => `<th scope="col">${escapeHtml(formatSizeColumnLabel(sz, sizeFormat))}</th>`).join('')}
               <th scope="col" style="background: var(--ink-200); color: var(--ink-950);">Total Asking</th>
             </tr>
           </thead>
           <tbody>
+            <tr data-testid="new-req-avail-row">
+              <td style="text-align: left; font-size: 11.5px; color: var(--ink-600); font-weight: 600;">Available</td>
+              ${sizeCodes
+                .map(sz => `<td style="font-size: 12px; color: var(--ink-600); font-variant-numeric: tabular-nums;">${Number(perSizeMax[sz] || 0).toLocaleString()}</td>`)
+                .join('')}
+              <td style="font-size: 12px; font-weight: 700; color: var(--ink-700); font-variant-numeric: tabular-nums;">${maxTotalAllowed.toLocaleString()}</td>
+            </tr>
             <tr>
+              <td style="text-align: left; font-size: 11.5px; color: var(--ink-950); font-weight: 700;">Asking</td>
               ${sizeCodes
                 .map(sz => `<td><input type="number" class="size-matrix-input req-size-val" data-size="${escapeHtml(sz)}" aria-label="Asking pairs for Size ${escapeHtml(formatSizeColumnLabel(sz, sizeFormat))}" min="0" max="${perSizeMax[sz] || 0}" value="${currentSizes[sz] || ''}" placeholder="0" /></td>`)
                 .join('')}
@@ -2921,23 +3379,39 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
     `;
   }
 
-  const defaultOrderId = preselectOrderId || state.packingWip.parentOrderId || state.pendingOrders[0]?.orderId || '';
+  const dockReadyOrders = state.pendingOrders.filter(
+    o => !o.shortClosed && getOrderStockState(o.orderId).unclaimedPairs > 0
+  );
+  const defaultOrderId =
+    preselectOrderId && dockReadyOrders.some(o => o.orderId === preselectOrderId)
+      ? preselectOrderId
+      : state.packingWip.parentOrderId && dockReadyOrders.some(o => o.orderId === state.packingWip.parentOrderId)
+        ? state.packingWip.parentOrderId
+        : dockReadyOrders[0]?.orderId || '';
   const initialCaps = getOrderReqEntryCaps(defaultOrderId);
-  const defaultArticle = initialCaps.matched?.article || state.packingWip.article || '';
+  const defaultArticle = initialCaps.matched?.article || (defaultOrderId ? state.packingWip.article : '') || '';
   const currentSizes = initialCaps.defaultSizes;
   const currentTotal = calculateSizeTotal(currentSizes);
 
   openModal('Create Packing Hall Requisition', `
     <div style="font-size: 13px;">
       <p style="margin-bottom: 12px; color: var(--ink-600);">
-        Choose the parent order and requested sizes. Requests are capped by remaining unrequested order balance and unclaimed Inward Register stock.
+        Choose an order with received Inward Register stock and enter the pairs to draw.
       </p>
       <div class="modal-meta-grid-3">
         <div class="form-group">
-          <label for="new-req-parent-order">Parent Master Order #</label>
+          <label for="new-req-parent-order">Received Order #</label>
           <select id="new-req-parent-order" class="form-select">
-            <option value="">-- Select Parent Order --</option>
-            ${state.pendingOrders.filter(o => !o.shortClosed).map(o => `<option value="${o.orderId}" ${defaultOrderId === o.orderId ? 'selected' : ''}>${o.orderId} (${o.article} • ${Number(o.totalQty || 0).toLocaleString()} Prs)</option>`).join('')}
+            ${
+              dockReadyOrders.length === 0
+                ? '<option value="">-- No received dock stock available --</option>'
+                : `<option value="">-- Select Order With Dock Stock --</option>${dockReadyOrders
+                    .map(o => {
+                      const avail = getOrderStockState(o.orderId).unclaimedPairs;
+                      return `<option value="${escapeHtml(o.orderId)}" ${defaultOrderId === o.orderId ? 'selected' : ''}>${escapeHtml(o.orderId)} (${escapeHtml(o.article)} &bull; ${avail.toLocaleString()} Prs available)</option>`;
+                    })
+                    .join('')}`
+            }
           </select>
         </div>
         <div class="form-group">
@@ -2954,7 +3428,7 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
       </div>
 
       <div id="new-req-size-matrix-container" style="background: var(--ink-50); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px; margin-bottom: 14px;">
-        ${renderReqSizeMatrixHtml(initialCaps.sizeFormat, initialCaps.sizeCodes, initialCaps.perSizeMax, currentSizes, currentTotal)}
+        ${renderReqSizeMatrixHtml(initialCaps.sizeFormat, initialCaps.sizeCodes, initialCaps.perSizeMax, currentSizes, currentTotal, initialCaps.maxTotalAllowed)}
       </div>
 
       <div class="form-group" style="margin-bottom: 10px;">
@@ -2981,22 +3455,20 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
   let activeCaps = initialCaps;
 
   function renderCapSummaryAndValidation(enteredTotal: number): void {
-    const { stock, maxTotalAllowed } = activeCaps;
+    const { maxTotalAllowed } = activeCaps;
     if (capSummaryEl) {
       capSummaryEl.innerHTML = `
-        <span>Order Remaining: <strong>${stock.remainingOrderTotal.toLocaleString()} Prs</strong></span>
-        <span>Inward Received: <strong>${stock.totalReceived.toLocaleString()} Prs</strong> (Issued: ${stock.totalIssued.toLocaleString()} &bull; Pending REQs: ${stock.pendingReqPairs.toLocaleString()})</span>
-        <span>Max Requestable Now: <strong>${maxTotalAllowed.toLocaleString()} Prs</strong></span>
+        <span>Available at Dock: <strong>${maxTotalAllowed.toLocaleString()} Prs</strong></span>
       `;
     }
     const exceeds = enteredTotal > maxTotalAllowed;
     if (capWarningEl) {
       if (maxTotalAllowed <= 0) {
         capWarningEl.style.display = 'block';
-        capWarningEl.textContent = '0 unclaimed Inward Register pairs available for this order. Receive GRN stock in Inward Goods Receiving before creating a requisition.';
+        capWarningEl.textContent = 'No unclaimed Inward Register stock available. Receive stock in Inward Goods Receiving first.';
       } else if (exceeds) {
         capWarningEl.style.display = 'block';
-        capWarningEl.textContent = `Asking ${enteredTotal.toLocaleString()} pairs exceeds Max Requestable Now (${maxTotalAllowed.toLocaleString()} pairs available in Inward Register).`;
+        capWarningEl.textContent = `Asking ${enteredTotal.toLocaleString()} pairs exceeds Available at Dock (${maxTotalAllowed.toLocaleString()} Prs).`;
       } else {
         capWarningEl.style.display = 'none';
         capWarningEl.textContent = '';
@@ -3057,7 +3529,8 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
         activeCaps.sizeCodes,
         activeCaps.perSizeMax,
         activeCaps.defaultSizes,
-        nextTotal
+        nextTotal,
+        activeCaps.maxTotalAllowed
       );
       bindReqSizeMatrixInputs();
     }
@@ -3074,7 +3547,7 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
     const parentOrderId = parentOrderSelect?.value || '';
     const parentOrder = state.pendingOrders.find(order => order.orderId === parentOrderId);
     if (!parentOrder) {
-      showToast('Select a pending parent order first.');
+      showToast('Select a received order with dock stock first.');
       return;
     }
 
@@ -3112,12 +3585,16 @@ function openNewRequisitionModal(preselectOrderId?: string): void {
         parentOrder.requestedPairs = Number(parentOrder.requestedPairs || 0) + pairs;
         parentOrder.pendingReqPairs = Number(parentOrder.pendingReqPairs || 0) + pairs;
         parentOrder.unclaimedDockPairs = Math.max(0, Number(parentOrder.availableDockPairs || 0) - parentOrder.pendingReqPairs);
-        if (parentOrder.remainingOrderSizes) {
-          for (const size of activeCaps.sizeCodes) {
-            parentOrder.remainingOrderSizes[size] = Math.max(
-              0,
-              Number(parentOrder.remainingOrderSizes[size] || 0) - Number(sizes[size] || 0)
-            );
+        for (const size of activeCaps.sizeCodes) {
+          const reqSz = Number(sizes[size] || 0);
+          if (parentOrder.remainingOrderSizes) {
+            parentOrder.remainingOrderSizes[size] = Math.max(0, Number(parentOrder.remainingOrderSizes[size] || 0) - reqSz);
+          }
+          if (parentOrder.requestedSizes) {
+            parentOrder.requestedSizes[size] = Number(parentOrder.requestedSizes[size] || 0) + reqSz;
+          }
+          if (parentOrder.unclaimedDockSizes) {
+            parentOrder.unclaimedDockSizes[size] = Math.max(0, Number(parentOrder.unclaimedDockSizes[size] || 0) - reqSz);
           }
         }
       }
@@ -3478,6 +3955,27 @@ function attachAdminHandlers(): void {
     renderApp();
   });
 
+  const miniChart = document.getElementById('su-lt-mini-chart');
+  const miniReadout = document.getElementById('su-lt-mini-readout');
+  if (miniChart && miniReadout) {
+    const defaultPct = miniReadout.getAttribute('data-default-pct') || '0';
+    miniChart.querySelectorAll<HTMLElement>('.su-lt-mini-col').forEach(col => {
+      const pct = col.getAttribute('data-mini-pct') || defaultPct;
+      col.addEventListener('mouseenter', () => {
+        miniChart.classList.add('is-hovering');
+        miniReadout.innerHTML = `<span>${escapeHtml(pct)}</span><small>%</small>`;
+      });
+      col.addEventListener('focus', () => {
+        miniChart.classList.add('is-hovering');
+        miniReadout.innerHTML = `<span>${escapeHtml(pct)}</span><small>%</small>`;
+      });
+    });
+    miniChart.addEventListener('mouseleave', () => {
+      miniChart.classList.remove('is-hovering');
+      miniReadout.innerHTML = `<span>${escapeHtml(defaultPct)}</span><small>%</small>`;
+    });
+  }
+
   document.querySelectorAll<HTMLButtonElement>('[data-admin-reset-password]').forEach(button => {
     button.addEventListener('click', () => {
       const userId = button.dataset.adminResetPassword;
@@ -3524,6 +4022,10 @@ function attachAdminHandlers(): void {
   document.querySelectorAll<HTMLElement>('[data-su-action]').forEach(el => {
     el.addEventListener('click', (e) => {
       if ((e.target as Element | null)?.closest('[data-su-action]') !== el) return;
+      if (el.closest('summary')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       const action = el.dataset.suAction;
       switch (action) {
         case 'inspect-order': {
@@ -3618,9 +4120,124 @@ function attachAdminHandlers(): void {
           }
           break;
         }
+        case 'remove-article-line': {
+          const lineIdx = Number(el.dataset.lineIndex);
+          if (Number.isInteger(lineIdx) && state.adminOrderArticleLines[lineIdx]) {
+            syncAdminOrderDraftFromDom();
+            state.adminOrderArticleLines.splice(lineIdx, 1);
+            renderApp();
+          }
+          break;
+        }
         case 'add-system-user':
           void window.adminAddSystemUser(el);
           break;
+        case 'add-stitcher': {
+          const hallId = Number(el.dataset.hallId);
+          const input = document.querySelector<HTMLInputElement>(`[data-hall-stitcher-input="${hallId}"]`);
+          const stitcherName = input?.value?.trim() || '';
+          if (!Number.isInteger(hallId) || hallId <= 0 || !stitcherName) {
+            applyFieldValidationErrors([[input || null, stitcherName ? '' : 'Enter stitcher name.']]);
+            showToast('Enter a stitcher name to add to this Hall.');
+            break;
+          }
+          void runAdminAction(`admin:add-stitcher:${hallId}`, el, async () => {
+            try {
+              const res = await fetch(`/api/admin/halls/${encodeURIComponent(String(hallId))}/stitchers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: stitcherName })
+              });
+              const json = await res.json();
+              if (!res.ok || !json.success || !json.data) {
+                showToast(json.error || 'Unable to add stitcher.');
+                return;
+              }
+              if (Array.isArray(json.data.halls)) {
+                state.dropdownOptions.halls = json.data.halls;
+              }
+              if (input) input.value = '';
+              showToast(`Added Stitcher "${stitcherName}" to ${json.data.hallName || 'Hall'}.`);
+              renderApp();
+              await syncBackendData();
+            } catch (err) {
+              console.warn('Add stitcher failed:', err);
+              showToast('Failed to add stitcher.');
+            }
+          });
+          break;
+        }
+        case 'delete-hall': {
+          const hallId = Number(el.dataset.hallId);
+          const hallName = el.dataset.hallName || 'Hall';
+          const stitcherCount = Number(el.dataset.stitcherCount || 0);
+          if (!Number.isInteger(hallId) || hallId <= 0) break;
+          void confirmAndRunAdminAction(
+            `admin:delete-hall:${hallId}`,
+            el,
+            {
+              title: 'Confirm Remove Hall',
+              message: `Remove Hall "${hallName}"?`,
+              detail: stitcherCount > 0
+                ? `Removes ${hallName} and its ${stitcherCount} assigned stitcher${stitcherCount === 1 ? '' : 's'} from the Hall -> Stitcher registry. Past GRN history rows keep their recorded labels.`
+                : `Removes ${hallName} from the Hall registry.`,
+              confirmLabel: 'Remove Hall',
+              cancelLabel: 'Keep Hall',
+              tone: 'danger'
+            },
+            async () => {
+              const res = await fetch(`/api/admin/halls/${encodeURIComponent(String(hallId))}`, { method: 'DELETE' });
+              const json = await res.json();
+              if (!res.ok || !json.success) {
+                showToast(json.error || `Unable to remove Hall "${hallName}".`);
+                return;
+              }
+              if (Array.isArray(json.data?.halls)) {
+                state.dropdownOptions.halls = json.data.halls;
+              }
+              state.dropdownOptions.makers = state.dropdownOptions.makers.filter(
+                m => m.trim().toLowerCase() !== hallName.trim().toLowerCase()
+              );
+              showToast(`Removed Hall "${hallName}".`);
+              renderApp();
+              await syncBackendData();
+            }
+          );
+          break;
+        }
+        case 'delete-stitcher': {
+          const stitcherId = Number(el.dataset.stitcherId);
+          const stitcherName = el.dataset.stitcherName || 'Stitcher';
+          const hallName = el.dataset.hallName || 'Hall';
+          if (!Number.isInteger(stitcherId) || stitcherId <= 0) break;
+          void confirmAndRunAdminAction(
+            `admin:delete-stitcher:${stitcherId}`,
+            el,
+            {
+              title: 'Confirm Remove Stitcher',
+              message: `Remove "${stitcherName}" from ${hallName}?`,
+              detail: 'Existing GRN history rows keep this stitcher name, and future receipts will no longer list them.',
+              confirmLabel: 'Remove Stitcher',
+              cancelLabel: 'Keep Stitcher',
+              tone: 'danger'
+            },
+            async () => {
+              const res = await fetch(`/api/admin/stitchers/${encodeURIComponent(String(stitcherId))}`, { method: 'DELETE' });
+              const json = await res.json();
+              if (!res.ok || !json.success) {
+                showToast(json.error || `Unable to remove Stitcher "${stitcherName}".`);
+                return;
+              }
+              if (Array.isArray(json.data?.halls)) {
+                state.dropdownOptions.halls = json.data.halls;
+              }
+              showToast(`Removed Stitcher "${stitcherName}" from ${hallName}.`);
+              renderApp();
+              await syncBackendData();
+            }
+          );
+          break;
+        }
       }
     });
   });
@@ -3756,32 +4373,92 @@ function attachAdminHandlers(): void {
     return getScaleSizeCodes(state.adminOverview.sizeStandards, state.adminOrderDraft.sizeFormat || 'LEGACY_7_11');
   }
 
+  function syncAdminArticleLinesFromDom(): void {
+    if (state.adminOrderArticleLines.length === 0) return;
+    state.adminOrderArticleLines.forEach((line, idx) => {
+      const makerEl = document.querySelector<HTMLSelectElement>(`.admin-line-maker[data-line-index="${idx}"]`);
+      const colorEl = document.querySelector<HTMLInputElement>(`.admin-line-color[data-line-index="${idx}"]`);
+      const dueEl = document.querySelector<HTMLInputElement>(`.admin-line-due-date[data-line-index="${idx}"]`);
+      if (makerEl) line.maker = makerEl.value.trim();
+      if (colorEl) line.color = colorEl.value.trim();
+      if (dueEl) line.dueDate = dueEl.value.trim();
+      const lineCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, line.sizeFormat || 'LEGACY_7_11');
+      const sizeInputs = document.querySelectorAll<HTMLInputElement>(`.admin-line-size-val[data-line-index="${idx}"]`);
+      if (sizeInputs.length > 0) {
+        const nextSizes = createEmptySizes(lineCodes);
+        sizeInputs.forEach(inp => {
+          const sz = inp.getAttribute('data-size') || '';
+          if (sz && lineCodes.includes(sz)) {
+            nextSizes[sz] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+          }
+        });
+        line.sizes = nextSizes;
+      }
+      if (line.splitRows.length > 0) {
+        line.splitRows.forEach((sRow, sIdx) => {
+          const sMaker = document.querySelector<HTMLSelectElement>(
+            `.admin-line-split-maker[data-line-index="${idx}"][data-split-index="${sIdx}"]`
+          );
+          const sDue = document.querySelector<HTMLInputElement>(
+            `.admin-line-split-due-date[data-line-index="${idx}"][data-split-index="${sIdx}"]`
+          );
+          if (sMaker) sRow.maker = sMaker.value.trim();
+          if (sDue) sRow.dueDate = sDue.value.trim();
+          const sInputs = document.querySelectorAll<HTMLInputElement>(
+            `.admin-line-split-size-val[data-line-index="${idx}"][data-split-index="${sIdx}"]`
+          );
+          if (sInputs.length > 0) {
+            const nextSplitSizes = createEmptySizes(lineCodes);
+            sInputs.forEach(inp => {
+              const sz = inp.getAttribute('data-size') || '';
+              if (sz && lineCodes.includes(sz)) {
+                nextSplitSizes[sz] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+              }
+            });
+            sRow.sizes = nextSplitSizes;
+          }
+        });
+      }
+    });
+  }
+
   function syncAdminOrderDraftFromDom(): void {
     const buyerEl = document.getElementById('admin-pending-order-buyer') as HTMLSelectElement | null;
     const articleEl = document.getElementById('admin-pending-order-article') as HTMLSelectElement | null;
+    const colorEl = document.getElementById('admin-pending-order-color') as HTMLInputElement | null;
     const buyerOpt = buyerEl?.selectedOptions?.[0];
-    const articleOpt = articleEl?.selectedOptions?.[0];
     state.adminOrderDraft.buyer = buyerEl?.value?.trim() || '';
     state.adminOrderDraft.customerId = buyerOpt?.getAttribute('data-customer-id') || '';
     state.adminOrderDraft.maker = (document.getElementById('admin-pending-order-maker') as HTMLSelectElement)?.value?.trim() || '';
     state.adminOrderDraft.po = (document.getElementById('admin-pending-order-po') as HTMLInputElement)?.value?.trim() || '';
-    state.adminOrderDraft.productId = articleOpt?.getAttribute('data-product-id') || '';
-    state.adminOrderDraft.article = articleEl?.value?.trim() || '';
-    state.adminOrderDraft.color = (document.getElementById('admin-pending-order-color') as HTMLInputElement)?.value?.trim() || '';
-    state.adminOrderDraft.sizeFormat = articleEl?.value
-      ? (articleOpt?.getAttribute('data-size-format') || 'LEGACY_7_11')
-      : 'LEGACY_7_11';
     state.adminOrderDraft.dueDate = (document.getElementById('admin-pending-order-due-date') as HTMLInputElement)?.value?.trim() || '';
-    const activeCodes = getActiveAdminOrderSizeCodes();
-    const sizes = createEmptySizes(activeCodes);
-    document.querySelectorAll('.admin-order-size-val').forEach(el => {
-      const inp = el as HTMLInputElement;
-      const k = inp.getAttribute('data-size');
-      if (k && activeCodes.includes(k)) {
-        sizes[k] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
-      }
-    });
-    state.adminOrderDraft.sizes = sizes;
+    const sizeFmtEl = document.getElementById('admin-order-size-format') as HTMLSelectElement | null;
+    if (articleEl) {
+      const articleOpt = articleEl.selectedOptions?.[0];
+      state.adminOrderDraft.productId = articleOpt?.getAttribute('data-product-id') || '';
+      state.adminOrderDraft.article = articleEl.value?.trim() || '';
+      state.adminOrderDraft.sizeFormat = sizeFmtEl?.value
+        || (articleEl.value ? (articleOpt?.getAttribute('data-size-format') || 'ALPHA_2XS_5XL') : 'ALPHA_2XS_5XL');
+    } else if (sizeFmtEl?.value) {
+      state.adminOrderDraft.sizeFormat = sizeFmtEl.value;
+    }
+    if (colorEl) {
+      state.adminOrderDraft.color = colorEl.value?.trim() || '';
+    }
+    const orderSizeInputs = document.querySelectorAll('.admin-order-size-val');
+    if (orderSizeInputs.length > 0) {
+      const activeCodes = getActiveAdminOrderSizeCodes();
+      const sizes = createEmptySizes(activeCodes);
+      orderSizeInputs.forEach(el => {
+        const inp = el as HTMLInputElement;
+        const k = inp.getAttribute('data-size');
+        if (k && activeCodes.includes(k)) {
+          sizes[k] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+        }
+      });
+      state.adminOrderDraft.sizes = sizes;
+    }
+    syncAdminArticleLinesFromDom();
   }
 
   function updateAdminSplitBalanceDom(): void {
@@ -3803,6 +4480,45 @@ function attachAdminHandlers(): void {
         </span>
         <strong>${check.valid ? 'Split Matches Order 100% ✓' : escapeHtml(check.error || 'Adjust contractor quantities to match order totals')}</strong>
       `;
+    }
+  }
+
+  function updateAdminLineSplitBalanceDom(lineIdx: number): void {
+    const line = state.adminOrderArticleLines[lineIdx];
+    if (!line || line.splitRows.length === 0) return;
+    const lineCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, line.sizeFormat || 'LEGACY_7_11');
+    line.splitRows.forEach((sRow, sIdx) => {
+      const rowTotalCell = document.getElementById(`admin-line-split-total-${lineIdx}-${sIdx}`);
+      if (rowTotalCell) rowTotalCell.textContent = calculateSizeTotal(sRow.sizes).toLocaleString();
+    });
+    const balanceBar = document.getElementById(`admin-line-split-balance-${lineIdx}`);
+    if (balanceBar) {
+      const check = validateContractorAllocations(line.sizes, line.splitRows, lineCodes);
+      balanceBar.className = `su-split-balance-bar ${check.valid ? 'is-balanced' : 'is-unbalanced'}`;
+      balanceBar.innerHTML = `
+        <span>
+          Unassigned Balance:
+          ${lineCodes.map(sz => `<strong>${escapeHtml(sz)}:${check.unassignedBySize[sz] ?? 0}</strong>`).join(' | ')}
+          (<strong>${check.totalUnassigned}</strong> Prs remaining)
+        </span>
+        <strong>${check.valid ? 'Split Matches Sub-order 100% ✓' : escapeHtml(check.error || 'Adjust contractor quantities to match sub-order totals')}</strong>
+      `;
+    }
+  }
+
+  function updateAdminMultiTotalDom(lineIdx?: number): void {
+    if (lineIdx !== undefined && state.adminOrderArticleLines[lineIdx]) {
+      const lineTotalCell = document.getElementById(`admin-line-total-${lineIdx}`);
+      if (lineTotalCell) {
+        lineTotalCell.textContent = calculateSizeTotal(state.adminOrderArticleLines[lineIdx].sizes).toLocaleString();
+      }
+      updateAdminLineSplitBalanceDom(lineIdx);
+    }
+    const summaryEl = document.getElementById('admin-multi-total-summary');
+    if (summaryEl) {
+      const nLines = state.adminOrderArticleLines.length;
+      const grand = state.adminOrderArticleLines.reduce((sum, l) => sum + calculateSizeTotal(l.sizes), 0);
+      summaryEl.textContent = `${nLines} ${nLines === 1 ? 'Article' : 'Sub-orders'} · ${grand.toLocaleString()} Pairs`;
     }
   }
 
@@ -3830,6 +4546,8 @@ function attachAdminHandlers(): void {
     state.adminOrderDraft.article = '';
     state.adminOrderDraft.color = '';
     state.adminOrderDraft.sizeFormat = 'LEGACY_7_11';
+    state.adminOrderArticleLines = [];
+    state.adminMultiArticleSearch = '';
     if (prevFormat !== 'LEGACY_7_11') {
       const legacyCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, 'LEGACY_7_11');
       state.adminOrderDraft.sizes = createEmptySizes(legacyCodes);
@@ -3873,14 +4591,253 @@ function attachAdminHandlers(): void {
     (document.getElementById('admin-pending-order-article') as HTMLSelectElement | null)?.focus();
   });
 
+  document.getElementById('admin-pending-order-maker')?.addEventListener('change', () => {
+    const prevDefaultMaker = state.adminOrderLastDefaultMaker;
+    syncAdminOrderDraftFromDom();
+    const nextMaker = state.adminOrderDraft.maker;
+    let changedLines = false;
+    if (state.adminOrderArticleLines.length > 0) {
+      for (const line of state.adminOrderArticleLines) {
+        if (line.splitRows.length === 0 && (!line.maker || line.maker === prevDefaultMaker)) {
+          line.maker = nextMaker;
+          changedLines = true;
+        }
+      }
+    }
+    state.adminOrderLastDefaultMaker = nextMaker;
+    if (changedLines) {
+      renderApp();
+      (document.getElementById('admin-pending-order-maker') as HTMLSelectElement | null)?.focus();
+    }
+  });
+
+  document.getElementById('admin-pending-order-due-date')?.addEventListener('change', () => {
+    const prevDue = state.adminOrderLastDefaultDueDate;
+    syncAdminOrderDraftFromDom();
+    const nextDue = state.adminOrderDraft.dueDate;
+    let changedLines = false;
+    if (state.adminOrderArticleLines.length > 0) {
+      for (const line of state.adminOrderArticleLines) {
+        if (!line.dueDate || line.dueDate === prevDue) {
+          line.dueDate = nextDue;
+          changedLines = true;
+        }
+      }
+    }
+    state.adminOrderLastDefaultDueDate = nextDue;
+    if (changedLines) {
+      renderApp();
+      (document.getElementById('admin-pending-order-due-date') as HTMLInputElement | null)?.focus();
+    }
+  });
+
   for (const fieldId of [
-    'admin-pending-order-maker',
     'admin-pending-order-po',
-    'admin-pending-order-color',
-    'admin-pending-order-due-date'
+    'admin-pending-order-color'
   ]) {
     document.getElementById(fieldId)?.addEventListener('change', syncAdminOrderDraftFromDom);
   }
+
+  document.getElementById('btn-admin-toggle-multi-articles')?.addEventListener('click', () => {
+    syncAdminOrderDraftFromDom();
+    const opening = !state.adminMultiArticlePickerOpen;
+    state.adminMultiArticlePickerOpen = opening;
+    state.adminOrderLastDefaultMaker = state.adminOrderDraft.maker;
+    state.adminOrderLastDefaultDueDate = state.adminOrderDraft.dueDate;
+    if (opening && state.adminOrderArticleLines.length === 0 && state.adminOrderDraft.article) {
+      const fmt = state.adminOrderDraft.sizeFormat || 'LEGACY_7_11';
+      state.adminOrderArticleLines.push({
+        lineId: state.adminOrderDraft.productId || state.adminOrderDraft.article,
+        productId: state.adminOrderDraft.productId || '',
+        article: state.adminOrderDraft.article,
+        color: state.adminOrderDraft.color || '',
+        sizeFormat: fmt,
+        maker: state.adminOrderDraft.maker || '',
+        dueDate: state.adminOrderDraft.dueDate || '',
+        sizes: { ...state.adminOrderDraft.sizes },
+        splitRows: state.adminOrderSplitRows.map(r => ({
+          maker: r.maker,
+          sizes: { ...r.sizes },
+          dueDate: r.dueDate
+        }))
+      });
+      state.adminOrderSplitRows = [];
+    }
+    renderApp();
+  });
+
+  document.getElementById('admin-multi-art-search')?.addEventListener('input', (ev) => {
+    const query = (ev.currentTarget as HTMLInputElement).value;
+    state.adminMultiArticleSearch = query;
+    const needle = query.trim().toLowerCase();
+    document.querySelectorAll<HTMLElement>('.su-multi-art-item').forEach(item => {
+      const hay = item.getAttribute('data-search') || '';
+      item.hidden = Boolean(needle && !hay.includes(needle));
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.admin-multi-art-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      syncAdminOrderDraftFromDom();
+      const productId = cb.getAttribute('data-product-id') || '';
+      const article = cb.getAttribute('data-article-name') || '';
+      const sizeFormat = cb.getAttribute('data-size-format') || 'LEGACY_7_11';
+      const colorSpec = cb.getAttribute('data-color-spec') || '';
+      const matchFn = (l: AdminOrderArticleLine) => (productId ? l.productId === productId : l.article === article);
+
+      if (cb.checked) {
+        if (!state.adminOrderArticleLines.some(matchFn)) {
+          const lineCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, sizeFormat);
+          state.adminOrderArticleLines.push({
+            lineId: productId || article,
+            productId,
+            article,
+            color: colorSpec,
+            sizeFormat,
+            maker: state.adminOrderDraft.maker || '',
+            dueDate: state.adminOrderDraft.dueDate || '',
+            sizes: createEmptySizes(lineCodes),
+            splitRows: []
+          });
+        }
+      } else {
+        state.adminOrderArticleLines = state.adminOrderArticleLines.filter(l => !matchFn(l));
+      }
+      state.adminOrderLastDefaultMaker = state.adminOrderDraft.maker;
+      state.adminOrderLastDefaultDueDate = state.adminOrderDraft.dueDate;
+      renderApp();
+      const escapedArt = article.replace(/"/g, '\\"');
+      document.querySelector<HTMLInputElement>(`.admin-multi-art-check[data-article-name="${escapedArt}"]`)?.focus();
+    });
+  });
+
+  document.querySelectorAll<HTMLSelectElement>('.admin-line-maker').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const idx = Number(sel.getAttribute('data-line-index'));
+      if (state.adminOrderArticleLines[idx]) {
+        state.adminOrderArticleLines[idx].maker = sel.value.trim();
+        clearFieldValidationError(sel);
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.admin-line-color').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const idx = Number(inp.getAttribute('data-line-index'));
+      if (state.adminOrderArticleLines[idx]) {
+        state.adminOrderArticleLines[idx].color = inp.value.trim();
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.admin-line-due-date').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const idx = Number(inp.getAttribute('data-line-index'));
+      if (state.adminOrderArticleLines[idx]) {
+        state.adminOrderArticleLines[idx].dueDate = inp.value.trim();
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.admin-line-size-val').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const idx = Number(inp.getAttribute('data-line-index'));
+      const sz = inp.getAttribute('data-size') || '';
+      const line = state.adminOrderArticleLines[idx];
+      if (line && sz) {
+        line.sizes[sz] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+        updateAdminMultiTotalDom(idx);
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.admin-line-toggle-split').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAdminOrderDraftFromDom();
+      const idx = Number(btn.getAttribute('data-line-index'));
+      const line = state.adminOrderArticleLines[idx];
+      if (!line) return;
+      const lineCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, line.sizeFormat || 'LEGACY_7_11');
+      if (line.splitRows.length > 0) {
+        line.splitRows = [];
+      } else {
+        const firstMaker = line.maker || state.adminOrderDraft.maker || state.dropdownOptions.makers[0] || '';
+        const secondMaker = state.dropdownOptions.makers.find(m => m !== firstMaker) || '';
+        line.splitRows = [
+          { maker: firstMaker, sizes: { ...line.sizes }, dueDate: line.dueDate || state.adminOrderDraft.dueDate },
+          { maker: secondMaker, sizes: createEmptySizes(lineCodes), dueDate: line.dueDate || state.adminOrderDraft.dueDate }
+        ];
+      }
+      renderApp();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.admin-line-add-split-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAdminOrderDraftFromDom();
+      const idx = Number(btn.getAttribute('data-line-index'));
+      const line = state.adminOrderArticleLines[idx];
+      if (!line) return;
+      const lineCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, line.sizeFormat || 'LEGACY_7_11');
+      const used = new Set(line.splitRows.map(r => r.maker));
+      const nextMaker = state.dropdownOptions.makers.find(m => !used.has(m)) || '';
+      line.splitRows.push({
+        maker: nextMaker,
+        sizes: createEmptySizes(lineCodes),
+        dueDate: line.dueDate || state.adminOrderDraft.dueDate
+      });
+      renderApp();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.admin-line-remove-split-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAdminOrderDraftFromDom();
+      const idx = Number(btn.getAttribute('data-line-index'));
+      const sIdx = Number(btn.getAttribute('data-split-index'));
+      const line = state.adminOrderArticleLines[idx];
+      if (line && Number.isInteger(sIdx) && line.splitRows.length > 2) {
+        line.splitRows.splice(sIdx, 1);
+        renderApp();
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLSelectElement>('.admin-line-split-maker').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const idx = Number(sel.getAttribute('data-line-index'));
+      const sIdx = Number(sel.getAttribute('data-split-index'));
+      const line = state.adminOrderArticleLines[idx];
+      if (line?.splitRows[sIdx]) {
+        line.splitRows[sIdx].maker = sel.value.trim();
+        updateAdminLineSplitBalanceDom(idx);
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.admin-line-split-size-val').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const idx = Number(inp.getAttribute('data-line-index'));
+      const sIdx = Number(inp.getAttribute('data-split-index'));
+      const sz = inp.getAttribute('data-size') || '';
+      const line = state.adminOrderArticleLines[idx];
+      if (line?.splitRows[sIdx] && sz) {
+        line.splitRows[sIdx].sizes[sz] = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+        updateAdminLineSplitBalanceDom(idx);
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.admin-line-split-due-date').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const idx = Number(inp.getAttribute('data-line-index'));
+      const sIdx = Number(inp.getAttribute('data-split-index'));
+      const line = state.adminOrderArticleLines[idx];
+      if (line?.splitRows[sIdx]) {
+        line.splitRows[sIdx].dueDate = inp.value.trim();
+      }
+    });
+  });
 
   document.getElementById('btn-admin-toggle-split')?.addEventListener('click', () => {
     syncAdminOrderDraftFromDom();
@@ -3943,6 +4900,7 @@ function attachAdminHandlers(): void {
 
   document.getElementById('btn-admin-reset-pending-order')?.addEventListener('click', () => {
     const hadSplit = state.adminOrderSplitRows.length > 0;
+    const hadMulti = state.adminOrderArticleLines.length > 0 || state.adminMultiArticlePickerOpen;
     const hadCatalogState =
       Boolean(state.adminOrderDraft.buyer) ||
       (state.adminOrderDraft.sizeFormat || 'LEGACY_7_11') !== 'LEGACY_7_11';
@@ -3959,6 +4917,11 @@ function attachAdminHandlers(): void {
       sizes: createEmptySizes()
     };
     state.adminOrderSplitRows = [];
+    state.adminOrderArticleLines = [];
+    state.adminMultiArticlePickerOpen = false;
+    state.adminMultiArticleSearch = '';
+    state.adminOrderLastDefaultMaker = '';
+    state.adminOrderLastDefaultDueDate = '';
     for (const id of [
       'admin-pending-order-buyer',
       'admin-pending-order-maker',
@@ -3978,7 +4941,7 @@ function attachAdminHandlers(): void {
     });
     const cell = document.getElementById('admin-order-size-total');
     if (cell) cell.textContent = '0';
-    if (hadSplit || hadCatalogState) renderApp();
+    if (hadSplit || hadMulti || hadCatalogState) renderApp();
   });
 
   document.getElementById('btn-admin-add-pending-order')?.addEventListener('click', (e) => {
@@ -3986,14 +4949,132 @@ function attachAdminHandlers(): void {
     const makerEl = document.getElementById('admin-pending-order-maker') as HTMLSelectElement | null;
     const articleEl = document.getElementById('admin-pending-order-article') as HTMLSelectElement | null;
     const buyer = state.adminOrderDraft.buyer;
+    const po = state.adminOrderDraft.po;
+    const dueDate = state.adminOrderDraft.dueDate;
+
+    if (state.adminOrderArticleLines.length > 0) {
+      const lines = state.adminOrderArticleLines;
+      for (let idx = 0; idx < lines.length; idx += 1) {
+        const line = lines[idx];
+        const lineCodes = getScaleSizeCodes(state.adminOverview.sizeStandards, line.sizeFormat || 'LEGACY_7_11');
+        if (line.splitRows.length > 0) {
+          const splitCheck = validateContractorAllocations(line.sizes, line.splitRows, lineCodes);
+          if (!splitCheck.valid) {
+            showToast(`Sub-order ${idx + 1} (${line.article}): ${splitCheck.error || 'Split must equal article size totals.'}`);
+            return;
+          }
+        } else {
+          const effectiveMaker = (line.maker || state.adminOrderDraft.maker || '').trim();
+          const lineMakerEl = document.querySelector<HTMLSelectElement>(`.admin-line-maker[data-line-index="${idx}"]`);
+          const errs = validatePendingOrderInputs({ maker: effectiveMaker, article: line.article });
+          if (applyFieldValidationErrors([[lineMakerEl || makerEl, errs.maker]])) {
+            showToast(`Select Contractor / Maker for Sub-order ${idx + 1} (${line.article}).`);
+            return;
+          }
+        }
+      }
+
+      const items = lines.map(line => {
+        const lineSplit = line.splitRows.length > 0;
+        const effectiveMaker = lineSplit
+          ? line.splitRows.map(r => r.maker.trim()).filter(Boolean).join(', ')
+          : (line.maker || state.adminOrderDraft.maker || '').trim();
+        const linePairs = calculateSizeTotal(line.sizes);
+        return {
+          productId: line.productId || undefined,
+          article: line.article,
+          color: line.color || 'Standard',
+          sizeFormat: line.sizeFormat || 'LEGACY_7_11',
+          dueDate: line.dueDate || dueDate || '',
+          maker: effectiveMaker,
+          sizes: { ...line.sizes },
+          totalQty: linePairs,
+          allocations: lineSplit
+            ? line.splitRows.map(r => ({
+                maker: r.maker.trim(),
+                sizes: { ...r.sizes },
+                dueDate: r.dueDate || line.dueDate || dueDate || ''
+              }))
+            : undefined,
+          notes: `Created by Super User: Buyer=${buyer}, PO=${po}, Color=${line.color || 'Standard'}, Scale=${line.sizeFormat || 'LEGACY_7_11'}`
+        };
+      });
+
+      const batchPayload = {
+        customerId: state.adminOrderDraft.customerId || undefined,
+        buyer: buyer || 'Standard Client',
+        maker: state.adminOrderDraft.maker || undefined,
+        po: po || '---',
+        dueDate,
+        items
+      };
+
+      void runAdminAction('admin:create-pending-order', e.currentTarget as HTMLElement, async () => {
+        try {
+          const res = await fetch('/api/admin/pending-orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(batchPayload)
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success || typeof json.data?.orderId !== 'string' || !Array.isArray(json.data.orders)) {
+            showToast(json.error || 'Orders were not saved. Please try again.');
+            return;
+          }
+
+          const createdIds: string[] = Array.isArray(json.data.orderIds) ? json.data.orderIds : [json.data.orderId];
+          const baseOrderId: string = json.data.baseOrderId || json.data.orderId;
+          state.pendingOrders = json.data.orders;
+          for (const cid of createdIds) {
+            state.adminExpandedOrders[cid] = true;
+          }
+          if (po && !state.dropdownOptions.poList.includes(po)) {
+            state.dropdownOptions.poList.unshift(po);
+          }
+          for (const it of items) {
+            if (!it.allocations && it.maker && !state.dropdownOptions.makers.includes(it.maker)) {
+              state.dropdownOptions.makers.unshift(it.maker);
+            }
+          }
+          const grandPairs = items.reduce((s, it) => s + Number(it.totalQty || 0), 0);
+          state.adminOrderDraft = {
+            customerId: '',
+            buyer: '',
+            maker: '',
+            po: '',
+            productId: '',
+            article: '',
+            color: '',
+            sizeFormat: 'LEGACY_7_11',
+            dueDate: '',
+            sizes: createEmptySizes()
+          };
+          state.adminOrderSplitRows = [];
+          state.adminOrderArticleLines = [];
+          state.adminMultiArticlePickerOpen = false;
+          state.adminMultiArticleSearch = '';
+          state.adminOrderLastDefaultMaker = '';
+          state.adminOrderLastDefaultDueDate = '';
+          showToast(
+            createdIds.length >= 2
+              ? `Saved ${createdIds.length} linked sub-orders under ${baseOrderId} (${createdIds.join(', ')} · ${grandPairs.toLocaleString()} Pairs).`
+              : `Saved Master Order ${createdIds[0]} (${buyer || 'Standard'} | ${items[0].article} | ${grandPairs.toLocaleString()} Pairs).`
+          );
+          renderApp();
+        } catch (error) {
+          console.error('Multi-article order creation failed:', error);
+          showToast('Order could not be saved. No order was created.');
+        }
+      });
+      return;
+    }
+
     const splitActive = state.adminOrderSplitRows.length > 0;
     const maker = splitActive
       ? state.adminOrderSplitRows.map(r => r.maker.trim()).filter(Boolean).join(', ')
       : state.adminOrderDraft.maker;
-    const po = state.adminOrderDraft.po;
     const article = state.adminOrderDraft.article;
     const color = state.adminOrderDraft.color;
-    const dueDate = state.adminOrderDraft.dueDate;
     const sizes: SizeBreakdown = { ...state.adminOrderDraft.sizes };
     const totalPairs = calculateSizeTotal(sizes);
 
@@ -4122,12 +5203,22 @@ function attachAdminHandlers(): void {
     });
   });
 
+  document.getElementById('admin-order-size-format')?.addEventListener('change', (ev) => {
+    syncAdminOrderDraftFromDom();
+    const nextFmt = (ev.currentTarget as HTMLSelectElement)?.value || 'ALPHA_2XS_5XL';
+    state.adminOrderDraft.sizeFormat = nextFmt;
+    state.adminOrderDraft.sizes = createEmptySizes(getScaleSizeCodes(state.adminOverview.sizeStandards, nextFmt));
+    renderApp();
+  });
+
   document.getElementById('btn-admin-save-product')?.addEventListener('click', (e) => {
     const nameEl = document.getElementById('admin-prod-name') as HTMLInputElement | null;
     const stickersEl = document.getElementById('admin-prod-stickers') as HTMLInputElement | null;
     const cartonEl = document.getElementById('admin-prod-carton') as HTMLInputElement | null;
+    const sizeFmtEl = document.getElementById('admin-prod-size-format') as HTMLSelectElement | null;
     const name = nameEl?.value?.trim() || '';
     const customerId = (document.getElementById('admin-prod-cust') as HTMLSelectElement)?.value;
+    const sizeFormat = sizeFmtEl?.value || 'ALPHA_2XS_5XL';
     const stickersPerPair = Number(stickersEl?.value || 2);
     const pairsPerCarton = Number(cartonEl?.value || 50);
 
@@ -4146,7 +5237,7 @@ function attachAdminHandlers(): void {
         const res = await fetch('/api/admin/master/product', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, customerId: customerId || 'CUST-01', stickersPerPair, pairsPerCarton })
+          body: JSON.stringify({ name, customerId: customerId || 'CUST-01', sizeFormat, stickersPerPair, pairsPerCarton })
         });
         const json = await res.json();
         if (!res.ok || !json.success) {
@@ -4177,6 +5268,51 @@ function attachAdminHandlers(): void {
       showToast(`Added Maker "${val}" to global dropdowns.`);
       renderApp();
     }
+  });
+
+  document.getElementById('admin-add-hall-input')?.addEventListener('input', (e) => {
+    clearFieldValidationError(e.currentTarget as HTMLInputElement);
+  });
+
+  document.querySelectorAll<HTMLInputElement>('[data-hall-stitcher-input]').forEach(inp => {
+    inp.addEventListener('input', () => clearFieldValidationError(inp));
+  });
+
+  document.getElementById('btn-admin-add-hall')?.addEventListener('click', (e) => {
+    const input = document.getElementById('admin-add-hall-input') as HTMLInputElement | null;
+    const val = input?.value?.trim() || '';
+    if (!val) {
+      applyFieldValidationErrors([[input, 'Enter a Hall name.']]);
+      showToast('Enter a Hall name to register.');
+      return;
+    }
+    void runAdminAction('admin:add-hall', e.currentTarget as HTMLElement, async () => {
+      try {
+        const res = await fetch('/api/admin/halls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: val })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success || !json.data) {
+          showToast(json.error || 'Unable to add Hall.');
+          return;
+        }
+        if (Array.isArray(json.data.halls)) {
+          state.dropdownOptions.halls = json.data.halls;
+        }
+        if (!state.dropdownOptions.makers.some(m => m.trim().toLowerCase() === val.toLowerCase())) {
+          state.dropdownOptions.makers.push(json.data.name || val);
+        }
+        if (input) input.value = '';
+        showToast(`Added Hall "${json.data.name || val}" to SQLite Halls Registry.`);
+        renderApp();
+        await syncBackendData();
+      } catch (err) {
+        console.warn('Add hall failed:', err);
+        showToast('Failed to add Hall.');
+      }
+    });
   });
 
   document.getElementById('btn-admin-add-po')?.addEventListener('click', () => {
@@ -4295,12 +5431,18 @@ window.adminInspectOrderInTracking = function(orderId: string, highlightRef?: st
   state.adminTrackingSearch = highlightRef || orderId;
   state.adminHighlightedRefCode = highlightRef || '';
   state.adminExpandedOrders[orderId] = true;
+  for (const ord of state.pendingOrders) {
+    if (ord.orderId.startsWith(`${orderId}-`)) {
+      state.adminExpandedOrders[ord.orderId] = true;
+    }
+  }
   renderApp();
 
   setTimeout(() => {
     const targetEl =
       (highlightRef ? document.getElementById(`tracking-chip-row-${highlightRef}`) : null) ||
-      document.getElementById(`tracking-order-card-${orderId}`);
+      document.getElementById(`tracking-order-card-${orderId}`) ||
+      document.querySelector(`[id^="tracking-order-card-${orderId}-"]`);
     if (targetEl && typeof targetEl.scrollIntoView === 'function') {
       targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -4333,8 +5475,11 @@ window.adminOpenDocumentSlip = function(
       date: grn?.date || formatCurrentDateDDMMYYYY(),
       pendingOrderId: grn?.pendingOrderId || orderId || '---',
       maker: grn?.maker || matchedOrder?.maker || '---',
+      hallName: grn?.hallName || undefined,
+      stitcherName: grn?.stitcherName || undefined,
+      receivingNote: grn?.receivingNote || undefined,
       article: grn?.article || matchedOrder?.article || '---',
-      receivedFrom: (grn as any)?.receivedFrom || undefined,
+      receivedFrom: grn?.receivedFrom || undefined,
       splitSummary: formatSplitAllocationSummary(linkedPending?.contractorAllocations || matchedOrder?.contractorAllocations) || undefined,
       rcvdPairs: grn?.rcvdPairs || 0,
       sizes: grn?.sizes || createEmptySizes(matchedOrder?.sizeCodes),
@@ -4769,6 +5914,8 @@ window.adminQuickReceiveGrnForOrder = function(orderId: string) {
       state.grnForm = {
         pendingOrderId: order.orderId,
         maker: '',
+        hallName: '',
+        stitcherName: '',
         article: order.article,
         color: order.color || 'Standard',
         receivedFrom: '',
@@ -4776,22 +5923,31 @@ window.adminQuickReceiveGrnForOrder = function(orderId: string) {
         sizeFormat: order.sizeFormat || 'LEGACY_7_11',
         sizeCodes: scaleCodes,
         sizes: createEmptySizes(scaleCodes),
-        splitRows: allocs.map(a => ({
-          maker: a.maker,
-          receivedFrom: '',
-          sizes: createEmptySizes(scaleCodes)
-        }))
+        splitRows: allocs.map(a => {
+          const matchedHall = findHallByName(a.maker);
+          return {
+            maker: a.maker,
+            hallName: matchedHall && matchedHall.stitchers.length > 0 ? matchedHall.name : '',
+            stitcherName: '',
+            receivedFrom: '',
+            sizes: createEmptySizes(scaleCodes)
+          };
+        })
       };
     } else {
       const activeAlloc = allocs.length === 1 ? allocs[0] : null;
       const defaultMaker = activeAlloc ? activeAlloc.maker : order.maker;
       const defaultSizes = activeAlloc ? (activeAlloc.remainingSizes || activeAlloc.sizes) : (order.sizes || createEmptySizes(scaleCodes));
+      const matchedHall = findHallByName(defaultMaker);
+      const hasHallStitchers = Boolean(matchedHall && matchedHall.stitchers.length > 0);
       state.grnForm = {
         pendingOrderId: order.orderId,
         maker: defaultMaker,
+        hallName: hasHallStitchers ? matchedHall!.name : '',
+        stitcherName: '',
         article: order.article,
         color: order.color || 'Standard',
-        receivedFrom: defaultMaker ? `${defaultMaker} Representative` : '',
+        receivedFrom: hasHallStitchers ? '' : (defaultMaker ? `${defaultMaker} Representative` : ''),
         rcvdPairs: String(calculateSizeTotal(defaultSizes) || order.totalQty || ''),
         sizeFormat: order.sizeFormat || 'LEGACY_7_11',
         sizeCodes: scaleCodes,
@@ -4926,6 +6082,9 @@ window.viewGrnRecord = function(sr: number) {
       date: item.date,
       pendingOrderId: item.pendingOrderId,
       maker: item.maker,
+      hallName: item.hallName || undefined,
+      stitcherName: item.stitcherName || undefined,
+      receivingNote: item.receivingNote || undefined,
       article: item.article,
       color: item.color,
       receivedFrom: item.receivedFrom,
@@ -4945,9 +6104,11 @@ window.editGrnRecord = function(sr: number) {
     state.grnForm = {
       pendingOrderId: item.pendingOrderId,
       maker: item.maker,
+      hallName: item.hallName || '',
+      stitcherName: item.stitcherName || '',
       article: item.article,
       color: item.color || 'Standard',
-      receivedFrom: item.receivedFrom || item.maker || '',
+      receivedFrom: item.receivingNote || item.receivedFrom || item.maker || '',
       rcvdPairs: String(item.rcvdPairs),
       sizeFormat: item.sizeFormat || 'LEGACY_7_11',
       sizeCodes: item.sizeCodes,
@@ -4978,10 +6139,11 @@ window.toggleQcCheck = function(id: string) {
 
 function applyDropdownsPayload(data: any): void {
   if (!data) return;
-  if (data.makers?.length) state.dropdownOptions.makers = data.makers;
-  if (data.customers?.length) state.dropdownOptions.customers = data.customers;
-  if (data.articles?.length) state.dropdownOptions.articles = data.articles;
-  if (data.poList?.length) state.dropdownOptions.poList = data.poList;
+  if (Array.isArray(data.makers)) state.dropdownOptions.makers = data.makers;
+  if (Array.isArray(data.customers)) state.dropdownOptions.customers = data.customers;
+  if (Array.isArray(data.articles)) state.dropdownOptions.articles = data.articles;
+  if (Array.isArray(data.poList)) state.dropdownOptions.poList = data.poList;
+  if (Array.isArray(data.halls)) state.dropdownOptions.halls = data.halls;
   if (Array.isArray(data.sizeStandards) && data.sizeStandards.length > 0) {
     state.adminOverview.sizeStandards = data.sizeStandards;
   }
@@ -5009,6 +6171,9 @@ function applyReceivingsPayload(rows: any[]): void {
       date: r.rcv_date || formatCurrentDateDDMMYYYY(),
       pendingOrderId: r.order_id || r.po_number || 'ORD-INWARD',
       maker: r.maker_contractor,
+      hallName: r.hall_name || '',
+      stitcherName: r.stitcher_name || '',
+      receivingNote: r.receiving_note || '',
       article: r.article_name,
       color: r.color_shade || 'Standard',
       receivedFrom: r.received_from || r.maker_contractor || '',
@@ -5089,7 +6254,7 @@ async function syncBackendData(options: { manual?: boolean; forceCatalog?: boole
       })());
     }
 
-    if (role === 'INWARD_CLERK') {
+    if (role === 'INWARD_CLERK' || role === 'ALTERATION_LEAD') {
       syncTasks.push((async () => {
         try {
           const res = await fetch('/api/store/dropdowns');
@@ -5104,7 +6269,9 @@ async function syncBackendData(options: { manual?: boolean; forceCatalog?: boole
           syncFailures.push('dropdowns');
         }
       })());
+    }
 
+    if (role === 'INWARD_CLERK') {
       syncTasks.push((async () => {
         try {
           const res = await fetch('/api/store/receivings');

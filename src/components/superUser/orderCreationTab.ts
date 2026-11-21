@@ -52,7 +52,18 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
     filteredCatalog.find(p => draft.article && p.name === draft.article) ||
     allProducts.find(p => draft.productId && p.id === draft.productId);
 
-  const activeSizeFormat = String(draft.sizeFormat || selectedProduct?.size_format || 'LEGACY_7_11').trim() || 'LEGACY_7_11';
+  const availableStandards = Array.isArray(ov.sizeStandards) ? ov.sizeStandards : [];
+  const defaultScaleCode = availableStandards.some((s: any) => s.code === 'ALPHA_2XS_5XL')
+    ? 'ALPHA_2XS_5XL'
+    : (availableStandards.some((s: any) => s.code === 'LEGACY_7_11')
+      ? 'LEGACY_7_11'
+      : (availableStandards[0]?.code || 'ALPHA_2XS_5XL'));
+  const rawActiveFmt = String(draft.sizeFormat && draft.sizeFormat !== 'LEGACY_7_11'
+    ? draft.sizeFormat
+    : (selectedProduct?.size_format || draft.sizeFormat || defaultScaleCode)).trim() || defaultScaleCode;
+  const activeSizeFormat = availableStandards.length > 0 && !availableStandards.some((s: any) => s.code === rawActiveFmt)
+    ? defaultScaleCode
+    : rawActiveFmt;
   const activeSizeCodes = getScaleSizeCodes(ov.sizeStandards, activeSizeFormat);
   const draftTotal = calculateSizeTotal(draft.sizes);
   const splitRows = ctx.orderSplitRows || [];
@@ -61,6 +72,12 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
     ? validateContractorAllocations(draft.sizes, splitRows, activeSizeCodes)
     : null;
   const catalogColorSpec = selectedProduct ? String(selectedProduct.color_spec || selectedProduct.raw_color || '').trim() : '';
+
+  const articleLines = ctx.orderArticleLines || [];
+  const multiMode = articleLines.length > 0;
+  const pickerOpen = Boolean(ctx.multiArticlePickerOpen);
+  const multiSearch = String(ctx.multiArticleSearch || '').trim().toLowerCase();
+  const multiGrandTotal = articleLines.reduce((sum, line) => sum + calculateSizeTotal(line.sizes), 0);
 
   return `
     <!-- 7.1: Super User Master Order Creation Suite (Primary View) -->
@@ -77,7 +94,11 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           <div class="form-group">
             <label for="admin-pending-order-id">Order Reference (system assigned)</label>
             <input type="text" id="admin-pending-order-id" class="form-input" placeholder="Assigned on save" readonly aria-readonly="true" />
-            <small>Assigned by the server after save; this reference cannot be changed.</small>
+            <small>${
+              articleLines.length >= 2
+                ? `Creates ${articleLines.length} linked sub-orders (ORD-YYYY-NNN-1 .. -${articleLines.length}) on save.`
+                : 'Assigned by the server after save; this reference cannot be changed.'
+            }</small>
           </div>
 
           <div class="form-group">
@@ -94,8 +115,8 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
 
           <div class="form-group">
-            <label for="admin-pending-order-maker">${splitActive ? 'Primary Contractor' : 'Contractor / Maker'} <span class="su-required-mark" aria-hidden="true">*</span></label>
-            <select id="admin-pending-order-maker" class="form-select" required aria-required="true" ${splitActive ? 'disabled title="Contractors are assigned in the Split Allocation table below."' : ''}>
+            <label for="admin-pending-order-maker">${multiMode ? 'Default Contractor / Maker' : (splitActive ? 'Primary Contractor' : 'Contractor / Maker')} <span class="su-required-mark" aria-hidden="true">*</span></label>
+            <select id="admin-pending-order-maker" class="form-select" required aria-required="true" ${!multiMode && splitActive ? 'disabled title="Contractors are assigned in the Split Allocation table below."' : ''}>
               <option value="">-- Choose Contractor --</option>
               ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${draft.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
             </select>
@@ -109,6 +130,10 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             </datalist>
           </div>
 
+          ${
+            multiMode
+              ? ''
+              : `
           <div class="form-group">
             <label for="admin-pending-order-article">Article <span class="su-required-mark" aria-hidden="true">*</span></label>
             <select id="admin-pending-order-article" class="form-select" required aria-required="true">
@@ -137,6 +162,8 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             <input type="text" id="admin-pending-order-color" class="form-input" placeholder="Auto-filled from article (or enter custom)" value="${escapeHtml(draft.color)}" />
             ${catalogColorSpec ? `<small>Catalog colorway: ${escapeHtml(catalogColorSpec)}</small>` : ''}
           </div>
+          `
+          }
 
           <div class="form-group">
             <label for="admin-pending-order-due-date">Delivery Due Date</label>
@@ -144,15 +171,204 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           </div>
         </div>
 
+        <div class="su-multi-art-bar" data-testid="admin-multi-article-bar">
+          <div class="su-multi-art-caption">
+            <strong>Multi-article order${draft.buyer ? ` (${escapeHtml(draft.buyer)})` : ''}:</strong>
+            select 2+ articles on one PO to generate linked sub-orders (<code>-1</code>, <code>-2</code>, <code>-3</code>).
+          </div>
+          <button type="button" class="btn-outline" id="btn-admin-toggle-multi-articles" style="padding: 5px 12px; font-size: 12px;">
+            ${
+              pickerOpen
+                ? 'Hide article picker'
+                : (multiMode
+                    ? `Add / change articles (${articleLines.length} selected)`
+                    : `Select multiple articles (${filteredCatalog.length})`)
+            }
+          </button>
+        </div>
+
+        ${
+          pickerOpen
+            ? `
+          <div class="su-multi-art-picker" data-testid="admin-multi-article-picker">
+            <div class="su-multi-art-toolbar">
+              <label for="admin-multi-art-search" class="sr-only">Filter buyer articles</label>
+              <input type="text" id="admin-multi-art-search" class="form-input su-multi-art-search" placeholder="Filter articles by code or name..." value="${escapeHtml(ctx.multiArticleSearch || '')}" />
+              <span class="admin-meta-caption">${articleLines.length} selected &bull; ${filteredCatalog.length} in list</span>
+            </div>
+            <div class="su-multi-art-grid">
+              ${(allProducts.length
+                ? filteredCatalog
+                : ctx.dropdownOptions.articles.map(a => ({ id: '', name: a, article_code: '', size_format: 'LEGACY_7_11', color_spec: '', raw_color: '', customer_id: '', customer_name: '' }))
+              ).map(p => {
+                const isSelected = articleLines.some(line =>
+                  p.id ? line.productId === p.id : line.article === p.name
+                );
+                const codeBadge = p.article_code ? `${p.article_code} — ` : '';
+                const fmt = String(p.size_format || 'LEGACY_7_11');
+                const clr = String(p.color_spec || p.raw_color || '').trim();
+                const searchKey = `${p.article_code || ''} ${p.name} ${p.customer_name || ''} ${fmt} ${clr}`.toLowerCase();
+                const hiddenAttr = multiSearch && !searchKey.includes(multiSearch) ? ' hidden' : '';
+                return `
+                  <label class="su-multi-art-item${isSelected ? ' is-selected' : ''}" data-search="${escapeHtml(searchKey)}"${hiddenAttr}>
+                    <input type="checkbox" class="admin-multi-art-check"
+                      data-product-id="${escapeHtml(p.id || '')}"
+                      data-article-name="${escapeHtml(p.name)}"
+                      data-size-format="${escapeHtml(fmt)}"
+                      data-color-spec="${escapeHtml(clr)}"
+                      ${isSelected ? 'checked' : ''} />
+                    <span class="su-multi-art-text">
+                      <span class="su-multi-art-name">${escapeHtml(codeBadge + p.name)}</span>
+                      <span class="su-multi-art-meta">${escapeHtml(fmt)}${clr ? ` &middot; ${escapeHtml(clr)}` : ''}${!draft.buyer && p.customer_name ? ` &middot; ${escapeHtml(p.customer_name)}` : ''}</span>
+                    </span>
+                  </label>`;
+              }).join('')}
+            </div>
+          </div>`
+            : ''
+        }
+
+        ${
+          multiMode
+            ? `
+          <div class="su-suborder-list" data-testid="admin-suborder-list">
+            ${articleLines.map((line, idx) => {
+              const lineFmt = String(line.sizeFormat || 'LEGACY_7_11').trim() || 'LEGACY_7_11';
+              const lineCodes = getScaleSizeCodes(ov.sizeStandards, lineFmt);
+              const lineTotal = calculateSizeTotal(line.sizes);
+              const lineSplitActive = line.splitRows.length > 0;
+              const lineSplitCheck = lineSplitActive
+                ? validateContractorAllocations(line.sizes, line.splitRows, lineCodes)
+                : null;
+              return `
+              <div class="su-suborder-card" data-line-index="${idx}" data-testid="admin-suborder-card-${idx}">
+                <div class="su-suborder-head">
+                  <div class="su-suborder-title">
+                    <span class="su-suborder-badge">${articleLines.length >= 2 ? `Sub-order -${idx + 1}` : 'Article 1'}</span>
+                    <span class="su-suborder-name">${escapeHtml(line.article)}</span>
+                    <span class="panel-counter-badge">${escapeHtml(lineFmt)} &middot; ${lineCodes.length} sizes</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn-outline admin-line-toggle-split" data-line-index="${idx}" style="padding: 4px 10px; font-size: 11.5px;">
+                      ${lineSplitActive ? 'Use Single Contractor' : '+ Split Across Contractors'}
+                    </button>
+                    <button type="button" class="btn-outline" data-su-action="remove-article-line" data-line-index="${idx}" style="padding: 4px 10px; font-size: 11.5px;">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
+                <div class="su-suborder-meta">
+                  <div class="form-group">
+                    <label for="admin-line-maker-${idx}">Contractor / Maker <span class="su-required-mark" aria-hidden="true">*</span></label>
+                    <select id="admin-line-maker-${idx}" class="form-select admin-line-maker" data-line-index="${idx}" ${lineSplitActive ? 'disabled title="Contractors assigned in split rows below"' : ''}>
+                      <option value="">-- Choose Contractor --</option>
+                      ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${line.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-line-color-${idx}">Colour / Shade</label>
+                    <input type="text" id="admin-line-color-${idx}" class="form-input admin-line-color" data-line-index="${idx}" placeholder="Colorway" value="${escapeHtml(line.color)}" />
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-line-due-date-${idx}">Delivery Due Date</label>
+                    <input type="date" id="admin-line-due-date-${idx}" class="form-input admin-line-due-date" data-line-index="${idx}" value="${escapeHtml(line.dueDate)}" />
+                  </div>
+                </div>
+
+                <div class="table-responsive">
+                  <table class="size-matrix-table" style="margin: 0;">
+                    <thead>
+                      <tr>
+                        ${lineCodes.map(sz => `<th>${escapeHtml(formatSizeColumnLabel(sz, lineFmt))}</th>`).join('')}
+                        <th style="background: var(--ink-200); color: var(--ink-950);">Total Pairs</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        ${lineCodes
+                          .map(sz => `<td><input type="number" aria-label="Sub-order ${idx + 1} Size ${escapeHtml(formatSizeColumnLabel(sz, lineFmt))}" class="size-matrix-input admin-line-size-val" data-line-index="${idx}" data-size="${escapeHtml(sz)}" min="0" placeholder="0" value="${line.sizes?.[sz] || ''}" /></td>`)
+                          .join('')}
+                        <td style="font-weight: 800; font-size: 13.5px; color: var(--ink-950); text-align: center;" id="admin-line-total-${idx}">${lineTotal}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                ${
+                  lineSplitActive
+                    ? `
+                  <div class="su-split-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
+                      <span style="font-weight: 700; color: var(--ink-950); font-size: 11.5px; text-transform: uppercase;">
+                        Contractor Share Split (Must Match Sub-order Sizes)
+                      </span>
+                      <button type="button" class="btn-outline admin-line-add-split-row" data-line-index="${idx}" style="padding: 3px 10px; font-size: 11.5px;">
+                        + Add Contractor Row
+                      </button>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="size-matrix-table" style="margin: 0;">
+                        <thead>
+                          <tr>
+                            <th style="min-width: 150px;">Contractor</th>
+                            ${lineCodes.map(sz => `<th>${escapeHtml(formatSizeColumnLabel(sz, lineFmt))}</th>`).join('')}
+                            <th>Total</th>
+                            <th>Due Date</th>
+                            <th>Remove</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${line.splitRows.map((sRow, sIdx) => {
+                            const sRowTotal = calculateSizeTotal(sRow.sizes);
+                            return `
+                            <tr>
+                              <td>
+                                <select class="form-select admin-line-split-maker" data-line-index="${idx}" data-split-index="${sIdx}" style="font-size: 12px;">
+                                  <option value="">-- Choose Contractor --</option>
+                                  ${ctx.dropdownOptions.makers.map(m => `<option value="${escapeHtml(m)}" ${sRow.maker === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
+                                </select>
+                              </td>
+                              ${lineCodes
+                                .map(sz => `<td><input type="number" class="size-matrix-input admin-line-split-size-val" data-line-index="${idx}" data-split-index="${sIdx}" data-size="${escapeHtml(sz)}" min="0" placeholder="0" value="${sRow.sizes?.[sz] || ''}" /></td>`)
+                                .join('')}
+                              <td class="text-center font-bold" id="admin-line-split-total-${idx}-${sIdx}">${sRowTotal.toLocaleString()}</td>
+                              <td><input type="date" class="form-input admin-line-split-due-date" data-line-index="${idx}" data-split-index="${sIdx}" value="${escapeHtml(sRow.dueDate || '')}" style="font-size: 11.5px;" /></td>
+                              <td class="text-center">
+                                ${line.splitRows.length > 2 ? `<button type="button" class="btn-outline admin-line-remove-split-row" data-line-index="${idx}" data-split-index="${sIdx}" style="padding: 2px 8px; font-size: 11px;">&times;</button>` : '<span style="color: var(--ink-500); font-size: 11px;">Min 2</span>'}
+                              </td>
+                            </tr>`;
+                          }).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div id="admin-line-split-balance-${idx}" class="su-split-balance-bar ${lineSplitCheck?.valid ? 'is-balanced' : 'is-unbalanced'}">
+                      <span>
+                        Unassigned Balance:
+                        ${lineCodes.map(sz => `<strong>${escapeHtml(sz)}:${lineSplitCheck?.unassignedBySize[sz] ?? 0}</strong>`).join(' | ')}
+                        (<strong>${lineSplitCheck?.totalUnassigned ?? 0}</strong> Prs remaining)
+                      </span>
+                      <strong>${lineSplitCheck?.valid ? 'Split Matches Sub-order 100% ✓' : escapeHtml(lineSplitCheck?.error || 'Adjust contractor quantities to match sub-order totals')}</strong>
+                    </div>
+                  </div>`
+                    : ''
+                }
+              </div>`;
+            }).join('')}
+          </div>`
+            : `
         <div class="su-order-matrix-card">
           <div class="su-order-matrix-header">
             <span style="font-weight: 700; color: var(--ink-950); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;">
               Planned Order Size Breakdown Matrix (Pairs &bull; Scale: ${escapeHtml(activeSizeFormat)}, ${activeSizeCodes.length} Sizes)
             </span>
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <span style="font-size: 12px; color: var(--ink-700);">
-                Enter pairs for each size. The order total calculates automatically.
-              </span>
+              ${availableStandards.length > 0 ? `
+                <label for="admin-order-size-format" style="font-size: 11.5px; font-weight: 600; color: var(--ink-700);">Size Scale:</label>
+                <select id="admin-order-size-format" class="form-select" style="width: auto; min-width: 165px; padding: 4px 8px; font-size: 12px;">
+                  ${availableStandards.map((s: any) => `<option value="${escapeHtml(s.code)}" ${activeSizeFormat === s.code ? 'selected' : ''}>${escapeHtml(s.rawLabel || s.code)}</option>`).join('')}
+                </select>
+              ` : ''}
               <button type="button" class="btn-outline" id="btn-admin-toggle-split" style="padding: 4px 10px; font-size: 11.5px;">
                 ${splitActive ? 'Use Single Contractor' : '+ Split Across Contractors'}
               </button>
@@ -235,7 +451,8 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           `
               : ''
           }
-        </div>
+        </div>`
+        }
 
         <div class="su-order-action-row">
           <span style="font-size: 12px; color: var(--su-text-secondary);">
@@ -243,11 +460,12 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
             Orders are saved directly to SQLite (<code>pending_orders</code>) and populate the Inward Receiving dropdown for multiple GRN batches and Packing Hall REQs.
           </span>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            ${multiMode ? `<span id="admin-multi-total-summary" class="su-multi-total-pill">${articleLines.length} ${articleLines.length === 1 ? 'Article' : 'Sub-orders'} &middot; ${multiGrandTotal.toLocaleString()} Pairs</span>` : ''}
             <button type="button" class="btn-outline" id="btn-admin-reset-pending-order">
               Reset Form
             </button>
             <button type="button" class="btn-primary" id="btn-admin-add-pending-order" style="padding: 7px 18px;">
-              Save &amp; Issue Master Order
+              ${articleLines.length >= 2 ? `Save &amp; Issue ${articleLines.length} Sub-Orders` : 'Save &amp; Issue Master Order'}
             </button>
           </div>
         </div>
@@ -441,6 +659,14 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
               </select>
             </div>
             <div class="form-group">
+              <label for="admin-prod-size-format">Size Scale</label>
+              <select id="admin-prod-size-format" class="form-select">
+                ${availableStandards.length > 0
+                  ? availableStandards.map((s: any) => `<option value="${escapeHtml(s.code)}" ${s.code === 'ALPHA_2XS_5XL' ? 'selected' : ''}>${escapeHtml(s.rawLabel || s.code)}</option>`).join('')
+                  : '<option value="ALPHA_2XS_5XL">2XS - 5XL (Alpha)</option><option value="NUMERIC_6_12">6 - 12 (Numeric)</option>'}
+              </select>
+            </div>
+            <div class="form-group">
               <label for="admin-prod-stickers">Stickers/Pr</label>
               <input type="number" id="admin-prod-stickers" class="form-input" value="2" min="1" />
             </div>
@@ -453,7 +679,7 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
           <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
             <table class="data-table">
               <thead>
-                <tr><th>Product ID</th><th>Article</th><th>Buyer</th><th class="text-right">Polybag</th><th class="text-right">Silica</th><th class="text-right">Stickers</th><th class="text-right">Prs/Ctn</th></tr>
+                <tr><th>Product ID</th><th>Article</th><th>Buyer</th><th>Size Scale</th><th class="text-right">Polybag</th><th class="text-right">Silica</th><th class="text-right">Stickers</th><th class="text-right">Prs/Ctn</th></tr>
               </thead>
               <tbody>
                 ${(() => {
@@ -469,6 +695,7 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                     <td class="font-bold">${escapeHtml(p.id)}</td>
                     <td class="font-bold">${escapeHtml(p.name)}</td>
                     <td>${escapeHtml(p.customer_name || p.customer_id)}</td>
+                    <td><span class="status-pill">${escapeHtml(p.size_format || 'ALPHA_2XS_5XL')}</span></td>
                     <td class="text-right">${p.polybag_per_pair}</td>
                     <td class="text-right">${p.silica_gel_per_pair}</td>
                     <td class="text-right">${p.stickers_per_pair}</td>
@@ -478,7 +705,7 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                     )
                     .join('');
                   const moreNotice = filteredProducts.length > MAX_ARTICLE_ROWS
-                    ? `<tr><td colspan="7" class="text-center" style="font-size: 11px; color: var(--su-text-muted); padding: 8px;">Showing first ${MAX_ARTICLE_ROWS} of ${filteredProducts.length} catalog articles${draft.buyer ? ` for ${escapeHtml(draft.buyer)}` : ' — select a Buyer in Section 1 to view its full SKU list'}.</td></tr>`
+                    ? `<tr><td colspan="8" class="text-center" style="font-size: 11px; color: var(--su-text-muted); padding: 8px;">Showing first ${MAX_ARTICLE_ROWS} of ${filteredProducts.length} catalog articles${draft.buyer ? ` for ${escapeHtml(draft.buyer)}` : ' — select a Buyer in Section 1 to view its full SKU list'}.</td></tr>`
                     : '';
                   return rowsHtml + moreNotice;
                 })()}
@@ -488,12 +715,12 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
         </div>
       </details>
 
-      <!-- Collapsible Registry 4: Contractors / Makers & PO Dropdowns -->
+      <!-- Collapsible Registry 4: Contractors / Makers, Halls & Stitchers & PO Dropdowns -->
       <details class="su-collapsible-registry" data-registry-id="makers_pos" ${isRegOpen('makers_pos', false) ? 'open' : ''}>
         <summary>
           <span class="su-registry-summary-main">
             <span class="su-registry-step-badge">04</span>
-            <span class="su-registry-title-text">4. Contractors / Makers (${ctx.dropdownOptions.makers.length}) &amp; PO Registry (${ctx.dropdownOptions.poList.length})</span>
+            <span class="su-registry-title-text">4. Contractors / Makers (${ctx.dropdownOptions.makers.length}), Halls (${(ctx.dropdownOptions.halls || []).length}) &amp; PO Registry (${ctx.dropdownOptions.poList.length})</span>
           </span>
           <span class="su-registry-summary-meta">
             <span class="admin-meta-caption">Synchronized across Dock &amp; Alteration Bay</span>
@@ -523,7 +750,91 @@ export function renderOrderCreationTab(ctx: SuperUserRenderContext): string {
                 .join('')}
             </div>
           </div>
-          <div>
+          ${(() => {
+            const halls = Array.isArray(ctx.dropdownOptions.halls) ? ctx.dropdownOptions.halls : [];
+            return `
+          <div class="su-halls-section" data-testid="su-halls-registry">
+            <div class="su-halls-head">
+              <span class="su-halls-title">Halls &amp; Assigned Stitchers (${halls.length})</span>
+              <span class="su-halls-sub">Chain-linked to Inward Dock #1 receiving &amp; Alteration Bay tailors</span>
+            </div>
+            <div class="su-hall-add-row">
+              <input type="text" id="admin-add-hall-input" class="form-input" placeholder="Add Hall name (e.g. Hall C (Export))" aria-label="Add Hall name" />
+              <button type="button" class="btn-primary" id="btn-admin-add-hall">Add Hall</button>
+            </div>
+            <div class="su-hall-grid">
+              ${
+                halls.length === 0
+                  ? `<div class="su-hall-empty">No halls configured yet. Add a Hall above and assign its Stitchers.</div>`
+                  : halls
+                      .map(
+                        h => `
+                <div class="su-hall-card" data-hall-id="${h.id}" data-hall-name="${escapeHtml(h.name)}">
+                  <div class="su-hall-card-head">
+                    <div class="su-hall-card-title">
+                      <span class="su-hall-card-name">${escapeHtml(h.name)}</span>
+                      <span class="su-hall-card-count">${h.stitchers.length} stitcher${h.stitchers.length === 1 ? '' : 's'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn-outline btn-xs su-hall-delete-btn"
+                      data-su-action="delete-hall"
+                      data-hall-id="${h.id}"
+                      data-hall-name="${escapeHtml(h.name)}"
+                      data-stitcher-count="${h.stitchers.length}"
+                      title="Remove ${escapeHtml(h.name)}"
+                      aria-label="Remove hall ${escapeHtml(h.name)}"
+                    >Remove</button>
+                  </div>
+                  <div class="su-hall-tags">
+                    ${
+                      h.stitchers.length === 0
+                        ? `<span class="su-hall-empty">No stitchers assigned yet.</span>`
+                        : h.stitchers
+                            .map(
+                              s => `
+                      <span class="admin-tag-item" data-stitcher-id="${s.id}">
+                        <span>${escapeHtml(s.name)}</span>
+                        <button
+                          type="button"
+                          class="admin-tag-remove"
+                          title="Remove ${escapeHtml(s.name)}"
+                          aria-label="Remove stitcher ${escapeHtml(s.name)} from ${escapeHtml(h.name)}"
+                          data-su-action="delete-stitcher"
+                          data-stitcher-id="${s.id}"
+                          data-stitcher-name="${escapeHtml(s.name)}"
+                          data-hall-name="${escapeHtml(h.name)}"
+                        >&times;</button>
+                      </span>
+                    `
+                            )
+                            .join('')
+                    }
+                  </div>
+                  <div class="su-hall-stitcher-add">
+                    <input
+                      type="text"
+                      class="form-input"
+                      data-hall-stitcher-input="${h.id}"
+                      placeholder="Add stitcher to ${escapeHtml(h.name)}"
+                      aria-label="Add stitcher to ${escapeHtml(h.name)}"
+                    />
+                    <button
+                      type="button"
+                      class="btn-outline btn-xs"
+                      data-su-action="add-stitcher"
+                      data-hall-id="${h.id}"
+                    >Add Stitcher</button>
+                  </div>
+                </div>
+              `
+                      )
+                      .join('')
+              }
+            </div>
+          </div>`;
+          })()}
+          <div style="margin-top: 14px;">
             <div style="font-size: 11.5px; font-weight: 700; color: var(--ink-600); margin-bottom: 6px; text-transform: uppercase;">Active Purchase Order Numbers (${ctx.dropdownOptions.poList.length})</div>
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
               <input type="text" id="admin-add-po-input" class="form-input" style="flex: 1;" placeholder="Add PO Number (e.g. 27401)" />

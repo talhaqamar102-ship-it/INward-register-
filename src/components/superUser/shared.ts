@@ -3,6 +3,8 @@ import {
   SuperUserDashboardSummary,
   SuperUserOrderRollup,
   ReconciliationResult,
+  OrderFlowTreeGroup,
+  groupOrderRollupsForTree,
   prioritizeAndSliceChips,
   escapeHtml
 } from '../../utils/requisitionLogic';
@@ -175,6 +177,33 @@ export function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): strin
       <div class="su-vg-empty-text">Create a master order in <strong>Order Creation</strong>, or open the <strong>Demo scenarios</strong> drawer above, to see the live flow.</div>
     </div>`;
 
+  const inspect = (orderId: string, ref?: string) =>
+    `data-su-action="inspect-order" data-order-id="${escapeHtml(orderId)}"${ref ? ` data-ref-code="${escapeHtml(ref)}"` : ''}`;
+  const openSlipAttrs = (type: 'GRN' | 'REQ' | 'M-REQ' | 'A-REQ', code: string, orderId: string) =>
+    `data-su-action="open-slip" data-slip-type="${type}" data-ref-code="${escapeHtml(code)}" data-order-id="${escapeHtml(orderId)}"`;
+
+  const renderOrderFlowChain = (o: SuperUserOrderRollup): string => `
+    <div class="su-vg-chain">
+      ${renderRefTag('req', o.orderId, inspect(o.orderId))}${ARROW}
+      ${
+        o.grnBatches.length === 0
+          ? `<span class="su-ref-none">No GRNs</span>`
+          : o.grnBatches.map(g => renderRefTag('grn', `${g.grnCode} (${n(g.rcvdPairs)})`, inspect(o.orderId, g.grnCode))).join('')
+      }
+      ${ARROW}
+      ${
+        o.reqBatches.length === 0
+          ? `<span class="su-ref-none">No REQs</span>`
+          : o.reqBatches
+              .map(r => [
+                renderRefTag('req', `${r.reqNumber} (${n(r.askingPairs)})`, inspect(o.orderId, r.reqNumber)),
+                renderRefTag('mreq', r.mreqNo, openSlipAttrs('M-REQ', r.mreqNo, o.orderId)),
+                renderRefTag('areq', r.altReqNo, openSlipAttrs('A-REQ', r.altReqNo, o.orderId))
+              ].join(''))
+              .join('')
+      }
+    </div>`;
+
   const orderCard = (o: SuperUserOrderRollup): string => {
     const plan = Math.max(1, o.plannedQty || o.receivedGrnQty || 1);
     const rcvdPct = Math.min(100, Math.round((o.receivedGrnQty / plan) * 100));
@@ -184,8 +213,6 @@ export function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): strin
     const wipPct = Math.min(100 - s5Pct - s4Pct, Math.round((wipOnly / plan) * 100));
     const altPct = Math.min(100 - s5Pct - s4Pct - wipPct, Math.round(((o.inAlterationQty + o.scrappedQty) / plan) * 100));
     const meta = [escapeHtml(o.buyer || ''), escapeHtml(o.article || ''), `${n(o.plannedQty)} pairs planned`].filter(Boolean).join(' · ');
-    const inspect = (ref?: string) =>
-      `data-su-action="inspect-order" data-order-id="${escapeHtml(o.orderId)}"${ref ? ` data-ref-code="${escapeHtml(ref)}"` : ''}`;
 
     return `
       <div class="su-vg-order">
@@ -216,26 +243,63 @@ export function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): strin
           <span class="su-vg-row-pct">${s5Pct}% S5</span>
         </div>
 
-        <div class="su-vg-chain">
-          ${renderRefTag('req', o.orderId)}${ARROW}
-          ${
-            o.grnBatches.length === 0
-              ? `<span class="su-ref-none">No GRNs</span>`
-              : o.grnBatches.map(g => renderRefTag('grn', `${g.grnCode} (${n(g.rcvdPairs)})`, inspect(g.grnCode))).join('')
-          }
-          ${ARROW}
-          ${
-            o.reqBatches.length === 0
-              ? `<span class="su-ref-none">No REQs</span>`
-              : o.reqBatches
-                  .map(r =>
-                    renderRefTag('req', r.reqNumber, inspect(r.reqNumber), `${escapeHtml(r.mreqNo)} | ${escapeHtml(r.altReqNo)} (${n(r.askingPairs)})`)
-                  )
-                  .join('')
-          }
-        </div>
+        ${renderOrderFlowChain(o)}
       </div>`;
   };
+
+  const renderTreeGroupCard = (group: OrderFlowTreeGroup): string => {
+    if (!group.isMultiSubOrder) {
+      return orderCard(group.orders[0]);
+    }
+    const plan = Math.max(1, group.plannedQty || group.receivedGrnQty || 1);
+    const grpRcvdPct = Math.min(100, Math.round((group.receivedGrnQty / plan) * 100));
+    const grpS5Pct = Math.min(100, Math.round((group.packedStage5Qty / plan) * 100));
+    const rootMeta = [
+      escapeHtml(group.buyer),
+      group.po ? `PO ${escapeHtml(group.po)}` : '',
+      `${n(group.plannedQty)} pairs planned`
+    ].filter(Boolean).join(' · ');
+
+    return `
+      <details class="su-tree-group" data-testid="su-order-tree-group" data-base-order="${escapeHtml(group.baseOrderId)}" open>
+        <summary class="su-tree-root">
+          <div class="su-tree-root-main">
+            <span class="su-tree-caret" aria-hidden="true"></span>
+            <span class="su-tree-root-id">${escapeHtml(group.baseOrderId)}</span>
+            <span class="su-tree-count">${group.orders.length} sub-orders</span>
+            <span class="su-vg-order-meta">${rootMeta}</span>
+          </div>
+          <div class="su-vg-order-actions">
+            <span class="su-badge ${group.reconciledAll ? 'su-badge-reconciled' : 'su-badge-variance'}">${group.reconciledAll ? 'RECONCILED &#10003;' : 'VARIANCE &Delta;'}</span>
+            <span class="su-tree-summary-pct">Rcvd ${grpRcvdPct}% &middot; S5 ${grpS5Pct}%</span>
+            <button type="button" class="table-btn su-vg-link" data-su-action="inspect-order" data-order-id="${escapeHtml(group.baseOrderId)}">Filter all</button>
+          </div>
+        </summary>
+        <ul class="su-tree-branches">
+          ${group.orders.map(o => {
+            const oPlan = Math.max(1, o.plannedQty || o.receivedGrnQty || 1);
+            const oRcvdPct = Math.min(100, Math.round((o.receivedGrnQty / oPlan) * 100));
+            const oS5Pct = Math.min(100, Math.round((o.packedStage5Qty / oPlan) * 100));
+            return `
+            <li class="su-tree-branch" data-sub-order="${escapeHtml(o.orderId)}">
+              <div class="su-tree-branch-head">
+                <div class="su-tree-branch-title">
+                  ${renderRefTag('req', o.orderId, inspect(o.orderId))}
+                  <span class="su-tree-branch-art">${escapeHtml(o.article)}${o.maker ? ` &middot; ${escapeHtml(o.maker)}` : ''} &middot; ${n(o.plannedQty)} prs</span>
+                </div>
+                <div class="su-tree-branch-meta">
+                  ${renderReconciliationBadge(o.reconciliation)}
+                  <span class="su-tree-branch-pct">Rcvd ${oRcvdPct}% &middot; S5 ${oS5Pct}%</span>
+                </div>
+              </div>
+              ${renderOrderFlowChain(o)}
+            </li>`;
+          }).join('')}
+        </ul>
+      </details>`;
+  };
+
+  const treeGroups = groupOrderRollupsForTree(s.orderRollups);
 
   return `
     <div class="su-vg">
@@ -250,10 +314,10 @@ export function renderDashboardVisualGraphs(s: SuperUserDashboardSummary): strin
       <section class="panel-card">
         <div class="panel-card-header">
           <div class="panel-card-title"><span>Order flow</span></div>
-          <span class="admin-meta-caption">1 order to N GRNs and N REQs</span>
+          <span class="admin-meta-caption">Order tree &middot; Parent &rarr; Sub-orders &rarr; GRNs &rarr; REQs</span>
         </div>
         <div class="su-vg-flow" tabindex="0" role="region" aria-label="Order flow">
-          ${s.orderRollups.length === 0 ? emptyFlow : s.orderRollups.map(orderCard).join('')}
+          ${treeGroups.length === 0 ? emptyFlow : treeGroups.map(renderTreeGroupCard).join('')}
         </div>
       </section>
     </div>

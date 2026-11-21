@@ -44,6 +44,10 @@ export function migrateLegacyRecordsToRelationalHierarchy(params: {
     date: string;
     pendingOrderId?: string;
     maker: string;
+    hallName?: string;
+    stitcherName?: string;
+    receivedFrom?: string;
+    receivingNote?: string;
     article: string;
     rcvdPairs: number;
     sizes?: SizeBreakdown;
@@ -58,6 +62,10 @@ export function migrateLegacyRecordsToRelationalHierarchy(params: {
     date: string;
     pendingOrderId: string;
     maker: string;
+    hallName?: string;
+    stitcherName?: string;
+    receivedFrom?: string;
+    receivingNote?: string;
     article: string;
     rcvdPairs: number;
     sizes: SizeBreakdown;
@@ -120,6 +128,10 @@ export function migrateLegacyRecordsToRelationalHierarchy(params: {
       date: g.date || formatCurrentDateDDMMYYYY(),
       pendingOrderId: targetOrderId,
       maker: g.maker || '---',
+      hallName: g.hallName || undefined,
+      stitcherName: g.stitcherName || undefined,
+      receivedFrom: g.receivedFrom || undefined,
+      receivingNote: g.receivingNote || undefined,
       article: g.article || '---',
       rcvdPairs: Number(g.rcvdPairs || 0),
       sizes: g.sizes ? { ...createEmptySizes(), ...g.sizes } : createEmptySizes(),
@@ -169,6 +181,10 @@ export function buildSuperUserOrderRollups(params: {
     date: string;
     pendingOrderId: string;
     maker: string;
+    hallName?: string;
+    stitcherName?: string;
+    receivedFrom?: string;
+    receivingNote?: string;
     article: string;
     rcvdPairs: number;
     sizes?: SizeBreakdown;
@@ -293,6 +309,10 @@ export function buildSuperUserOrderRollups(params: {
       orderId: ord.orderId,
       pendingOrderId: ord.orderId,
       maker: g.maker || ord.maker,
+      hallName: g.hallName || undefined,
+      stitcherName: g.stitcherName || undefined,
+      receivedFrom: g.receivedFrom || undefined,
+      receivingNote: g.receivingNote || undefined,
       article: g.article || ord.article,
       rcvdPairs: Number(g.rcvdPairs || 0),
       sizes: g.sizes || createEmptySizes(),
@@ -906,4 +926,77 @@ export function processAlterationCycle(params: {
     condemnedToScrapPairs: qty,
     contractorDebitPairs: next.contractorDebitPairs
   };
+}
+
+export interface ParsedOrderGroupKey {
+  baseOrderId: string;
+  subIndex: number | null;
+  isSubOrder: boolean;
+}
+
+export interface OrderFlowTreeGroup {
+  baseOrderId: string;
+  isMultiSubOrder: boolean;
+  buyer: string;
+  po: string;
+  orders: SuperUserOrderRollup[];
+  plannedQty: number;
+  receivedGrnQty: number;
+  issuedReqQty: number;
+  inFloorWipQty: number;
+  awaitingFinalQcQty: number;
+  inAlterationQty: number;
+  scrappedQty: number;
+  packedStage5Qty: number;
+  reconciledAll: boolean;
+}
+
+export function parseParentOrderGroupKey(orderId: string): ParsedOrderGroupKey {
+  const raw = String(orderId || '').trim();
+  const match = /^(ORD-\d{4}-\d+)-(\d+)$/i.exec(raw);
+  if (match) {
+    return {
+      baseOrderId: match[1].toUpperCase(),
+      subIndex: Number(match[2]),
+      isSubOrder: true
+    };
+  }
+  return { baseOrderId: raw, subIndex: null, isSubOrder: false };
+}
+
+export function groupOrderRollupsForTree(orderRollups: SuperUserOrderRollup[]): OrderFlowTreeGroup[] {
+  const byBase = new Map<string, SuperUserOrderRollup[]>();
+  const baseOrderKeys: string[] = [];
+  for (const ord of orderRollups) {
+    const parsed = parseParentOrderGroupKey(ord.orderId);
+    if (!byBase.has(parsed.baseOrderId)) {
+      byBase.set(parsed.baseOrderId, []);
+      baseOrderKeys.push(parsed.baseOrderId);
+    }
+    byBase.get(parsed.baseOrderId)!.push(ord);
+  }
+  return baseOrderKeys.map(baseOrderId => {
+    const list = (byBase.get(baseOrderId) || []).slice().sort((a, b) => {
+      const pa = parseParentOrderGroupKey(a.orderId).subIndex ?? 0;
+      const pb = parseParentOrderGroupKey(b.orderId).subIndex ?? 0;
+      return pa - pb;
+    });
+    const isMultiSubOrder = list.length > 1 || list.some(o => parseParentOrderGroupKey(o.orderId).isSubOrder);
+    return {
+      baseOrderId,
+      isMultiSubOrder,
+      buyer: list.find(o => o.buyer)?.buyer || '',
+      po: list.find(o => o.po && o.po !== '---')?.po || '',
+      orders: list,
+      plannedQty: list.reduce((s, o) => s + Number(o.plannedQty || 0), 0),
+      receivedGrnQty: list.reduce((s, o) => s + Number(o.receivedGrnQty || 0), 0),
+      issuedReqQty: list.reduce((s, o) => s + Number(o.issuedReqQty || 0), 0),
+      inFloorWipQty: list.reduce((s, o) => s + Number(o.inFloorWipQty || 0), 0),
+      awaitingFinalQcQty: list.reduce((s, o) => s + Number(o.awaitingFinalQcQty || 0), 0),
+      inAlterationQty: list.reduce((s, o) => s + Number(o.inAlterationQty || 0), 0),
+      scrappedQty: list.reduce((s, o) => s + Number(o.scrappedQty || 0), 0),
+      packedStage5Qty: list.reduce((s, o) => s + Number(o.packedStage5Qty || 0), 0),
+      reconciledAll: list.every(o => o.reconciliation?.isReconciled !== false)
+    };
+  });
 }

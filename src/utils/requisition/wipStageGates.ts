@@ -228,6 +228,20 @@ export interface ReconciliationResult {
   detail: string;
 }
 
+export interface HallStitcherItem {
+  id: number;
+  hallId: number;
+  name: string;
+  createdAt?: string;
+}
+
+export interface HallWithStitchers {
+  id: number;
+  name: string;
+  createdAt?: string;
+  stitchers: HallStitcherItem[];
+}
+
 export interface SuperUserGrnBatchItem {
   grnCode: string;
   orderBatchSeq: number;
@@ -236,6 +250,10 @@ export interface SuperUserGrnBatchItem {
   orderId: string;
   pendingOrderId: string;
   maker: string;
+  hallName?: string;
+  stitcherName?: string;
+  receivedFrom?: string;
+  receivingNote?: string;
   article: string;
   rcvdPairs: number;
   allocatedPairs: number;
